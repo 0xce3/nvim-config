@@ -37,6 +37,12 @@ return {
   {
     "nvim-tree/nvim-web-devicons",
     lazy = true,
+    config = function()
+      require("nvim-web-devicons").setup({
+        color_icons = false,
+        default = true,
+      })
+    end,
   },
 
   {
@@ -48,6 +54,18 @@ return {
       "MunifTanjim/nui.nvim",
     },
     config = function()
+      vim.api.nvim_set_hl(0, "NeoTreeGitAdded",       { fg = "#b8bb26" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitUntracked",   { fg = "#b8bb26" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitModified",    { fg = "#fe8019" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitUnstaged",    { fg = "#fe8019" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitStaged",      { fg = "#fe8019" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitIgnored",     { fg = "#928374" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitDeleted",     { fg = "#fb4934" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitConflict",    { fg = "#fb4934" })
+      vim.api.nvim_set_hl(0, "NeoTreeDirectoryIcon",  { fg = "#a89984" })
+      vim.api.nvim_set_hl(0, "NeoTreeDirectoryName",  { fg = "#ebdbb2" })
+      vim.api.nvim_set_hl(0, "NeoTreeFileIcon", { fg = "#a89984" })
+
       require("neo-tree").setup({
         close_if_last_window = true,
         window = {
@@ -65,15 +83,29 @@ return {
           },
         },
         default_component_configs = {
+          indent = {
+            indent_size = 2,
+            with_markers = false,
+            with_expanders = false,
+          },
+          icon = {
+            folder_closed = ">",
+            folder_open   = "v",
+            folder_empty  = ">",
+            default       = " ",
+          },
+          modified = {
+            symbol = "●",
+          },
           git_status = {
             symbols = {
               added     = "",
               modified  = "",
-              deleted   = "✖",
-              renamed   = "󰁕",
+              deleted   = "",
+              renamed   = "",
               untracked = "",
               ignored   = "",
-              unstaged  = "󰄱",
+              unstaged  = "",
               staged    = "",
               conflict  = "",
             },
@@ -113,6 +145,7 @@ return {
           globalstatus = true,
           component_separators = { left = "", right = "" },
           section_separators = { left = "", right = "" },
+
         },
         sections = {
           lualine_a = { "mode" },
