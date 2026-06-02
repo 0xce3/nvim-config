@@ -497,6 +497,7 @@ return {
         { "<leader>l", group = "lsp" },
         { "<leader>p", group = "pull request" },
         { "<leader>t", group = "tasks" },
+        { "<leader>w", group = "window" },
       })
     end,
   },
