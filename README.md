@@ -28,6 +28,17 @@ For local testing:
 ./install.sh --skip-packages
 ```
 
+## Required font
+
+Icons in neo-tree and the status line require a **Nerd Font** installed on the **Windows host** (not inside the container).
+
+1. Download **JetBrainsMono Nerd Font** from https://www.nerdfonts.com/font-downloads
+2. Extract the zip and install `JetBrainsMonoNerdFontMono-Regular.ttf` (right-click → Install for all users)
+3. Open Windows Terminal settings → select your WSL profile → Appearance → set font to `JetBrainsMono Nerd Font Mono`
+4. Restart Windows Terminal
+
+Without this font, icons appear as boxes or question marks.
+
 ## Windows and WSL launcher
 
 For Windows Terminal, WSL, Docker, and devcontainer session launching, use ShellHopper:
