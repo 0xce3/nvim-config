@@ -64,7 +64,10 @@ return {
       vim.api.nvim_set_hl(0, "NeoTreeGitConflict",    { fg = "#fb4934" })
       vim.api.nvim_set_hl(0, "NeoTreeDirectoryIcon",  { fg = "#a89984" })
       vim.api.nvim_set_hl(0, "NeoTreeDirectoryName",  { fg = "#ebdbb2" })
+      vim.api.nvim_set_hl(0, "NeoTreeRootName",       { fg = "#ebdbb2", bg = "#32302f", bold = true })
       vim.api.nvim_set_hl(0, "NeoTreeFileIcon", { fg = "#a89984" })
+
+      local neo_tree_components = require("neo-tree.sources.common.components")
 
       require("neo-tree").setup({
         close_if_last_window = true,
@@ -73,6 +76,25 @@ return {
           position = "left",
         },
         filesystem = {
+          components = {
+            name = function(config, node, state)
+              if node:get_depth() == 1 and node.type ~= "message" then
+                local name = vim.fn.fnamemodify(node.path or node.name, ":t")
+                if name == "" then
+                  name = node.name
+                end
+                if state.current_position == "current" and state.sort and state.sort.label == "Name" then
+                  local icon = state.sort.direction == 1 and "▲" or "▼"
+                  name = name .. "  " .. icon
+                end
+                return {
+                  text = name,
+                  highlight = "NeoTreeRootName",
+                }
+              end
+              return neo_tree_components.name(config, node, state)
+            end,
+          },
           filtered_items = {
             visible = true,
             hide_dotfiles = false,
