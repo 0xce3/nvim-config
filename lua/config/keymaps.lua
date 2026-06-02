@@ -57,3 +57,8 @@ map("t", "<c-h>", [[<cmd>wincmd h<cr>]], { desc = "Move left" })
 map("t", "<c-j>", [[<cmd>wincmd j<cr>]], { desc = "Move down" })
 map("t", "<c-k>", [[<cmd>wincmd k<cr>]], { desc = "Move up" })
 map("t", "<c-l>", [[<cmd>wincmd l<cr>]], { desc = "Move right" })
+
+map("n", "<c-h>", "<cmd>wincmd h<cr>", { desc = "Move left" })
+map("n", "<c-j>", "<cmd>wincmd j<cr>", { desc = "Move down" })
+map("n", "<c-k>", "<cmd>wincmd k<cr>", { desc = "Move up" })
+map("n", "<c-l>", "<cmd>wincmd l<cr>", { desc = "Move right" })
