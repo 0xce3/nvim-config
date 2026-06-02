@@ -482,4 +482,22 @@ return {
       })
     end,
   },
+
+  {
+    "folke/which-key.nvim",
+    event = "VeryLazy",
+    config = function()
+      require("which-key").setup({
+        delay = 500,
+      })
+      require("which-key").add({
+        { "<leader>d", group = "diagnostics" },
+        { "<leader>f", group = "find" },
+        { "<leader>g", group = "git" },
+        { "<leader>l", group = "lsp" },
+        { "<leader>p", group = "pull request" },
+        { "<leader>t", group = "tasks" },
+      })
+    end,
+  },
 }
