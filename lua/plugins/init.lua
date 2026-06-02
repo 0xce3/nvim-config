@@ -484,6 +484,10 @@ return {
   },
 
   {
+    "famiu/bufdelete.nvim",
+  },
+
+  {
     "folke/which-key.nvim",
     event = "VeryLazy",
     config = function()
