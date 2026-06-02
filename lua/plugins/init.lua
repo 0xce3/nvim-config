@@ -7,10 +7,30 @@ return {
         contrast = "soft",
         transparent_mode = false,
         terminal_colors = true,
+        overrides = {
+          PmenuSbar  = { bg = "#504945" },
+          PmenuThumb = { bg = "#928374" },
+        },
       })
 
       vim.o.background = "dark"
       vim.cmd.colorscheme("gruvbox")
+
+      -- Re-apply scrollbar highlights after gruvbox to prevent override
+      vim.api.nvim_create_autocmd("ColorScheme", {
+        pattern = "*",
+        callback = function()
+          vim.api.nvim_set_hl(0, "ScrollbarHandle",        { bg = "#504945", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarError",         { fg = "#fb4934", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarErrorHandle",   { fg = "#fb4934", bg = "#504945", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarWarn",          { fg = "#fabd2f", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarWarnHandle",    { fg = "#fabd2f", bg = "#504945", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarGitAdd",        { fg = "#b8bb26", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarGitAddHandle",  { fg = "#b8bb26", bg = "#504945", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarGitChange",     { fg = "#fabd2f", default = false })
+          vim.api.nvim_set_hl(0, "ScrollbarGitChangeHandle", { fg = "#fabd2f", bg = "#504945", default = false })
+        end,
+      })
     end,
   },
 
@@ -20,48 +40,65 @@ return {
   },
 
   {
-    "nvim-tree/nvim-tree.lua",
-    dependencies = { "nvim-tree/nvim-web-devicons" },
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-tree/nvim-web-devicons",
+      "MunifTanjim/nui.nvim",
+    },
     config = function()
-      require("nvim-tree").setup({
-        view = {
+      require("neo-tree").setup({
+        close_if_last_window = true,
+        window = {
           width = 34,
-          side = "left",
+          position = "left",
         },
-        renderer = {
-          group_empty = true,
-          highlight_git = true,
-          indent_markers = {
-            enable = true,
+        filesystem = {
+          filtered_items = {
+            visible = true,
+            hide_dotfiles = false,
+            hide_gitignored = false,
           },
-          icons = {
-            show = {
-              file = true,
-              folder = true,
-              folder_arrow = true,
-              git = true,
+          follow_current_file = {
+            enabled = true,
+          },
+        },
+        default_component_configs = {
+          git_status = {
+            symbols = {
+              added     = "",
+              modified  = "",
+              deleted   = "✖",
+              renamed   = "󰁕",
+              untracked = "",
+              ignored   = "",
+              unstaged  = "󰄱",
+              staged    = "",
+              conflict  = "",
             },
-          },
-        },
-        git = {
-          enable = true,
-          ignore = false,
-        },
-        filters = {
-          dotfiles = false,
-          git_ignored = false,
-        },
-        actions = {
-          open_file = {
-            quit_on_open = false,
           },
         },
       })
 
       vim.api.nvim_create_autocmd("VimEnter", {
         callback = function()
-          require("nvim-tree.api").tree.open()
+          require("neo-tree.command").execute({ action = "show" })
         end,
+      })
+    end,
+  },
+
+  {
+    "petertriho/nvim-scrollbar",
+    config = function()
+      require("scrollbar").setup({
+        handlers = {
+          cursor     = false,
+          diagnostic = true,
+          gitsigns   = false,
+          search     = false,
+        },
       })
     end,
   },
@@ -74,8 +111,8 @@ return {
         options = {
           theme = "gruvbox",
           globalstatus = true,
-          component_separators = "|",
-          section_separators = "",
+          component_separators = { left = "", right = "" },
+          section_separators = { left = "", right = "" },
         },
         sections = {
           lualine_a = { "mode" },
@@ -94,6 +131,7 @@ return {
     version = "*",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
+      local colors = require("gruvbox").palette
       require("bufferline").setup({
         options = {
           mode = "buffers",
@@ -104,11 +142,58 @@ return {
           always_show_bufferline = true,
           offsets = {
             {
-              filetype = "NvimTree",
+              filetype = "neo-tree",
               text = "Explorer",
               text_align = "left",
               separator = true,
             },
+          },
+        },
+        highlights = {
+          fill = {
+            bg = colors.dark0_soft,
+          },
+          background = {
+            bg = colors.dark0_soft,
+          },
+          buffer_visible = {
+            bg = colors.dark0_soft,
+          },
+          buffer_selected = {
+            bg = colors.dark1,
+            bold = true,
+            italic = false,
+          },
+          tab = {
+            bg = colors.dark0_soft,
+          },
+          tab_selected = {
+            bg = colors.dark1,
+            bold = true,
+          },
+          tab_separator = {
+            bg = colors.dark0_soft,
+            fg = colors.dark2,
+          },
+          tab_separator_selected = {
+            bg = colors.dark1,
+            fg = colors.dark2,
+          },
+          separator = {
+            bg = colors.dark0_soft,
+            fg = colors.dark2,
+          },
+          separator_visible = {
+            bg = colors.dark0_soft,
+            fg = colors.dark2,
+          },
+          separator_selected = {
+            bg = colors.dark1,
+            fg = colors.dark2,
+          },
+          offset_separator = {
+            bg = colors.dark0_soft,
+            fg = colors.dark2,
           },
         },
       })
@@ -124,6 +209,27 @@ return {
         size = 15,
         open_mapping = [[<F12>]],
       })
+    end,
+  },
+
+  {
+    "stevearc/overseer.nvim",
+    opts = {
+      task_list = {
+        direction = "bottom",
+        min_height = 10,
+        max_height = 20,
+      },
+    },
+    config = function(_, opts)
+      local overseer = require("overseer")
+      overseer.setup(opts)
+
+      local map = vim.keymap.set
+      map("n", "<leader>tr", "<cmd>OverseerRun<cr>", { desc = "Run task" })
+      map("n", "<leader>tt", "<cmd>OverseerToggle<cr>", { desc = "Toggle tasks" })
+      map("n", "<leader>ta", "<cmd>OverseerTaskAction<cr>", { desc = "Task action" })
+      map("n", "<leader>ts", "<cmd>OverseerShell<cr>", { desc = "Run shell task" })
     end,
   },
 
@@ -290,12 +396,22 @@ return {
     "neovim/nvim-lspconfig",
     config = function()
       local function find_compile_commands_dir()
+        local configured_dir = vim.env.NVIM_CLANGD_COMPILE_COMMANDS_DIR
+        if configured_dir and configured_dir ~= "" then
+          local configured_path = configured_dir .. "/compile_commands.json"
+          if vim.fn.filereadable(configured_path) == 1 then
+            return configured_dir
+          end
+        end
+
         local candidates = {
-          "build",
-          "build/debug",
-          "build_native_clang_debug",
+          "main_app/build_native_clang",
+          "main_app/build_native_gcc",
           "main_app/build",
           "main_app/build_native_clang_debug",
+          "build_native_clang_debug",
+          "build",
+          "build/debug",
         }
 
         for _, dir in ipairs(candidates) do
