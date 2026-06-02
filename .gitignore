@@ -1,0 +1,11 @@
+.DS_Store
+*.log
+
+# Keep plugin downloads, LSP state, swap files, and editor caches out of the repo.
+.cache/
+lazy/
+site/
+state/
+swap/
+shada/
+
