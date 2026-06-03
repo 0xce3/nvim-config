@@ -286,6 +286,26 @@ return {
       "nvim-telescope/telescope.nvim",
     },
     config = function()
+      local function find_task_root()
+        local cwd = vim.uv.cwd()
+        if vim.fn.executable("west") == 1 and vim.system({ "west", "topdir" }, { cwd = cwd }):wait().code == 0 then
+          return cwd
+        end
+
+        local home_workspace = vim.fs.joinpath(vim.env.HOME or "", "west_workspace", vim.fn.fnamemodify(cwd, ":t"))
+        if vim.fn.isdirectory(home_workspace) == 1
+            and vim.fn.executable("west") == 1
+            and vim.system({ "west", "topdir" }, { cwd = home_workspace }):wait().code == 0 then
+          return home_workspace
+        end
+
+        local matches = vim.fs.find({ ".vscode", ".git", ".west" }, { upward = true, path = cwd })
+        if #matches == 0 then
+          return cwd
+        end
+        return vim.fs.dirname(matches[1])
+      end
+
       local function decode_jsonc(text)
         local out = {}
         local i = 1
@@ -334,6 +354,17 @@ return {
         local without_comments = table.concat(out)
         local without_trailing_commas = without_comments:gsub(",%s*([}%]])", "%1")
         return vim.json.decode(without_trailing_commas)
+      end
+
+      local task_root = find_task_root()
+      local vstask_job = require("vstask.Job")
+      local clean_command = vstask_job.clean_command
+      vstask_job.clean_command = function(command, options)
+        local cleaned = clean_command(command, options)
+        if type(options) == "table" and type(options.cwd) == "string" then
+          return cleaned
+        end
+        return "cd " .. vim.fn.shellescape(task_root) .. " && " .. cleaned
       end
 
       require("vstask").setup({
