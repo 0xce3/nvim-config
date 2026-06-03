@@ -174,21 +174,25 @@ return {
           end
 
           local editor_windows = 0
-          local neo_tree_open = false
+          local neo_tree_windows = {}
           for _, win in ipairs(vim.api.nvim_list_wins()) do
             local config = vim.api.nvim_win_get_config(win)
             if config.relative == "" then
               local buf = vim.api.nvim_win_get_buf(win)
               if vim.bo[buf].filetype == "neo-tree" then
-                neo_tree_open = true
+                table.insert(neo_tree_windows, win)
               else
                 editor_windows = editor_windows + 1
               end
             end
           end
 
-          if neo_tree_open and editor_windows == 1 then
-            require("neo-tree.command").execute({ action = "close" })
+          if #neo_tree_windows > 0 and editor_windows == 1 then
+            for _, win in ipairs(neo_tree_windows) do
+              if vim.api.nvim_win_is_valid(win) then
+                pcall(vim.api.nvim_win_close, win, true)
+              end
+            end
           end
         end,
       })
