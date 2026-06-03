@@ -10,6 +10,9 @@ return {
         overrides = {
           PmenuSbar  = { bg = "#504945" },
           PmenuThumb = { bg = "#928374" },
+          Search     = { fg = "#ebdbb2", bg = "#504945" },
+          IncSearch  = { fg = "#282828", bg = "#fabd2f" },
+          CurSearch  = { fg = "#282828", bg = "#fabd2f" },
         },
       })
 
