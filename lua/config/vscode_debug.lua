@@ -6,14 +6,22 @@ end
 
 function M.find_task_root()
   local cwd = vim.uv.cwd()
+  local project_name = vim.fn.fnamemodify(cwd, ":t")
+
+  local west_ws = vim.env.WEST_WORKSPACE
+  if west_ws and west_ws ~= "" then
+    local ws_project = vim.fs.joinpath(west_ws, project_name)
+    if vim.fn.isdirectory(ws_project) == 1 then
+      return ws_project
+    end
+  end
+
   if vim.fn.executable("west") == 1 and vim.system({ "west", "topdir" }, { cwd = cwd }):wait().code == 0 then
     return cwd
   end
 
-  local home_workspace = vim.fs.joinpath(vim.env.HOME or "", "west_workspace", vim.fn.fnamemodify(cwd, ":t"))
-  if vim.fn.isdirectory(home_workspace) == 1
-      and vim.fn.executable("west") == 1
-      and vim.system({ "west", "topdir" }, { cwd = home_workspace }):wait().code == 0 then
+  local home_workspace = vim.fs.joinpath(vim.env.HOME or "", "west_workspace", project_name)
+  if vim.fn.isdirectory(home_workspace) == 1 then
     return home_workspace
   end
 
@@ -254,25 +262,29 @@ function M.run_launch(name)
   local config = M.build_dap_config(launch, task_root)
 
   check_tcp(host, port, function(open)
-    if open then
-      dap.run(config)
-      return
-    end
-
-    if type(launch.preLaunchTask) == "string" then
-      notify("Starting " .. launch.preLaunchTask)
-      if not run_vscode_task(launch.preLaunchTask) then
+    vim.schedule(function()
+      if open then
+        dap.run(config)
         return
       end
-    end
 
-    notify("Waiting for gdbserver on " .. launch.miDebuggerServerAddress)
-    wait_for_tcp(host, port, 90000, function(ready)
-      if not ready then
-        notify("gdbserver did not open " .. launch.miDebuggerServerAddress, vim.log.levels.ERROR)
-        return
+      if type(launch.preLaunchTask) == "string" then
+        notify("Starting " .. launch.preLaunchTask)
+        if not run_vscode_task(launch.preLaunchTask) then
+          return
+        end
       end
-      dap.run(config)
+
+      notify("Waiting for gdbserver on " .. launch.miDebuggerServerAddress)
+      wait_for_tcp(host, port, 90000, function(ready)
+        vim.schedule(function()
+          if not ready then
+            notify("gdbserver did not open " .. launch.miDebuggerServerAddress, vim.log.levels.ERROR)
+            return
+          end
+          dap.run(config)
+        end)
+      end)
     end)
   end)
 end

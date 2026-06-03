@@ -31,6 +31,11 @@ opt.listchars = { tab = "  ", trail = ".", nbsp = "+" }
 
 opt.hidden = true
 
+-- bash -ic: interactive flag makes $- contain 'i', so ~/.bashrc runs fully
+-- (the default .bashrc guard "case $- in *i*)" requires this)
+opt.shell = "bash"
+opt.shellcmdflag = "-ic"
+
 vim.cmd("syntax enable")
 vim.cmd("filetype plugin indent on")
 

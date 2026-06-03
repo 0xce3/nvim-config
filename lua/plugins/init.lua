@@ -242,10 +242,6 @@ return {
           show_close_icon = false,
           show_buffer_close_icons = true,
           always_show_bufferline = true,
-          custom_filter = function(bufnr)
-            local name = vim.api.nvim_buf_get_name(bufnr)
-            return not name:match("Task: ")
-          end,
           offsets = {
             {
               filetype = "neo-tree",
@@ -319,7 +315,6 @@ return {
         direction = "horizontal",
         size = 15,
         open_mapping = [[<F12>]],
-        shell = "bash -l",
       })
     end,
   },
@@ -334,14 +329,23 @@ return {
     config = function()
       local function find_task_root()
         local cwd = vim.uv.cwd()
+        local project_name = vim.fn.fnamemodify(cwd, ":t")
+
+        -- Prefer WEST_WORKSPACE env var (set in devcontainer) to avoid /workspaces path
+        local west_ws = vim.env.WEST_WORKSPACE
+        if west_ws and west_ws ~= "" then
+          local ws_project = vim.fs.joinpath(west_ws, project_name)
+          if vim.fn.isdirectory(ws_project) == 1 then
+            return ws_project
+          end
+        end
+
         if vim.fn.executable("west") == 1 and vim.system({ "west", "topdir" }, { cwd = cwd }):wait().code == 0 then
           return cwd
         end
 
-        local home_workspace = vim.fs.joinpath(vim.env.HOME or "", "west_workspace", vim.fn.fnamemodify(cwd, ":t"))
-        if vim.fn.isdirectory(home_workspace) == 1
-            and vim.fn.executable("west") == 1
-            and vim.system({ "west", "topdir" }, { cwd = home_workspace }):wait().code == 0 then
+        local home_workspace = vim.fs.joinpath(vim.env.HOME or "", "west_workspace", project_name)
+        if vim.fn.isdirectory(home_workspace) == 1 then
           return home_workspace
         end
 
@@ -431,6 +435,8 @@ return {
         return build_launch(command, expanded_args)
       end
 
+      local pyenv_activate = (vim.env.VIRTUAL_ENV or "/home/user/west_workspace/.pyEnv") .. "/bin/activate"
+
       local clean_command = vstask_job.clean_command
       vstask_job.clean_command = function(command, options)
         local cleaned = expand_vscode_vars(clean_command(command, options))
@@ -443,37 +449,82 @@ return {
             cleaned = table.concat(exports, "; ") .. "; " .. cleaned
           end
         end
+        local activate = ". " .. vim.fn.shellescape(pyenv_activate) .. " 2>/dev/null"
         if type(options) == "table" and type(options.cwd) == "string" then
-          return cleaned
+          return activate .. " && { " .. cleaned .. "; }"
         end
-        return "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
+        return activate .. " && cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
       end
 
-      local function focus_task_window()
-        local target_win = nil
-        local target_width = 0
+      local task_terminals = {}
 
-        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-          local buf = vim.api.nvim_win_get_buf(win)
-          local filetype = vim.bo[buf].filetype
-          local width = vim.api.nvim_win_get_width(win)
-          if filetype ~= "neo-tree" and width > target_width then
-            target_win = win
-            target_width = width
-          end
-        end
-
-        if target_win ~= nil then
-          vim.api.nvim_set_current_win(target_win)
-        end
-      end
-
-      local start_job = vstask_job.start_job
       vstask_job.start_job = function(opts)
-        if opts == nil or opts.terminal ~= false then
-          focus_task_window()
+        if opts == nil or opts.terminal == false then
+          return
         end
-        start_job(opts)
+
+        local label = opts.label or "task"
+        local command = opts.command
+
+        local existing = task_terminals[label]
+        if existing then
+          pcall(function() existing:shutdown() end)
+          task_terminals[label] = nil
+        end
+
+        local Terminal = require("toggleterm.terminal").Terminal
+        local term = Terminal:new({
+          cmd = command,
+          direction = "horizontal",
+          close_on_exit = false,
+          display_name = label,
+          hidden = true,
+          on_exit = function(t, _, exit_code, _)
+            vim.schedule(function()
+              local icon = exit_code == 0 and "✓" or "✗"
+              vim.notify(
+                string.format("[%s] %s exited %d — press q to close terminal", icon, label, exit_code),
+                exit_code == 0 and vim.log.levels.INFO or vim.log.levels.WARN,
+                { title = "task" }
+              )
+              local bufnr = t.bufnr
+              if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+                vim.keymap.set("n", "q", function()
+                  t:close()
+                  task_terminals[label] = nil
+                end, { buffer = bufnr, nowait = true, silent = true, desc = "Close task terminal" })
+                vim.keymap.set("n", "<CR>", function()
+                  t:close()
+                  task_terminals[label] = nil
+                end, { buffer = bufnr, nowait = true, silent = true, desc = "Close task terminal" })
+              end
+            end)
+          end,
+        })
+        task_terminals[label] = term
+        term:open()
+      end
+
+      local function pick_terminal()
+        local terms = require("toggleterm.terminal").get_all(true)
+        if #terms == 0 then
+          vim.notify("No terminals open", vim.log.levels.INFO)
+          return
+        end
+        local items = {}
+        for _, t in ipairs(terms) do
+          table.insert(items, t)
+        end
+        vim.ui.select(items, {
+          prompt = "Switch terminal",
+          format_item = function(t)
+            return string.format("[%d] %s", t.id, t.display_name or ("Terminal " .. t.id))
+          end,
+        }, function(choice)
+          if choice then
+            choice:open()
+          end
+        end)
       end
 
       local function find_task_by_label(tasks, label)
@@ -517,7 +568,6 @@ return {
         cache_strategy = "last",
         config_dir = ".vscode",
         support_code_workspace = true,
-        terminal = "toggleterm",
         json_parser = decode_jsonc,
         telescope_keys = {
           vertical = "<C-v>",
@@ -528,22 +578,6 @@ return {
           watch_job = "<C-w>",
           kill_job = "<C-d>",
           run = "<C-r>",
-        },
-        term_opts = {
-          horizontal = {
-            direction = "horizontal",
-            size = "15",
-          },
-          vertical = {
-            direction = "vertical",
-            size = "80",
-          },
-          current = {
-            direction = "float",
-          },
-          tab = {
-            direction = "tab",
-          },
         },
       })
 
@@ -563,6 +597,7 @@ return {
       map("n", "<leader>ts", function()
         require("vstask").command()
       end, { desc = "Run shell task" })
+      map("n", "<leader>tj", pick_terminal, { desc = "Switch terminal" })
     end,
   },
 
@@ -834,7 +869,7 @@ return {
         { "<leader>l", group = "lsp" },
         { "<leader>p", group = "pull request" },
         { "<leader>q", group = "session" },
-        { "<leader>t", group = "tasks" },
+        { "<leader>t", group = "tasks/terminals" },
         { "<leader>w", group = "window" },
       })
     end,

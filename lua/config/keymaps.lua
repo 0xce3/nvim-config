@@ -1,7 +1,93 @@
 local map = vim.keymap.set
 
+local function is_replacement_buffer(bufnr, current)
+  if bufnr == current or bufnr < 1 or not vim.api.nvim_buf_is_valid(bufnr) then
+    return false
+  end
+
+  if not vim.bo[bufnr].buflisted or vim.bo[bufnr].filetype == "neo-tree" then
+    return false
+  end
+
+  return vim.bo[bufnr].buftype ~= "nofile"
+end
+
+local function replacement_buffer(current)
+  local alternate = vim.fn.bufnr("#")
+  if is_replacement_buffer(alternate, current) then
+    return alternate
+  end
+
+  local buffers = vim.fn.getbufinfo({ buflisted = 1 })
+  table.sort(buffers, function(left, right)
+    return (left.lastused or 0) > (right.lastused or 0)
+  end)
+
+  for _, buffer in ipairs(buffers) do
+    if is_replacement_buffer(buffer.bufnr, current) then
+      return buffer.bufnr
+    end
+  end
+
+  local scratch = vim.api.nvim_create_buf(false, true)
+  vim.bo[scratch].bufhidden = "wipe"
+  vim.bo[scratch].buftype = "nofile"
+  vim.bo[scratch].swapfile = false
+  return scratch
+end
+
+local function windows_showing_buffer(bufnr)
+  local windows = {}
+
+  for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+      if vim.api.nvim_win_get_config(win).relative == "" and vim.api.nvim_win_get_buf(win) == bufnr then
+        table.insert(windows, win)
+      end
+    end
+  end
+
+  return windows
+end
+
+local function close_current_buffer(force)
+  local current = vim.api.nvim_get_current_buf()
+
+  if vim.bo[current].filetype == "neo-tree" then
+    vim.notify("Neo-tree mit <leader>E schliessen.", vim.log.levels.INFO)
+    return
+  end
+
+  if vim.bo[current].modified and not force then
+    vim.notify("Buffer hat ungespeicherte Aenderungen. Nutze :BufferClose! oder <leader>X.", vim.log.levels.WARN)
+    return
+  end
+
+  local replacement = replacement_buffer(current)
+  for _, win in ipairs(windows_showing_buffer(current)) do
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_set_buf(win, replacement)
+    end
+  end
+
+  local ok, err = pcall(vim.api.nvim_buf_delete, current, { force = force })
+  if not ok then
+    vim.notify(err, vim.log.levels.ERROR)
+  end
+end
+
+vim.api.nvim_create_user_command("BufferClose", function(opts)
+  close_current_buffer(opts.bang)
+end, { bang = true, desc = "Close current buffer without closing the editor layout" })
+
+vim.api.nvim_create_user_command("Bd", function(opts)
+  close_current_buffer(opts.bang)
+end, { bang = true, desc = "Close current buffer without closing the editor layout" })
+
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })
 map("n", "<esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
+map("n", "<leader>x", "<cmd>BufferClose<cr>", { desc = "Close buffer" })
+map("n", "<leader>X", "<cmd>BufferClose!<cr>", { desc = "Force close buffer" })
 
 map("n", "<leader>e", "<cmd>Neotree toggle<cr>", { desc = "Toggle file explorer" })
 map("n", "<leader>gg", "<cmd>Git<cr>", { desc = "Open Git status" })
