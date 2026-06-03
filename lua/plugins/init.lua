@@ -182,26 +182,6 @@ return {
   },
 
   {
-    "stevearc/dressing.nvim",
-    event = "VeryLazy",
-    opts = {
-      select = {
-        backend = { "telescope", "builtin" },
-        builtin = {
-          border = "rounded",
-          relative = "editor",
-          min_width = 60,
-          max_width = 100,
-          max_height = 22,
-        },
-      },
-      input = {
-        border = "rounded",
-      },
-    },
-  },
-
-  {
     "akinsho/bufferline.nvim",
     version = "*",
     dependencies = { "nvim-tree/nvim-web-devicons" },
@@ -288,23 +268,114 @@ return {
   },
 
   {
-    "stevearc/overseer.nvim",
-    opts = {
-      task_list = {
-        direction = "bottom",
-        min_height = 10,
-        max_height = 20,
-      },
+    "EthanJWright/vs-tasks.nvim",
+    dependencies = {
+      "nvim-lua/popup.nvim",
+      "nvim-lua/plenary.nvim",
+      "nvim-telescope/telescope.nvim",
     },
-    config = function(_, opts)
-      local overseer = require("overseer")
-      overseer.setup(opts)
+    config = function()
+      local function decode_jsonc(text)
+        local out = {}
+        local i = 1
+        local len = #text
+        local in_string = false
+        local quote = nil
+        local escaped = false
+
+        while i <= len do
+          local ch = text:sub(i, i)
+          local next_ch = text:sub(i + 1, i + 1)
+
+          if in_string then
+            table.insert(out, ch)
+            if escaped then
+              escaped = false
+            elseif ch == "\\" then
+              escaped = true
+            elseif ch == quote then
+              in_string = false
+              quote = nil
+            end
+            i = i + 1
+          elseif ch == '"' or ch == "'" then
+            in_string = true
+            quote = ch
+            table.insert(out, ch)
+            i = i + 1
+          elseif ch == "/" and next_ch == "/" then
+            i = i + 2
+            while i <= len and text:sub(i, i) ~= "\n" do
+              i = i + 1
+            end
+          elseif ch == "/" and next_ch == "*" then
+            i = i + 2
+            while i <= len and not (text:sub(i, i) == "*" and text:sub(i + 1, i + 1) == "/") do
+              i = i + 1
+            end
+            i = i + 2
+          else
+            table.insert(out, ch)
+            i = i + 1
+          end
+        end
+
+        local without_comments = table.concat(out)
+        local without_trailing_commas = without_comments:gsub(",%s*([}%]])", "%1")
+        return vim.json.decode(without_trailing_commas)
+      end
+
+      require("vstask").setup({
+        cache_json_conf = false,
+        cache_strategy = "last",
+        config_dir = ".vscode",
+        support_code_workspace = true,
+        terminal = "toggleterm",
+        json_parser = decode_jsonc,
+        telescope_keys = {
+          vertical = "<C-v>",
+          split = "<C-p>",
+          tab = "<C-t>",
+          current = "<CR>",
+          background = "<C-b>",
+          watch_job = "<C-w>",
+          kill_job = "<C-d>",
+          run = "<C-r>",
+        },
+        term_opts = {
+          horizontal = {
+            direction = "horizontal",
+            size = "15",
+          },
+          vertical = {
+            direction = "vertical",
+            size = "80",
+          },
+          current = {
+            direction = "float",
+          },
+          tab = {
+            direction = "tab",
+          },
+        },
+      })
 
       local map = vim.keymap.set
-      map("n", "<leader>tr", "<cmd>OverseerRun<cr>", { desc = "Run task" })
-      map("n", "<leader>tt", "<cmd>OverseerToggle<cr>", { desc = "Toggle tasks" })
-      map("n", "<leader>ta", "<cmd>OverseerTaskAction<cr>", { desc = "Task action" })
-      map("n", "<leader>ts", "<cmd>OverseerShell<cr>", { desc = "Run shell task" })
+      map("n", "<leader>tr", function()
+        require("vstask").tasks()
+      end, { desc = "Run VS Code task" })
+      map("n", "<leader>tt", function()
+        require("vstask").jobs()
+      end, { desc = "Show task jobs" })
+      map("n", "<leader>ti", function()
+        require("vstask").inputs()
+      end, { desc = "Set task inputs" })
+      map("n", "<leader>tl", function()
+        require("vstask").launches()
+      end, { desc = "Run launch config" })
+      map("n", "<leader>ts", function()
+        require("vstask").command()
+      end, { desc = "Run shell task" })
     end,
   },
 

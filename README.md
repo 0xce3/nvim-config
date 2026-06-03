@@ -54,22 +54,23 @@ Repository: https://github.com/0xce3/shell-hopper
 - GitHub PR interaction through `octo.nvim`
 - C/C++ highlighting and diagnostics through Treesitter and `clangd`
 - Git workflow through Fugitive and Gitsigns
-- VS Code task execution through `overseer.nvim`
+- VS Code task execution through `vs-tasks.nvim`
 - Integrated terminal through ToggleTerm
 
 ## Tasks
 
-Project tasks from `.vscode/tasks.json` are available in Neovim through Overseer:
+Project tasks from `.vscode/tasks.json` are available in Neovim through VS Tasks:
 
 ```vim
-:OverseerRun
+:lua require("vstask").tasks()
 ```
 
 Useful mappings:
 
-- `<leader>tr`: select and run a task
-- `<leader>tt`: toggle the task list
-- `<leader>ta`: run an action on a task
+- `<leader>tr`: select and run a VS Code task
+- `<leader>tt`: show running and completed task jobs
+- `<leader>ti`: edit task input variables
+- `<leader>tl`: run a launch configuration
 - `<leader>ts`: run an ad-hoc shell task
 
 ## C/C++ compile commands
