@@ -206,6 +206,10 @@ return {
           show_close_icon = false,
           show_buffer_close_icons = true,
           always_show_bufferline = true,
+          custom_filter = function(bufnr)
+            local name = vim.api.nvim_buf_get_name(bufnr)
+            return not name:match("Task: ")
+          end,
           offsets = {
             {
               filetype = "neo-tree",
