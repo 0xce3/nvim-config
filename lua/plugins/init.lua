@@ -163,7 +163,17 @@ return {
 
       vim.api.nvim_create_autocmd("VimEnter", {
         callback = function()
-          require("neo-tree.command").execute({ action = "show" })
+          vim.schedule(function()
+            if vim.fn.exists(":Neotree") ~= 2 then
+              return
+            end
+
+            local current_win = vim.api.nvim_get_current_win()
+            pcall(require("neo-tree.command").execute, { action = "focus" })
+            if vim.api.nvim_win_is_valid(current_win) then
+              pcall(vim.api.nvim_set_current_win, current_win)
+            end
+          end)
         end,
       })
 
