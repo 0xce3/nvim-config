@@ -85,6 +85,27 @@ Inside the task picker:
 - `<C-t>`: run task in a new tab
 - `<C-b>`: run task in the background
 
+## Debugging
+
+Debugging uses `.vscode/launch.json` as the source of truth where possible. The native simulator workflow starts the existing VS Code pre-launch task, waits for the gdbserver on `127.0.0.1:4112`, then attaches through `nvim-dap`.
+
+Useful mappings:
+
+- `<F5>`: start `Debug native_sim (Clang)` or continue an active debug session
+- `<F9>`: toggle breakpoint
+- `<F10>`: step over
+- `<F11>`: step into
+- `<S-F11>`: step out
+- `<leader>dn`: start `Debug native_sim (Clang)`
+- `<leader>du`: toggle debug UI
+- `<leader>dr`: open debug REPL
+
+The first start installs the C/C++ debug adapter through Mason (`cpptools`). If the adapter is not ready yet, run:
+
+```vim
+:MasonInstall cpptools
+```
+
 ## C/C++ compile commands
 
 `clangd` automatically uses the first existing `compile_commands.json` from common build directories. To force a specific build directory:

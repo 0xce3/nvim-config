@@ -392,6 +392,12 @@ return {
       end
 
       local task_root = find_task_root()
+      if vim.env.PROJECT_ROOT == nil or vim.env.PROJECT_ROOT == "" then
+        vim.env.PROJECT_ROOT = task_root
+      end
+      if vim.env.WORKSPACE_FOLDER == nil or vim.env.WORKSPACE_FOLDER == "" then
+        vim.env.WORKSPACE_FOLDER = task_root
+      end
       local vstask_job = require("vstask.Job")
       local vstask_parse = require("vstask.Parse")
       local function expand_vscode_vars(value)
@@ -546,6 +552,43 @@ return {
       map("n", "<leader>ts", function()
         require("vstask").command()
       end, { desc = "Run shell task" })
+    end,
+  },
+
+  {
+    "williamboman/mason.nvim",
+    config = function()
+      require("mason").setup()
+    end,
+  },
+
+  {
+    "WhoIsSethDaniel/mason-tool-installer.nvim",
+    dependencies = { "williamboman/mason.nvim" },
+    config = function()
+      require("mason-tool-installer").setup({
+        ensure_installed = {
+          "cpptools",
+        },
+        auto_update = false,
+        run_on_start = true,
+      })
+    end,
+  },
+
+  {
+    "mfussenegger/nvim-dap",
+    dependencies = {
+      "rcarriga/nvim-dap-ui",
+      "theHamsta/nvim-dap-virtual-text",
+      "nvim-neotest/nvim-nio",
+      "EthanJWright/vs-tasks.nvim",
+      "williamboman/mason.nvim",
+      "WhoIsSethDaniel/mason-tool-installer.nvim",
+    },
+    config = function()
+      require("nvim-dap-virtual-text").setup()
+      require("config.vscode_debug").setup()
     end,
   },
 
@@ -778,7 +821,7 @@ return {
         delay = 500,
       })
       require("which-key").add({
-        { "<leader>d", group = "diagnostics" },
+        { "<leader>d", group = "debug/diagnostics" },
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
         { "<leader>l", group = "lsp" },
