@@ -182,6 +182,26 @@ return {
   },
 
   {
+    "stevearc/dressing.nvim",
+    event = "VeryLazy",
+    opts = {
+      select = {
+        backend = { "telescope", "builtin" },
+        builtin = {
+          border = "rounded",
+          relative = "editor",
+          min_width = 60,
+          max_width = 100,
+          max_height = 22,
+        },
+      },
+      input = {
+        border = "rounded",
+      },
+    },
+  },
+
+  {
     "akinsho/bufferline.nvim",
     version = "*",
     dependencies = { "nvim-tree/nvim-web-devicons" },
