@@ -161,30 +161,87 @@ local function find_task_by_label(tasks, label)
   return nil
 end
 
+local function build_task_cmd(task, tasks, job)
+  local commands = {}
+  local deps = type(task.dependsOn) == "string" and { task.dependsOn } or task.dependsOn or {}
+  for _, dep_label in ipairs(deps) do
+    local dep = find_task_by_label(tasks, dep_label)
+    if dep then
+      table.insert(commands, job.clean_command(dep.command, dep.options))
+    end
+  end
+  if task.command then
+    table.insert(commands, job.clean_command(task.command, task.options))
+  end
+  return table.concat(commands, " && ")
+end
+
 local function run_vscode_task(label)
+  local SIM_TRIGGER = (vim.env.WEST_WORKSPACE or "/home/user/west_workspace")
+    .. "/qmx63_firmware_main/.shellhopper-sim-trigger"
   local parse = require("vstask.Parse")
-  local job = require("vstask.Job")
+  local job   = require("vstask.Job")
   local tasks = parse.Tasks()
-  local task = find_task_by_label(tasks, label)
+  local task  = find_task_by_label(tasks, label)
 
   if task == nil then
     notify("VS Code task not found: " .. label, vim.log.levels.ERROR)
     return false
   end
 
+  local cmd = build_task_cmd(task, tasks, job)
+  if cmd == "" then
+    notify("Empty command for task: " .. label, vim.log.levels.ERROR)
+    return false
+  end
+
+  -- Preferred path: write trigger file for the WSL shellhopper-sim-bridge.
+  -- The bridge process (running in WSL with Windows interop) picks this up
+  -- within ~300 ms and opens a new Windows Terminal tab running the simulation.
+  local trigger_dir = vim.fn.fnamemodify(SIM_TRIGGER, ":h")
+  if vim.fn.isdirectory(trigger_dir) == 1 then
+    local f = io.open(SIM_TRIGGER, "w")
+    if f then
+      local ok, err = f:write(cmd)
+      f:close()
+      if ok then
+        notify("Starting " .. label .. " in new terminal tab…")
+        return true
+      else
+        notify("Failed to write trigger: " .. tostring(err), vim.log.levels.WARN)
+      end
+    end
+  end
+
+  -- Fallback A: outer tmux window (when running inside tmux without shellhopper bridge)
+  if vim.env.TMUX then
+    local tmpfile = vim.fn.tempname() .. ".sh"
+    local tf = io.open(tmpfile, "w")
+    if tf then
+      tf:write("#!/bin/bash\n" .. cmd .. "\n")
+      tf:close()
+      os.execute("chmod +x " .. vim.fn.shellescape(tmpfile))
+      local win_name = label:gsub("[%(%)%s]+", "-"):lower():sub(1, 20)
+      vim.fn.system(string.format("tmux new-window -n %s %s",
+        vim.fn.shellescape(win_name), vim.fn.shellescape(tmpfile)))
+      vim.defer_fn(function() os.remove(tmpfile) end, 30000)
+      return true
+    end
+  end
+
+  -- Fallback B: toggleterm inside nvim
   if task.dependsOn ~= nil then
     job.run_dependent_tasks(task, tasks)
   else
     job.start_job({
-      label = task.label,
-      command = job.clean_command(task.command, task.options),
-      silent = false,
-      watch = false,
-      terminal = true,
+      label     = task.label,
+      command   = cmd,
+      silent    = false,
+      watch     = false,
+      terminal  = true,
       direction = "horizontal",
     })
   end
-
   return true
 end
 
@@ -302,10 +359,32 @@ function M.setup()
   local dapui = require("dapui")
   local stopped_sessions = {}
 
-  dapui.setup()
+  dapui.setup({
+    layouts = {
+      {
+        elements = {
+          { id = "scopes",      size = 0.40 },
+          { id = "stacks",      size = 0.35 },
+          { id = "breakpoints", size = 0.15 },
+          { id = "watches",     size = 0.10 },
+        },
+        size = 40,
+        position = "left",
+      },
+      {
+        elements = {
+          { id = "repl",    size = 0.5 },
+          { id = "console", size = 0.5 },
+        },
+        size = 12,
+        position = "bottom",
+      },
+    },
+  })
 
+  -- Open only the side panel on start to leave bottom free for simulation terminal
   dap.listeners.after.event_initialized["dapui_config"] = function()
-    dapui.open()
+    dapui.open({ layout = 1, reset = true })
   end
   dap.listeners.before.event_terminated["dapui_config"] = function()
     dapui.close()
