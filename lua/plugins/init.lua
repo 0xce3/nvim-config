@@ -177,36 +177,6 @@ return {
         end,
       })
 
-      vim.api.nvim_create_autocmd("QuitPre", {
-        callback = function()
-          if vim.bo.filetype == "neo-tree" then
-            return
-          end
-
-          local editor_windows = 0
-          local neo_tree_windows = {}
-          for _, win in ipairs(vim.api.nvim_list_wins()) do
-            local config = vim.api.nvim_win_get_config(win)
-            if config.relative == "" then
-              local buf = vim.api.nvim_win_get_buf(win)
-              if vim.bo[buf].filetype == "neo-tree" then
-                table.insert(neo_tree_windows, win)
-              else
-                editor_windows = editor_windows + 1
-              end
-            end
-          end
-
-          if #neo_tree_windows > 0 and editor_windows == 1 then
-            for _, win in ipairs(neo_tree_windows) do
-              if vim.api.nvim_win_is_valid(win) then
-                pcall(vim.api.nvim_win_close, win, true)
-              end
-            end
-          end
-        end,
-      })
-
       local function focus_project_explorer()
         require("neo-tree.command").execute({
           action = "focus",
@@ -349,6 +319,7 @@ return {
         direction = "horizontal",
         size = 15,
         open_mapping = [[<F12>]],
+        shell = "bash -l",
       })
     end,
   },
@@ -872,12 +843,33 @@ return {
   {
     "folke/persistence.nvim",
     event = "VimEnter",
-    opts = {
-      options = { "buffers", "curdir", "tabpages", "winsize" },
-    },
-    config = function(_, opts)
+    config = function()
       local persistence = require("persistence")
-      persistence.setup(opts)
+      vim.opt.sessionoptions = { "buffers", "curdir", "tabpages", "winsize" }
+      persistence.setup()
+
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "PersistenceSavePre",
+        callback = function()
+          vim.cmd("%argdel")
+
+          for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.bo[buf].filetype == "neo-tree" and vim.api.nvim_win_is_valid(win) then
+              pcall(vim.api.nvim_win_close, win, true)
+            end
+          end
+
+          for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            local name = vim.api.nvim_buf_get_name(buf)
+            local is_neotree = vim.bo[buf].filetype == "neo-tree" or name:match("^neo%-tree filesystem")
+            local is_dir = name ~= "" and vim.fn.isdirectory(name) == 1
+            if vim.api.nvim_buf_is_valid(buf) and (is_neotree or is_dir) then
+              pcall(vim.api.nvim_buf_delete, buf, { force = true })
+            end
+          end
+        end,
+      })
 
       if vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
         vim.schedule(function()
