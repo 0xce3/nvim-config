@@ -10,10 +10,10 @@ return {
         overrides = {
           PmenuSbar  = { bg = "#504945" },
           PmenuThumb = { bg = "#928374" },
-          Comment    = { fg = "#928374", bg = "NONE", italic = true },
-          String     = { fg = "#b8bb26", bg = "NONE", italic = true },
-          ["@comment"] = { fg = "#928374", bg = "NONE", italic = true },
-          ["@string"] = { fg = "#b8bb26", bg = "NONE", italic = true },
+          Comment    = { fg = "#928374", bg = "NONE", italic = false },
+          String     = { fg = "#b8bb26", bg = "NONE", italic = false },
+          ["@comment"] = { fg = "#928374", bg = "NONE", italic = false },
+          ["@string"] = { fg = "#b8bb26", bg = "NONE", italic = false },
           ["@string.special.path"] = { fg = "#b8bb26", bg = "NONE" },
           cIncluded  = { fg = "#b8bb26", bg = "NONE" },
           Search     = { fg = "#ebdbb2", bg = "#504945", reverse = false },
@@ -26,10 +26,26 @@ return {
       vim.o.background = "dark"
       vim.cmd.colorscheme("gruvbox")
 
+      local function apply_gruvbox_fixes()
+        vim.api.nvim_set_hl(0, "Comment", { fg = "#928374", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "String", { fg = "#b8bb26", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "@comment", { fg = "#928374", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "@string", { fg = "#b8bb26", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "@string.special.path", { fg = "#b8bb26", bg = "NONE", italic = false, underline = false })
+        vim.api.nvim_set_hl(0, "cIncluded", { fg = "#b8bb26", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "Search", { fg = "#ebdbb2", bg = "#504945", reverse = false })
+        vim.api.nvim_set_hl(0, "IncSearch", { fg = "#282828", bg = "#fabd2f", reverse = false })
+        vim.api.nvim_set_hl(0, "CurSearch", { fg = "#282828", bg = "#fabd2f", reverse = false })
+        vim.api.nvim_set_hl(0, "Visual", { bg = "#504945", reverse = false })
+      end
+
+      apply_gruvbox_fixes()
+
       -- Re-apply scrollbar highlights after gruvbox to prevent override
       vim.api.nvim_create_autocmd("ColorScheme", {
         pattern = "*",
         callback = function()
+          apply_gruvbox_fixes()
           vim.api.nvim_set_hl(0, "ScrollbarHandle",        { bg = "#504945", default = false })
           vim.api.nvim_set_hl(0, "ScrollbarError",         { fg = "#fb4934", default = false })
           vim.api.nvim_set_hl(0, "ScrollbarErrorHandle",   { fg = "#fb4934", bg = "#504945", default = false })
