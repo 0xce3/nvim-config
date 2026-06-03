@@ -96,7 +96,7 @@ return {
       local neo_tree_components = require("neo-tree.sources.common.components")
 
       require("neo-tree").setup({
-        close_if_last_window = true,
+        close_if_last_window = false,
         window = {
           width = 34,
           position = "left",
@@ -810,10 +810,6 @@ return {
   },
 
   {
-    "famiu/bufdelete.nvim",
-  },
-
-  {
     "folke/which-key.nvim",
     event = "VeryLazy",
     config = function()
@@ -826,9 +822,41 @@ return {
         { "<leader>g", group = "git" },
         { "<leader>l", group = "lsp" },
         { "<leader>p", group = "pull request" },
+        { "<leader>q", group = "session" },
         { "<leader>t", group = "tasks" },
         { "<leader>w", group = "window" },
       })
+    end,
+  },
+
+  {
+    "folke/persistence.nvim",
+    event = "VimEnter",
+    opts = {
+      options = { "buffers", "curdir", "tabpages", "winsize" },
+    },
+    config = function(_, opts)
+      local persistence = require("persistence")
+      persistence.setup(opts)
+
+      if vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
+        vim.schedule(function()
+          if vim.v.this_session == "" then
+            persistence.load()
+          end
+        end)
+      end
+
+      local map = vim.keymap.set
+      map("n", "<leader>qs", function()
+        persistence.load()
+      end, { desc = "Restore session" })
+      map("n", "<leader>ql", function()
+        persistence.load({ last = true })
+      end, { desc = "Restore last session" })
+      map("n", "<leader>qd", function()
+        persistence.stop()
+      end, { desc = "Do not save session" })
     end,
   },
 }

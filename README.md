@@ -62,6 +62,16 @@ Repository: https://github.com/0xce3/shell-hopper
 - `<leader>e`: open/focus Neo-tree at the project root
 - `<leader>E`: close Neo-tree
 
+## Sessions and closing
+
+Neovim keeps normal quit behavior: `:q` closes the current window and exits Neovim only when it is the last window. The close button in the buffer line closes a file buffer without letting Neo-tree close the whole editor as a side effect.
+
+Project sessions are saved automatically and restored when Neovim starts without explicit file arguments.
+
+- `<leader>qs`: restore the current project session
+- `<leader>ql`: restore the last session
+- `<leader>qd`: stop saving the current session
+
 ## Tasks
 
 Project tasks from `.vscode/tasks.json` are available in Neovim through VS Tasks:
