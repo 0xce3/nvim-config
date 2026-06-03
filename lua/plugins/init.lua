@@ -362,13 +362,43 @@ return {
 
       local task_root = find_task_root()
       local vstask_job = require("vstask.Job")
+      local vstask_parse = require("vstask.Parse")
+      local function expand_vscode_vars(value)
+        if type(value) ~= "string" then
+          return value
+        end
+        value = value:gsub("%${workspaceFolder}", task_root)
+        value = value:gsub("%${env:([^}]+)}", function(name)
+          return vim.env[name] or ""
+        end)
+        return value
+      end
+
+      local build_launch = vstask_parse.Build_launch
+      vstask_parse.Build_launch = function(command, args)
+        local expanded_args = {}
+        for _, arg in ipairs(args or {}) do
+          table.insert(expanded_args, expand_vscode_vars(arg))
+        end
+        return build_launch(command, expanded_args)
+      end
+
       local clean_command = vstask_job.clean_command
       vstask_job.clean_command = function(command, options)
-        local cleaned = clean_command(command, options)
+        local cleaned = expand_vscode_vars(clean_command(command, options))
+        if type(options) == "table" and type(options.env) == "table" then
+          local exports = {}
+          for key, value in pairs(options.env) do
+            table.insert(exports, "export " .. key .. "=" .. vim.fn.shellescape(expand_vscode_vars(value)))
+          end
+          if #exports > 0 then
+            cleaned = table.concat(exports, "; ") .. "; " .. cleaned
+          end
+        end
         if type(options) == "table" and type(options.cwd) == "string" then
           return cleaned
         end
-        return "cd " .. vim.fn.shellescape(task_root) .. " && " .. cleaned
+        return "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
       end
 
       local function focus_task_window()
