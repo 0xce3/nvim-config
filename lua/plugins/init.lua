@@ -167,6 +167,32 @@ return {
         end,
       })
 
+      vim.api.nvim_create_autocmd("QuitPre", {
+        callback = function()
+          if vim.bo.filetype == "neo-tree" then
+            return
+          end
+
+          local editor_windows = 0
+          local neo_tree_open = false
+          for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local config = vim.api.nvim_win_get_config(win)
+            if config.relative == "" then
+              local buf = vim.api.nvim_win_get_buf(win)
+              if vim.bo[buf].filetype == "neo-tree" then
+                neo_tree_open = true
+              else
+                editor_windows = editor_windows + 1
+              end
+            end
+          end
+
+          if neo_tree_open and editor_windows == 1 then
+            require("neo-tree.command").execute({ action = "close" })
+          end
+        end,
+      })
+
       local function focus_project_explorer()
         require("neo-tree.command").execute({
           action = "focus",

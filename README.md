@@ -64,7 +64,7 @@ Repository: https://github.com/0xce3/shell-hopper
 
 ## Sessions and closing
 
-Neovim keeps normal quit behavior: `:q` closes the current window and exits Neovim only when it is the last window. The close button in the buffer line closes a file buffer without letting Neo-tree close the whole editor as a side effect.
+Neovim keeps normal quit behavior for editor windows: `:q` closes the current editor window and exits Neovim when that would leave only Neo-tree behind. The close button in the buffer line closes a file buffer without letting Neo-tree close the whole editor as a side effect.
 
 Project sessions are saved automatically and restored when Neovim starts without explicit file arguments.
 
