@@ -367,6 +367,33 @@ return {
         return "cd " .. vim.fn.shellescape(task_root) .. " && " .. cleaned
       end
 
+      local function focus_task_window()
+        local target_win = nil
+        local target_width = 0
+
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local buf = vim.api.nvim_win_get_buf(win)
+          local filetype = vim.bo[buf].filetype
+          local width = vim.api.nvim_win_get_width(win)
+          if filetype ~= "neo-tree" and width > target_width then
+            target_win = win
+            target_width = width
+          end
+        end
+
+        if target_win ~= nil then
+          vim.api.nvim_set_current_win(target_win)
+        end
+      end
+
+      local start_job = vstask_job.start_job
+      vstask_job.start_job = function(opts)
+        if opts == nil or opts.terminal ~= false then
+          focus_task_window()
+        end
+        start_job(opts)
+      end
+
       require("vstask").setup({
         cache_json_conf = false,
         cache_strategy = "last",
