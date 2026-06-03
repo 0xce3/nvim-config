@@ -140,6 +140,17 @@ return {
           require("neo-tree.command").execute({ action = "show" })
         end,
       })
+
+      local function focus_project_explorer()
+        require("neo-tree.command").execute({
+          action = "focus",
+          source = "filesystem",
+          dir = vim.uv.cwd(),
+        })
+      end
+
+      vim.keymap.set("n", "<leader>e", focus_project_explorer, { desc = "Explorer project root" })
+      vim.keymap.set("n", "<leader>E", "<cmd>Neotree close<cr>", { desc = "Close explorer" })
     end,
   },
 

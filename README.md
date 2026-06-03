@@ -57,6 +57,11 @@ Repository: https://github.com/0xce3/shell-hopper
 - VS Code task execution through `vs-tasks.nvim`
 - Integrated terminal through ToggleTerm
 
+## Explorer
+
+- `<leader>e`: open/focus Neo-tree at the project root
+- `<leader>E`: close Neo-tree
+
 ## Tasks
 
 Project tasks from `.vscode/tasks.json` are available in Neovim through VS Tasks:
