@@ -398,6 +398,42 @@ return {
         start_job(opts)
       end
 
+      local function find_task_by_label(tasks, label)
+        for _, task in ipairs(tasks) do
+          if task.label == label then
+            return task
+          end
+        end
+        return nil
+      end
+
+      vstask_job.run_dependent_tasks = function(task, task_list)
+        local commands = {}
+        local deps = type(task.dependsOn) == "string" and { task.dependsOn } or task.dependsOn or {}
+
+        for _, dep_label in ipairs(deps) do
+          local dep_task = find_task_by_label(task_list, dep_label)
+          if dep_task == nil then
+            vim.notify("Dependent task not found: " .. dep_label, vim.log.levels.ERROR)
+            return
+          end
+          table.insert(commands, vstask_job.clean_command(dep_task.command, dep_task.options))
+        end
+
+        if task.command ~= nil then
+          table.insert(commands, vstask_job.clean_command(task.command, task.options))
+        end
+
+        vstask_job.start_job({
+          label = task.label,
+          command = table.concat(commands, " && "),
+          silent = false,
+          watch = false,
+          terminal = true,
+          direction = "horizontal",
+        })
+      end
+
       require("vstask").setup({
         cache_json_conf = false,
         cache_strategy = "last",
