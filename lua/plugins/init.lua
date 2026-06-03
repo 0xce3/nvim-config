@@ -334,9 +334,9 @@ return {
         json_parser = decode_jsonc,
         telescope_keys = {
           vertical = "<C-v>",
-          split = "<C-p>",
+          split = "<CR>",
           tab = "<C-t>",
-          current = "<CR>",
+          current = "<C-e>",
           background = "<C-b>",
           watch_job = "<C-w>",
           kill_job = "<C-d>",

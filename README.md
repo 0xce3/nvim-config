@@ -73,6 +73,13 @@ Useful mappings:
 - `<leader>tl`: run a launch configuration
 - `<leader>ts`: run an ad-hoc shell task
 
+Inside the task picker:
+
+- `<Enter>`: run task in a horizontal terminal split
+- `<C-v>`: run task in a vertical split
+- `<C-t>`: run task in a new tab
+- `<C-b>`: run task in the background
+
 ## C/C++ compile commands
 
 `clangd` automatically uses the first existing `compile_commands.json` from common build directories. To force a specific build directory:
