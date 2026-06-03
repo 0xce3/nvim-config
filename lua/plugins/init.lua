@@ -10,9 +10,16 @@ return {
         overrides = {
           PmenuSbar  = { bg = "#504945" },
           PmenuThumb = { bg = "#928374" },
-          Search     = { fg = "#ebdbb2", bg = "#504945" },
-          IncSearch  = { fg = "#282828", bg = "#fabd2f" },
-          CurSearch  = { fg = "#282828", bg = "#fabd2f" },
+          Comment    = { fg = "#928374", bg = "NONE", italic = true },
+          String     = { fg = "#b8bb26", bg = "NONE", italic = true },
+          ["@comment"] = { fg = "#928374", bg = "NONE", italic = true },
+          ["@string"] = { fg = "#b8bb26", bg = "NONE", italic = true },
+          ["@string.special.path"] = { fg = "#b8bb26", bg = "NONE" },
+          cIncluded  = { fg = "#b8bb26", bg = "NONE" },
+          Search     = { fg = "#ebdbb2", bg = "#504945", reverse = false },
+          IncSearch  = { fg = "#282828", bg = "#fabd2f", reverse = false },
+          CurSearch  = { fg = "#282828", bg = "#fabd2f", reverse = false },
+          Visual     = { bg = "#504945", reverse = false },
         },
       })
 
@@ -233,9 +240,14 @@ return {
             bg = colors.dark0_soft,
           },
           buffer_selected = {
+            fg = colors.light1,
             bg = colors.dark1,
             bold = true,
             italic = false,
+          },
+          modified_selected = {
+            fg = colors.bright_orange,
+            bg = colors.dark1,
           },
           tab = {
             bg = colors.dark0_soft,
