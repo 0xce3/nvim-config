@@ -307,9 +307,7 @@ git commit -m "feat: route sim preLaunchTask through shellhopper-sim-bridge trig
 When nvim is started via shellhopper (no outer tmux), writes the
 simulation command to a shared trigger file that the WSL bridge
 process picks up and opens in a new Windows Terminal tab.
-Falls back to tmux new-window or toggleterm if bridge unavailable.
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+Falls back to tmux new-window or toggleterm if bridge unavailable."
 ```
 
 - [ ] **Step 2: Push**

@@ -667,6 +667,113 @@ return {
     end,
   },
 
+  {
+    "nickjvandyke/opencode.nvim",
+    version = "*",
+    keys = {
+      {
+        "<leader>oa",
+        function()
+          require("opencode").ask("@this: ", { submit = true })
+        end,
+        mode = { "n", "x" },
+        desc = "Ask opencode",
+      },
+      {
+        "<leader>oo",
+        function()
+          require("opencode").select()
+        end,
+        mode = { "n", "x" },
+        desc = "Select opencode action",
+      },
+      {
+        "<leader>on",
+        function()
+          require("opencode").command("session.new")
+        end,
+        desc = "New opencode session",
+      },
+      {
+        "<leader>os",
+        function()
+          require("opencode").command("session.select")
+        end,
+        desc = "Select opencode session",
+      },
+      {
+        "<leader>ou",
+        function()
+          require("opencode").command("session.undo")
+        end,
+        desc = "Undo opencode change",
+      },
+      {
+        "<leader>or",
+        function()
+          require("opencode").command("session.redo")
+        end,
+        desc = "Redo opencode change",
+      },
+      {
+        "<leader>oi",
+        function()
+          require("opencode").command("session.interrupt")
+        end,
+        desc = "Interrupt opencode",
+      },
+      {
+        "<leader>op",
+        function()
+          require("opencode").command("prompt.submit")
+        end,
+        desc = "Submit opencode prompt",
+      },
+      {
+        "<leader>oc",
+        function()
+          require("opencode").command("prompt.clear")
+        end,
+        desc = "Clear opencode prompt",
+      },
+      {
+        "<leader>oU",
+        function()
+          require("opencode").command("session.half.page.up")
+        end,
+        desc = "Scroll opencode up",
+      },
+      {
+        "<leader>oD",
+        function()
+          require("opencode").command("session.half.page.down")
+        end,
+        desc = "Scroll opencode down",
+      },
+      {
+        "go",
+        function()
+          return require("opencode").operator("@this ")
+        end,
+        mode = { "n", "x" },
+        expr = true,
+        desc = "Add range to opencode",
+      },
+      {
+        "goo",
+        function()
+          return require("opencode").operator("@this ") .. "_"
+        end,
+        expr = true,
+        desc = "Add line to opencode",
+      },
+    },
+    init = function()
+      vim.g.opencode_opts = {}
+      vim.o.autoread = true
+    end,
+  },
+
   -- Fuzzy Finder
   {
     "nvim-telescope/telescope.nvim",
@@ -867,6 +974,7 @@ return {
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
         { "<leader>l", group = "lsp" },
+        { "<leader>o", group = "opencode" },
         { "<leader>p", group = "pull request" },
         { "<leader>q", group = "session" },
         { "<leader>t", group = "tasks/terminals" },

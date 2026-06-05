@@ -52,6 +52,7 @@ Repository: https://github.com/0xce3/shell-hopper
 ## Current focus
 
 - GitHub PR interaction through `octo.nvim`
+- AI-assisted editor workflow through `opencode.nvim`
 - C/C++ highlighting and diagnostics through Treesitter and `clangd`
 - Git workflow through Fugitive and Gitsigns
 - VS Code task execution through `vs-tasks.nvim`
@@ -64,7 +65,7 @@ Repository: https://github.com/0xce3/shell-hopper
 
 ## Sessions and closing
 
-Neovim keeps normal quit behavior for editor windows: `:q` closes the current editor window and exits Neovim when that would leave only Neo-tree behind. The close button in the buffer line closes a file buffer without letting Neo-tree close the whole editor as a side effect.
+Neovim keeps normal quit behavior for editor windows: `:q` closes the current window and `:qa` exits Neovim. To close the current file buffer while keeping the editor layout and Neo-tree open, use `:BufferClose`, `:Bd`, or `<leader>x`. Use `:BufferClose!`, `:Bd!`, or `<leader>X` to force-close a modified buffer.
 
 Project sessions are saved automatically and restored when Neovim starts without explicit file arguments.
 
@@ -94,6 +95,25 @@ Inside the task picker:
 - `<C-v>`: run task in a vertical split
 - `<C-t>`: run task in a new tab
 - `<C-b>`: run task in the background
+
+## opencode
+
+`opencode.nvim` connects Neovim to the `opencode` CLI. Install `opencode` in the devcontainer and run `:checkhealth opencode` if the integration does not start.
+
+Useful mappings:
+
+- `<leader>oa`: ask opencode with the current cursor or visual selection as context
+- `<leader>oo`: open the opencode action picker
+- `<leader>on`: start a new opencode session
+- `<leader>os`: select an opencode session
+- `<leader>ou`: undo the last opencode change
+- `<leader>or`: redo the last undone opencode change
+- `<leader>oi`: interrupt the current opencode request
+- `<leader>op`: submit the current opencode prompt
+- `<leader>oc`: clear the current opencode prompt
+- `<leader>oU` / `<leader>oD`: scroll the opencode TUI up or down
+- `go{motion}`: add a motion range to opencode
+- `goo`: add the current line to opencode
 
 ## Debugging
 
