@@ -657,7 +657,9 @@ return {
       "nvim-tree/nvim-web-devicons",
     },
     config = function()
-      require("octo").setup()
+      require("octo").setup({
+        use_local_fs = true,
+      })
 
       local map = vim.keymap.set
       map("n", "<leader>pr",  "<cmd>Octo pr list<cr>",     { desc = "List PRs" })
