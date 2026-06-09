@@ -690,7 +690,7 @@ return {
         desc = "Select opencode action",
       },
       {
-        "<leader>oh",
+        "<leader>h",
         function()
           vim.lsp.enable("opencode", true)
           vim.defer_fn(vim.lsp.buf.hover, 100)
