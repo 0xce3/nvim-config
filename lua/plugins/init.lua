@@ -1,137 +1,3 @@
-local function open_markdown_float(title, lines)
-  local width = math.min(math.floor(vim.o.columns * 0.82), 110)
-  local height = math.min(math.floor(vim.o.lines * 0.72), math.max(#lines + 2, 10))
-  local buf = vim.api.nvim_create_buf(false, true)
-
-  vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].buftype = "nofile"
-  vim.bo[buf].filetype = "markdown"
-  vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].modifiable = false
-
-  local win = vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    width = width,
-    height = height,
-    row = math.floor((vim.o.lines - height) / 2),
-    col = math.floor((vim.o.columns - width) / 2),
-    style = "minimal",
-    border = "rounded",
-    title = " " .. title .. " ",
-    title_pos = "center",
-  })
-
-  vim.wo[win].wrap = true
-  vim.wo[win].linebreak = true
-  vim.keymap.set("n", "<esc>", "<cmd>close<cr>", { buffer = buf, silent = true })
-  vim.keymap.set("n", "q", "<cmd>close<cr>", { buffer = buf, silent = true })
-end
-
-local function selected_text()
-  local mode = vim.fn.mode()
-  if mode ~= "v" and mode ~= "V" and mode ~= "\22" then
-    return nil
-  end
-
-  local start_pos = vim.fn.getpos("v")
-  local end_pos = vim.fn.getpos(".")
-  local start_line = math.min(start_pos[2], end_pos[2])
-  local end_line = math.max(start_pos[2], end_pos[2])
-  return table.concat(vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false), "\n")
-end
-
-local function opencode_context_prompt(question, context_text)
-  local filepath = vim.fn.expand("%:p")
-  local line = vim.fn.line(".")
-  local symbol = vim.fn.expand("<cword>")
-  local filetype = vim.bo.filetype ~= "" and vim.bo.filetype or "text"
-
-  return table.concat({
-    "You are answering a question about code from Neovim.",
-    "Answer concisely and directly. Do not edit files.",
-    "",
-    "Question:",
-    question,
-    "",
-    "Location:",
-    filepath .. ":" .. line,
-    "",
-    "Symbol under cursor:",
-    symbol ~= "" and symbol or "(none)",
-    "",
-    "Context:",
-    "```" .. filetype,
-    context_text,
-    "```",
-  }, "\n")
-end
-
-local function buffer_context()
-  local selection = selected_text()
-  if selection and selection ~= "" then
-    return selection
-  end
-
-  local cursor_line = vim.fn.line(".")
-  local start_line = math.max(cursor_line - 35, 1)
-  local end_line = math.min(cursor_line + 35, vim.api.nvim_buf_line_count(0))
-  return table.concat(vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false), "\n")
-end
-
-local function ask_opencode_telescope()
-  if vim.fn.executable("opencode") == 0 then
-    vim.notify(
-      "opencode CLI not found. Install it or add ~/.opencode/bin to PATH.",
-      vim.log.levels.ERROR,
-      { title = "opencode" }
-    )
-    return
-  end
-
-  local context_text = buffer_context()
-  local pickers = require("telescope.pickers")
-  local finders = require("telescope.finders")
-  local conf = require("telescope.config").values
-  local actions = require("telescope.actions")
-  local action_state = require("telescope.actions.state")
-
-  pickers.new({}, {
-    prompt_title = "Ask opencode",
-    finder = finders.new_table({ results = {} }),
-    sorter = conf.generic_sorter({}),
-    attach_mappings = function(prompt_bufnr)
-      local submit = function()
-        local question = action_state.get_current_line()
-        actions.close(prompt_bufnr)
-
-        if question == nil or question:gsub("%s+", "") == "" then
-          return
-        end
-
-        vim.notify("Asking opencode...", vim.log.levels.INFO, { title = "opencode" })
-        vim.system({ "opencode", "run", opencode_context_prompt(question, context_text) }, { text = true }, function(result)
-          vim.schedule(function()
-            if result.code ~= 0 then
-              open_markdown_float("opencode error", vim.split(result.stderr or result.stdout or "unknown error", "\n"))
-              return
-            end
-
-            local output = vim.trim(result.stdout or "")
-            if output == "" then
-              output = "(no response)"
-            end
-            open_markdown_float("opencode", vim.split(output, "\n"))
-          end)
-        end)
-      end
-
-      actions.select_default:replace(submit)
-      return true
-    end,
-  }):find()
-end
-
 return {
   {
     "ellisonleao/gruvbox.nvim",
@@ -824,29 +690,6 @@ return {
         desc = "Select opencode action",
       },
       {
-        "<leader>h",
-        function()
-          if vim.fn.executable("opencode") == 0 then
-            vim.notify(
-              "opencode CLI not found. Install it or add ~/.opencode/bin to PATH.",
-              vim.log.levels.ERROR,
-              { title = "opencode" }
-            )
-            return
-          end
-
-          vim.lsp.enable("opencode", true)
-          vim.defer_fn(vim.lsp.buf.hover, 100)
-        end,
-        desc = "Explain symbol with opencode",
-      },
-      {
-        "<leader>ha",
-        ask_opencode_telescope,
-        mode = { "n", "x" },
-        desc = "Ask opencode inline",
-      },
-      {
         "<leader>on",
         function()
           require("opencode").command("session.new")
@@ -928,11 +771,6 @@ return {
       },
     },
     init = function()
-      local opencode_bin = vim.fn.expand("~/.opencode/bin")
-      if vim.fn.isdirectory(opencode_bin) == 1 and not vim.env.PATH:find(opencode_bin, 1, true) then
-        vim.env.PATH = opencode_bin .. ":" .. vim.env.PATH
-      end
-
       vim.g.opencode_opts = {}
       vim.o.autoread = true
     end,
