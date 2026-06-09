@@ -920,6 +920,14 @@ return {
     branch = "master",
     build = ":TSUpdate",
     config = function()
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "markdown", "markdown_inline" },
+        callback = function(event)
+          pcall(vim.treesitter.stop, event.buf)
+        end,
+        desc = "Disable Treesitter for Markdown conceal queries",
+      })
+
       require("nvim-treesitter.configs").setup({
         ensure_installed = {
           "c",
@@ -934,6 +942,7 @@ return {
         },
         highlight = {
           enable = true,
+          disable = { "markdown", "markdown_inline" },
         },
         indent = {
           enable = true,
