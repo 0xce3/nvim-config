@@ -779,11 +779,7 @@ return {
       },
     },
     init = function()
-      vim.g.opencode_opts = {
-        lsp = {
-          enabled = true,
-        },
-      }
+      vim.g.opencode_opts = {}
       vim.o.autoread = true
     end,
   },
