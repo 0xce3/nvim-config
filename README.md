@@ -59,7 +59,7 @@ Repository: https://github.com/0xce3/shell-hopper
 
 - GitHub PR interaction through `octo.nvim`
 - AI-assisted editor workflow through `opencode.nvim`
-- C/C++ highlighting and diagnostics through Treesitter and `clangd`
+- C/C++ highlighting, diagnostics, and format-on-save through Treesitter, `clangd`, and `clang-format`
 - Git workflow through Fugitive and Gitsigns
 - VS Code task execution through `vs-tasks.nvim`
 - Integrated terminal through ToggleTerm
@@ -72,6 +72,10 @@ Repository: https://github.com/0xce3/shell-hopper
 ## Sessions and closing
 
 Neovim keeps normal quit behavior for editor windows: `:q` closes the current window and `:qa` exits Neovim. To close the current file buffer while keeping the editor layout and Neo-tree open, use `:BufferClose`, `:Bd`, or `<leader>x`. Use `:BufferClose!`, `:Bd!`, or `<leader>X` to force-close a modified buffer.
+
+## Formatting
+
+Buffers are formatted before save. C/C++ files use `clang-format`; other attached LSP clients may format through `vim.lsp.buf.format()`. Run `:Format` to format the current buffer manually.
 
 Project sessions are saved automatically and restored when Neovim starts without explicit file arguments.
 

@@ -84,6 +84,76 @@ vim.api.nvim_create_user_command("Bd", function(opts)
   close_current_buffer(opts.bang)
 end, { bang = true, desc = "Close current buffer without closing the editor layout" })
 
+local function clang_format_buffer(bufnr)
+  if vim.fn.executable("clang-format") == 0 then
+    return false
+  end
+
+  local filename = vim.api.nvim_buf_get_name(bufnr)
+  local input = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  if vim.bo[bufnr].endofline then
+    input = input .. "\n"
+  end
+
+  local result = vim.system({ "clang-format", "--assume-filename", filename }, {
+    stdin = input,
+    text = true,
+  }):wait()
+
+  if result.code ~= 0 then
+    vim.notify(result.stderr ~= "" and result.stderr or "clang-format failed", vim.log.levels.WARN)
+    return false
+  end
+
+  local output = vim.split(result.stdout:gsub("\n$", ""), "\n", { plain = true })
+  local view = vim.fn.winsaveview()
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, output)
+  vim.fn.winrestview(view)
+  return true
+end
+
+local function format_buffer(bufnr)
+  if not vim.bo[bufnr].modifiable or vim.bo[bufnr].readonly then
+    return
+  end
+
+  local filetype = vim.bo[bufnr].filetype
+  if filetype == "c" or filetype == "cpp" or filetype == "h" or filetype == "hpp" then
+    if clang_format_buffer(bufnr) then
+      return
+    end
+  end
+
+  local has_formatter = false
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+    if client:supports_method("textDocument/formatting", bufnr) then
+      has_formatter = true
+      break
+    end
+  end
+
+  if not has_formatter then
+    return
+  end
+
+  vim.lsp.buf.format({
+    bufnr = bufnr,
+    async = false,
+    timeout_ms = 2000,
+  })
+end
+
+vim.api.nvim_create_user_command("Format", function()
+  format_buffer(vim.api.nvim_get_current_buf())
+end, { desc = "Format current buffer" })
+
+vim.api.nvim_create_autocmd("BufWritePre", {
+  callback = function(event)
+    format_buffer(event.buf)
+  end,
+  desc = "Format buffer before saving",
+})
+
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })
 map("n", "<esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 map("n", "<leader>x", "<cmd>BufferClose<cr>", { desc = "Close buffer" })

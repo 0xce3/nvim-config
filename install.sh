@@ -73,7 +73,7 @@ install_packages() {
       as_root apt-get update
       as_root apt-get install -y \
         neovim git curl ripgrep fd-find build-essential cmake ninja-build \
-        clangd python3 python3-pip nodejs npm gh
+        clangd clang-format python3 python3-pip nodejs npm gh
       ;;
     dnf)
       as_root dnf install -y \
@@ -93,7 +93,7 @@ install_packages() {
       run brew install neovim git curl ripgrep fd cmake ninja llvm python node gh
       ;;
     *)
-      log "No supported package manager found. Install Neovim, git, ripgrep, fd, clangd, Python, Node.js, npm, cmake, and ninja manually."
+      log "No supported package manager found. Install Neovim, git, ripgrep, fd, clangd, clang-format, Python, Node.js, npm, cmake, and ninja manually."
       exit 1
       ;;
   esac
