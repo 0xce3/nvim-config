@@ -690,6 +690,14 @@ return {
         desc = "Select opencode action",
       },
       {
+        "<leader>oh",
+        function()
+          vim.lsp.enable("opencode", true)
+          vim.defer_fn(vim.lsp.buf.hover, 100)
+        end,
+        desc = "Explain symbol with opencode",
+      },
+      {
         "<leader>on",
         function()
           require("opencode").command("session.new")
@@ -771,7 +779,11 @@ return {
       },
     },
     init = function()
-      vim.g.opencode_opts = {}
+      vim.g.opencode_opts = {
+        lsp = {
+          enabled = true,
+        },
+      }
       vim.o.autoread = true
     end,
   },

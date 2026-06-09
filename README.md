@@ -110,6 +110,7 @@ Useful mappings:
 
 - `<leader>oa`: ask opencode with the current cursor or visual selection as context
 - `<leader>oo`: open the opencode action picker
+- `<leader>oh`: show an opencode LSP hover explanation for the symbol under the cursor
 - `<leader>on`: start a new opencode session
 - `<leader>os`: select an opencode session
 - `<leader>ou`: undo the last opencode change
