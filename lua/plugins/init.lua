@@ -12,9 +12,20 @@ return {
           PmenuThumb = { bg = "#928374" },
           Comment    = { fg = "#928374", bg = "NONE", italic = false },
           String     = { fg = "#b8bb26", bg = "NONE", italic = false },
+          Function   = { fg = "#fabd2f", bg = "NONE", bold = true },
+          Identifier = { fg = "#d79921", bg = "NONE" },
           ["@comment"] = { fg = "#928374", bg = "NONE", italic = false },
           ["@string"] = { fg = "#b8bb26", bg = "NONE", italic = false },
           ["@string.special.path"] = { fg = "#b8bb26", bg = "NONE" },
+          ["@function"] = { fg = "#fabd2f", bg = "NONE", bold = true },
+          ["@function.call"] = { fg = "#fabd2f", bg = "NONE", bold = true },
+          ["@function.method"] = { fg = "#fabd2f", bg = "NONE", bold = true },
+          ["@function.method.call"] = { fg = "#fabd2f", bg = "NONE", bold = true },
+          ["@constructor"] = { fg = "#fabd2f", bg = "NONE", bold = true },
+          ["@variable"] = { fg = "#d79921", bg = "NONE" },
+          ["@variable.parameter"] = { fg = "#fe8019", bg = "NONE" },
+          ["@variable.member"] = { fg = "#83a598", bg = "NONE" },
+          ["@property"] = { fg = "#83a598", bg = "NONE" },
           cIncluded  = { fg = "#b8bb26", bg = "NONE" },
           Search     = { fg = "#ebdbb2", bg = "#504945", reverse = false },
           IncSearch  = { fg = "#282828", bg = "#fabd2f", reverse = false },
@@ -29,9 +40,20 @@ return {
       local function apply_gruvbox_fixes()
         vim.api.nvim_set_hl(0, "Comment", { fg = "#928374", bg = "NONE", italic = false })
         vim.api.nvim_set_hl(0, "String", { fg = "#b8bb26", bg = "NONE", italic = false })
+        vim.api.nvim_set_hl(0, "Function", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "Identifier", { fg = "#d79921", bg = "NONE" })
         vim.api.nvim_set_hl(0, "@comment", { fg = "#928374", bg = "NONE", italic = false })
         vim.api.nvim_set_hl(0, "@string", { fg = "#b8bb26", bg = "NONE", italic = false })
         vim.api.nvim_set_hl(0, "@string.special.path", { fg = "#b8bb26", bg = "NONE", italic = false, underline = false })
+        vim.api.nvim_set_hl(0, "@function", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "@function.call", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "@function.method", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "@function.method.call", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "@constructor", { fg = "#fabd2f", bg = "NONE", bold = true })
+        vim.api.nvim_set_hl(0, "@variable", { fg = "#d79921", bg = "NONE" })
+        vim.api.nvim_set_hl(0, "@variable.parameter", { fg = "#fe8019", bg = "NONE" })
+        vim.api.nvim_set_hl(0, "@variable.member", { fg = "#83a598", bg = "NONE" })
+        vim.api.nvim_set_hl(0, "@property", { fg = "#83a598", bg = "NONE" })
         vim.api.nvim_set_hl(0, "cIncluded", { fg = "#b8bb26", bg = "NONE", italic = false })
         vim.api.nvim_set_hl(0, "Search", { fg = "#ebdbb2", bg = "#504945", reverse = false })
         vim.api.nvim_set_hl(0, "IncSearch", { fg = "#282828", bg = "#fabd2f", reverse = false })
