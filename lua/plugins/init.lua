@@ -692,6 +692,15 @@ return {
       {
         "<leader>h",
         function()
+          if vim.fn.executable("opencode") == 0 then
+            vim.notify(
+              "opencode CLI not found. Install it or add ~/.opencode/bin to PATH.",
+              vim.log.levels.ERROR,
+              { title = "opencode" }
+            )
+            return
+          end
+
           vim.lsp.enable("opencode", true)
           vim.defer_fn(vim.lsp.buf.hover, 100)
         end,
@@ -779,6 +788,11 @@ return {
       },
     },
     init = function()
+      local opencode_bin = vim.fn.expand("~/.opencode/bin")
+      if vim.fn.isdirectory(opencode_bin) == 1 and not vim.env.PATH:find(opencode_bin, 1, true) then
+        vim.env.PATH = opencode_bin .. ":" .. vim.env.PATH
+      end
+
       vim.g.opencode_opts = {}
       vim.o.autoread = true
     end,
