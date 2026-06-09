@@ -24,7 +24,7 @@ return {
           ["@function.method"] = { fg = "#8ec07c", bg = "NONE", bold = true },
           ["@function.method.call"] = { fg = "#8ec07c", bg = "NONE", bold = true },
           ["@constructor"] = { fg = "#8ec07c", bg = "NONE", bold = true },
-          ["@variable"] = { fg = "#83a598", bg = "NONE" },
+          ["@variable"] = { fg = "#ebdbb2", bg = "NONE" },
           ["@variable.parameter"] = { fg = "#83a598", bg = "NONE" },
           ["@variable.member"] = { fg = "#83a598", bg = "NONE" },
           ["@property"] = { fg = "#83a598", bg = "NONE" },
@@ -58,7 +58,7 @@ return {
         vim.api.nvim_set_hl(0, "@function.method", { fg = "#8ec07c", bg = "NONE", bold = true })
         vim.api.nvim_set_hl(0, "@function.method.call", { fg = "#8ec07c", bg = "NONE", bold = true })
         vim.api.nvim_set_hl(0, "@constructor", { fg = "#8ec07c", bg = "NONE", bold = true })
-        vim.api.nvim_set_hl(0, "@variable", { fg = "#83a598", bg = "NONE" })
+        vim.api.nvim_set_hl(0, "@variable", { fg = "#ebdbb2", bg = "NONE" })
         vim.api.nvim_set_hl(0, "@variable.parameter", { fg = "#83a598", bg = "NONE" })
         vim.api.nvim_set_hl(0, "@variable.member", { fg = "#83a598", bg = "NONE" })
         vim.api.nvim_set_hl(0, "@property", { fg = "#83a598", bg = "NONE" })
