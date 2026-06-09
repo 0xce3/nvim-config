@@ -795,9 +795,22 @@ return {
 
       local builtin = require("telescope.builtin")
       local map = vim.keymap.set
+      local function live_grep()
+        if vim.fn.executable("rg") == 0 then
+          vim.notify(
+            "Telescope live_grep requires ripgrep. Install it with: sudo apt install ripgrep",
+            vim.log.levels.ERROR,
+            { title = "Missing dependency" }
+          )
+          return
+        end
+
+        builtin.live_grep()
+      end
+
       map("n", "<C-p>",      builtin.find_files,  { desc = "Find files" })
       map("n", "<leader>ff", builtin.find_files,  { desc = "Find files" })
-      map("n", "<leader>fg", builtin.live_grep,   { desc = "Live grep" })
+      map("n", "<leader>fg", live_grep,           { desc = "Live grep" })
       map("n", "<leader>fb", builtin.buffers,     { desc = "Find buffers" })
       map("n", "<leader>fh", builtin.help_tags,   { desc = "Help tags" })
       map("n", "<leader>fr", builtin.oldfiles,    { desc = "Recent files" })

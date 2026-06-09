@@ -11,6 +11,12 @@ nvim
 
 `lazy.nvim` bootstraps itself on first start and installs the configured plugins.
 
+## Requirements
+
+- Neovim 0.11 or newer
+- `ripgrep` for project-wide text search through Telescope (`<leader>fg`)
+- `fd` for fast file discovery through Telescope (`<leader>ff`)
+
 ## One-command install
 
 On a fresh Linux or macOS host:
