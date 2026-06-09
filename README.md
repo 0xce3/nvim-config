@@ -111,6 +111,7 @@ Useful mappings:
 - `<leader>oa`: ask opencode with the current cursor or visual selection as context
 - `<leader>oo`: open the opencode action picker
 - `<leader>h`: show an opencode LSP hover explanation for the symbol under the cursor
+- `<leader>ha`: ask opencode through a Telescope-style prompt and show the answer in a floating window
 - `<leader>on`: start a new opencode session
 - `<leader>os`: select an opencode session
 - `<leader>ou`: undo the last opencode change
