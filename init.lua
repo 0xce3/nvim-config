@@ -1,0 +1,6 @@
+require("config.options")
+require("config.keymaps")
+require("config.filetypes")
+require("config.format_specifiers").setup()
+require("config.preproc").setup()
+require("config.lazy")
