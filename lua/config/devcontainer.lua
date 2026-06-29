@@ -106,25 +106,63 @@ local function container_bootstrap_script(workspace, workspace_name)
   }, "\n")
 end
 
-local function container_bootstrap_command(workspace, workspace_name)
-  return "sh -lc " .. q(container_bootstrap_script(workspace, workspace_name):gsub("exec nvim %.", "true"))
-end
-
 local function run_terminal(command)
   require("config.terminal").run(command)
 end
 
-local function replace_with_command(command)
-  local script = vim.fn.tempname() .. ".sh"
-  vim.fn.writefile({ "#!/usr/bin/env sh", "set -e", "clear", command }, script)
-  vim.cmd("silent! wall")
-  vim.cmd("redraw!")
-  if vim.fn.executable("script") == 1 then
-    vim.cmd("!script -q -e -c " .. q("sh " .. script) .. " /dev/null")
-  else
-    vim.cmd("!sh " .. q(script))
+local function find_free_port()
+  local server = vim.uv.new_tcp()
+  if not server then
+    return tostring(math.random(41000, 49000))
   end
-  pcall(vim.fn.delete, script)
+  server:bind("127.0.0.1", 0)
+  local ok, sock = pcall(server.getsockname, server)
+  server:close()
+  if ok and sock and sock.port then
+    return tostring(sock.port)
+  end
+  return tostring(math.random(41000, 49000))
+end
+
+local function open_remote_ui(addr)
+  vim.cmd("enew")
+  local buf = vim.api.nvim_get_current_buf()
+  vim.bo[buf].buflisted = true
+  vim.bo[buf].bufhidden = "wipe"
+  vim.api.nvim_buf_set_name(buf, "Devcontainer Remote UI")
+
+  local previous_laststatus = vim.o.laststatus
+  vim.o.laststatus = 0
+  vim.fn.termopen("nvim --server " .. q(addr) .. " --remote-ui", {
+    on_exit = function(_, code)
+      vim.schedule(function()
+        vim.o.laststatus = previous_laststatus
+        if code ~= 0 then
+          notify("Remote UI exited with code " .. tostring(code), vim.log.levels.ERROR)
+        end
+      end)
+    end,
+  })
+  vim.cmd("startinsert")
+end
+
+local function wait_for_server(addr, cb)
+  local tries = 0
+  local function probe()
+    tries = tries + 1
+    vim.system({ "nvim", "--server", addr, "--remote-expr", "1" }, { text = true }, function(res)
+      if res and res.code == 0 then
+        vim.schedule(cb)
+      elseif tries < 50 then
+        vim.defer_fn(probe, 200)
+      else
+        vim.schedule(function()
+          notify("Timed out waiting for container nvim server at " .. addr, vim.log.levels.ERROR)
+        end)
+      end
+    end)
+  end
+  probe()
 end
 
 local function up_command(root, rebuild)
@@ -139,50 +177,49 @@ local function up_command(root, rebuild)
   return table.concat(parts, " ")
 end
 
-local function exec_nvim_command(root)
-  local cli = ensure_cli()
-  if not cli then
-    return nil
+local function container_ip(container)
+  local result = vim.system({ "docker", "inspect", "-f", "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container }, { text = true }):wait()
+  if result.code == 0 and result.stdout then
+    local ip = vim.trim(result.stdout)
+    if ip ~= "" then
+      return ip
+    end
   end
-  local script = container_bootstrap_script(root, vim.fn.fnamemodify(root, ":t"))
-  return table.concat({
-    cli,
-    "exec",
-    "--workspace-folder",
-    q(root),
-    "sh",
-    "-lc",
-    q(script),
-  }, " ")
+  return nil
 end
 
-local function docker_exec_nvim_command(container, workspace)
+local function start_remote_server(container, workspace)
   local workspace_name = vim.fn.fnamemodify(workspace, ":t")
-  local fallback_workspace = "/workspaces/" .. workspace_name
-  local bootstrap = container_bootstrap_command(workspace, workspace_name)
-  local open_workspace = table.concat({
+  local port = find_free_port()
+  local ip = container_ip(container)
+  if not ip then
+    notify("Could not determine container IP for " .. container, vim.log.levels.ERROR)
+    return
+  end
+
+  local bootstrap = container_bootstrap_script(workspace, workspace_name):gsub("exec nvim %.", "true")
+  local server = table.concat({
+    bootstrap,
     "workspace=" .. q(workspace),
-    "if [ ! -d \"$workspace\" ]; then workspace=" .. q(fallback_workspace) .. "; fi",
+    "if [ ! -d \"$workspace\" ]; then workspace=" .. q("/workspaces/" .. workspace_name) .. "; fi",
     "if [ ! -d \"$workspace\" ]; then workspace=" .. q("/workspace/" .. workspace_name) .. "; fi",
     "if [ ! -d \"$workspace\" ]; then workspace=$PWD; fi",
     "cd \"$workspace\"",
-    "exec nvim .",
-  }, "; ")
-  return table.concat({
-    "docker",
-    "exec",
-    "-i",
-    q(container),
-    bootstrap,
-    "&&",
-    "docker",
-    "exec",
-    "-it",
-    q(container),
-    "sh",
-    "-lc",
-    q(open_workspace),
-  }, " ")
+    "export DEVCONTAINER=true",
+    "exec nvim --listen 0.0.0.0:" .. port .. " --headless",
+  }, "\n")
+
+  notify("Starting container nvim server in " .. container)
+  local result = vim.system({ "docker", "exec", "-d", container, "sh", "-lc", server }, { text = true }):wait()
+  if result.code ~= 0 then
+    notify("Failed to start container nvim server: " .. (result.stderr or ""), vim.log.levels.ERROR)
+    return
+  end
+
+  local addr = ip .. ":" .. port
+  wait_for_server(addr, function()
+    open_remote_ui(addr)
+  end)
 end
 
 local function list_running_containers()
@@ -256,13 +293,12 @@ local function open_in_devcontainer(root, opts)
   end
 
   local up = up_command(root, opts.rebuild)
-  local exec_nvim = exec_nvim_command(root)
-  if not up or not exec_nvim then
+  if not up then
     return
   end
 
   notify((opts.rebuild and "Rebuilding" or "Opening") .. " devcontainer for " .. root)
-  replace_with_command(up .. " && " .. exec_nvim)
+  run_terminal(up .. " && printf '\nDevcontainer is running. Use :DevcontainerAttach to open nvim via remote-ui.\n'")
   refresh_statusline()
 end
 
@@ -287,7 +323,7 @@ function M.attach(container_name, project_path)
   if container_name and container_name ~= "" then
     local workspace = inspect_container_workspace(container_name, root)
     notify("Attaching to " .. container_name)
-    replace_with_command(docker_exec_nvim_command(container_name, workspace))
+    start_remote_server(container_name, workspace)
     return
   end
 
