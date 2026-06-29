@@ -264,18 +264,117 @@ function M.attach(container_name, project_path)
     return
   end
 
-  local items = {}
-  for _, c in ipairs(containers) do
-    table.insert(items, c.name .. "  " .. c.image .. "  " .. c.status)
+  local ok_telescope, pickers = pcall(require, "telescope.pickers")
+  if not ok_telescope then
+    local items = {}
+    for _, c in ipairs(containers) do
+      table.insert(items, c.name .. "  " .. c.image .. "  " .. c.status)
+    end
+    vim.ui.select(items, { prompt = "Attach nvim to running container:" }, function(choice, idx)
+      if choice and idx then
+        M.attach(containers[idx].name, root)
+      end
+    end)
+    return
   end
 
-  vim.ui.select(items, { prompt = "Attach nvim to running container:" }, function(choice, idx)
-    if not choice or not idx then
-      return
-    end
-    local selected = containers[idx]
-    M.attach(selected.name, root)
-  end)
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+
+  pickers
+    .new({}, {
+      prompt_title = "Attach Running Container",
+      finder = finders.new_table({
+        results = containers,
+        entry_maker = function(c)
+          local display = c.name .. "  " .. c.image .. "  " .. c.status
+          return { value = c, display = display, ordinal = display }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if selection and selection.value then
+            M.attach(selection.value.name, root)
+          end
+        end)
+        return true
+      end,
+    })
+    :find()
+end
+
+function M.menu(project_path)
+  local root = project_path or M.find_project_root()
+  local ok_telescope, pickers = pcall(require, "telescope.pickers")
+  if not ok_telescope then
+    vim.ui.select({ "Attach to Running Container", "Reopen in Devcontainer", "Rebuild Devcontainer", "Open Shell", "Stop Devcontainer" }, {
+      prompt = "Devcontainer",
+    }, function(choice)
+      if choice == "Attach to Running Container" then
+        M.attach(nil, root)
+      elseif choice == "Reopen in Devcontainer" then
+        M.reopen(root)
+      elseif choice == "Rebuild Devcontainer" then
+        M.rebuild(root)
+      elseif choice == "Open Shell" then
+        M.shell(root)
+      elseif choice == "Stop Devcontainer" then
+        M.stop(root)
+      end
+    end)
+    return
+  end
+
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+
+  local entries = {
+    { label = "Attach to running container", action = function() M.attach(nil, root) end, ordinal = "attach running container" },
+    { label = "Reopen in Devcontainer", action = function() M.reopen(root) end, ordinal = "reopen devcontainer" },
+    { label = "Rebuild Devcontainer", action = function() M.rebuild(root) end, ordinal = "rebuild devcontainer" },
+    { label = "Open Devcontainer Shell", action = function() M.shell(root) end, ordinal = "shell devcontainer" },
+    { label = "Stop Devcontainer", action = function() M.stop(root) end, ordinal = "stop devcontainer" },
+  }
+
+  for _, c in ipairs(list_running_containers()) do
+    table.insert(entries, {
+      label = "Attach: " .. c.name .. "  " .. c.image,
+      ordinal = "attach " .. c.name .. " " .. c.image,
+      action = function()
+        M.attach(c.name, root)
+      end,
+    })
+  end
+
+  pickers
+    .new({}, {
+      prompt_title = "Devcontainer: " .. vim.fn.fnamemodify(root, ":t"),
+      finder = finders.new_table({
+        results = entries,
+        entry_maker = function(entry)
+          return { value = entry, display = entry.label, ordinal = entry.ordinal }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if selection and selection.value and selection.value.action then
+            selection.value.action()
+          end
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 function M.shell(project_path)
@@ -326,25 +425,6 @@ function M.statusline()
   return state.status_text
 end
 
-function M.prompt_for_current_project()
-  if M.is_inside_container() then
-    return
-  end
-  local root = M.find_project_root()
-  if not M.has_devcontainer(root) then
-    return
-  end
-  vim.ui.select({ "Attach to Running Container", "Reopen in Devcontainer", "Open locally" }, {
-    prompt = vim.fn.fnamemodify(root, ":t") .. " has a devcontainer.json",
-  }, function(choice)
-    if choice == "Attach to Running Container" then
-      M.attach(nil, root)
-    elseif choice == "Reopen in Devcontainer" then
-      M.reopen(root)
-    end
-  end)
-end
-
 function M.setup()
   vim.api.nvim_create_user_command("DevcontainerReopen", function(opts)
     M.reopen(opts.args ~= "" and opts.args or nil)
@@ -359,8 +439,12 @@ function M.setup()
   end, { nargs = "?", complete = "shellcmd", desc = "Attach nvim to a running Docker container" })
 
   vim.api.nvim_create_user_command("DevcontainerHub", function()
-    require("config.workspace_hub").open()
-  end, { desc = "Open workspace hub" })
+    M.menu()
+  end, { desc = "Open devcontainer action menu" })
+
+  vim.api.nvim_create_user_command("DevcontainerMenu", function(opts)
+    M.menu(opts.args ~= "" and opts.args or nil)
+  end, { nargs = "?", desc = "Open devcontainer action menu" })
 
   vim.api.nvim_create_user_command("DevcontainerUp", function(opts)
     M.open(opts.args ~= "" and opts.args or nil)
@@ -378,14 +462,9 @@ function M.setup()
     M.shell(opts.args ~= "" and opts.args or nil)
   end, { nargs = "?", desc = "Open shell in this project's devcontainer" })
 
-  vim.api.nvim_create_autocmd("VimEnter", {
+  vim.api.nvim_create_autocmd("DirChanged", {
     group = vim.api.nvim_create_augroup("DevcontainerHub", { clear = true }),
-    callback = function()
-      vim.defer_fn(function()
-        M.prompt_for_current_project()
-        refresh_statusline()
-      end, 300)
-    end,
+    callback = refresh_statusline,
   })
 end
 

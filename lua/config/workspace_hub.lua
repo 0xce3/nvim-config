@@ -174,23 +174,9 @@ function M.handle_selection(entry)
     vim.env.PROJECT_ROOT = entry.path
     vim.env.WORKSPACE_FOLDER = entry.path
     if dc.has_devcontainer(entry.path) then
-      vim.ui.select({ "Attach to Running Container", "Reopen in Devcontainer", "Open locally" }, {
-        prompt = entry.name .. " has a devcontainer.json:",
-      }, function(choice)
-        if choice == "Attach to Running Container" then
-          vim.defer_fn(function()
-            dc.attach(nil, entry.path)
-          end, 50)
-        elseif choice == "Reopen in Devcontainer" then
-          vim.defer_fn(function()
-            dc.reopen(entry.path)
-          end, 50)
-        else
-          vim.defer_fn(function()
-            require("telescope.builtin").find_files({ cwd = entry.path })
-          end, 50)
-        end
-      end)
+      vim.defer_fn(function()
+        dc.menu(entry.path)
+      end, 50)
     else
       vim.defer_fn(function()
         require("telescope.builtin").find_files({ cwd = entry.path })
