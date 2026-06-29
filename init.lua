@@ -5,37 +5,7 @@ require("config.format_specifiers").setup()
 require("config.preproc").setup()
 require("config.lazy")
 
--- Warm container/devcontainer cache in the background after UI renders.
--- Uses vim.system with callbacks so it never blocks the UI thread.
-vim.api.nvim_create_autocmd("UIEnter", {
-  once = true,
-  callback = function()
-    pcall(require("config.container_detect").refresh_cache_async)
-  end,
-})
 
-vim.api.nvim_create_autocmd("VimEnter", {
-  once = true,
-  callback = function()
-    if vim.fn.argc(-1) ~= 0 then
-      return
-    end
-    vim.schedule(function()
-      vim.defer_fn(function()
-        local bufs = vim.api.nvim_list_bufs()
-        local has_real_buffers = false
-        for _, buf in ipairs(bufs) do
-          if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buflisted
-            and vim.bo[buf].buftype ~= "terminal"
-            and vim.api.nvim_buf_get_name(buf) ~= "" then
-            has_real_buffers = true
-            break
-          end
-        end
-        if not has_real_buffers then
-          require("config.workspace_hub").open()
-        end
-      end, 100)
-    end)
-  end,
-})
+
+-- Workspace hub is opened manually via <leader>hh or the `h` key on
+-- the Snacks dashboard. No auto-open during startup to avoid any IO.

@@ -236,31 +236,7 @@ return {
       end
 
       local function container_status()
-        local dc = require("config.devcontainer")
-        if dc.is_connected() then
-          return dc.statusline()
-        end
-        -- Only use cached container data – never call docker/fd from
-        -- the statusline (would block startup). The cache is populated
-        -- asynchronously after UIEnter by init.lua.
-        local cd = require("config.container_detect")
-        if not cd.is_cache_ready() then
-          return ""
-        end
-        local containers = cd.get_cached_containers()
-        if not containers or #containers == 0 then
-          return ""
-        end
-        local names = {}
-        for _, cont in ipairs(containers) do
-          if cont.workspace_folder ~= "" and cont.workspace_folder ~= vim.fn.expand("~") then
-            table.insert(names, vim.fn.fnamemodify(cont.workspace_folder, ":t"))
-          end
-        end
-        if #names == 0 then
-          return ""
-        end
-        return " " .. table.concat(names, ",")
+        return ""
       end
 
       require("lualine").setup({
