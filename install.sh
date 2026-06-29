@@ -79,18 +79,25 @@ install_packages() {
       as_root apt-get update || true
 
       # Neovim 0.11+ needed – Ubuntu repositories ship ancient versions,
-      # so we install from the official PPA.
-      if ! command -v nvim >/dev/null 2>&1 \
-        || ! nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//' | sort -V -c 2>/dev/null; then
+      # so we add the official PPA and install from there.
+      if ! command -v nvim >/dev/null 2>&1; then
         as_root apt-get install -y software-properties-common
         as_root add-apt-repository -y ppa:neovim-ppa/unstable
         as_root apt-get update || true
+      else
+        local nvim_ver
+        nvim_ver="$(nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//')"
+        if ! printf '0.11.0\n%s\n' "$nvim_ver" | sort -V -C 2>/dev/null; then
+          as_root apt-get install -y software-properties-common
+          as_root add-apt-repository -y ppa:neovim-ppa/unstable
+          as_root apt-get update || true
+        fi
       fi
 
       # Host packages: only what nvim needs on WSL.
       # Toolchain (clangd, cmake, gcc, ninja, …) lives in the devcontainer.
       as_root apt-get install -y \
-        git curl ripgrep fd-find \
+        neovim git curl ripgrep fd-find \
         python3 python3-pip nodejs gh || true
       if ! command -v npm >/dev/null 2>&1; then
         as_root apt-get install -y npm || true
