@@ -17,22 +17,24 @@ nvim
 
 ## Requirements
 
-- Neovim 0.11 or newer
-- `git`, `curl`, `ripgrep`, `fd`
-- `clangd` and `clang-format` for C/C++
-- `node`/`npm` and Python tooling for language servers
-- GitHub CLI (`gh`) for Octo
-- A Nerd Font on the host terminal for file/status icons
+**Host (WSL / Linux / macOS):** Neovim 0.11+, `git`, `curl`, `ripgrep`, `fd`,
+  `python3`, `node`/`npm`, Docker, and a Nerd Font for icons.
+
+**Devcontainer:** Toolchain (clangd, cmake, gcc, ninja, …) – defined in your
+  project's `.devcontainer/devcontainer.json` / Dockerfile.
+
+  nvim on the host connects remotely to the devcontainer for LSP, builds,
+  and debugging. The host itself does not need the toolchain.
 
 ## One-command install
 
 ```sh
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh")'
 ```
 
-The installer detects common package managers, installs helper tools, backs up an
-existing `~/.config/nvim` when needed, clones this repo, installs Python/Node
-language tooling, and runs Lazy plugin sync.
+The installer detects the package manager, installs host packages (nvim, git,
+ripgrep, fd, node, python, gh, lazygit), backs up an existing `~/.config/nvim`
+when needed, clones this repo, and runs Lazy plugin sync.
 
 For local testing:
 

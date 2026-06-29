@@ -10,7 +10,13 @@ usage() {
   cat <<'USAGE'
 Usage: ./install.sh [--dry-run] [--skip-packages]
 
-Installs Neovim, required helper tools, this Neovim config, and plugins.
+Installs Neovim (host), helper tools, this Neovim config, and plugins.
+
+This script installs only what is needed on the **host** (WSL/Linux/macOS):
+  nvim, git, ripgrep, fd, python, node, gh, lazygit
+
+The **dev toolchain** (clangd, cmake, gcc, ninja, …) lives inside your
+devcontainers – use :DevcontainerReopen or :DevcontainerUp in nvim.
 
 Options:
   --dry-run        Print the planned actions without changing the system.
@@ -74,17 +80,18 @@ install_packages() {
 
       # Neovim 0.11+ needed – Ubuntu repositories ship ancient versions,
       # so we install from the official PPA.
-      if ! nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//' | sort -V -c 2>/dev/null; then
+      if ! command -v nvim >/dev/null 2>&1 \
+        || ! nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//' | sort -V -c 2>/dev/null; then
         as_root apt-get install -y software-properties-common
         as_root add-apt-repository -y ppa:neovim-ppa/unstable
         as_root apt-get update || true
       fi
 
+      # Host packages: only what nvim needs on WSL.
+      # Toolchain (clangd, cmake, gcc, ninja, …) lives in the devcontainer.
       as_root apt-get install -y \
-        git curl ripgrep fd-find build-essential cmake ninja-build \
-        clangd clang-format python3 python3-pip nodejs gh || true
-      # npm is bundled with nodejs from nodesource; installing it separately
-      # causes a conflict. If npm is missing, we install it explicitly.
+        git curl ripgrep fd-find \
+        python3 python3-pip nodejs gh || true
       if ! command -v npm >/dev/null 2>&1; then
         as_root apt-get install -y npm || true
       fi
@@ -92,21 +99,19 @@ install_packages() {
       ;;
     dnf)
       as_root dnf install -y \
-        neovim git curl ripgrep fd-find gcc gcc-c++ make cmake ninja-build \
-        clang-tools-extra python3 python3-pip nodejs npm gh
+        neovim git curl ripgrep fd-find python3 python3-pip nodejs npm gh
       install_lazygit_github
       ;;
     pacman)
       as_root pacman -Sy --needed --noconfirm \
-        neovim git curl ripgrep fd base-devel cmake ninja clang python python-pip nodejs npm github-cli lazygit
+        neovim git curl ripgrep fd python python-pip nodejs npm github-cli lazygit
       ;;
     apk)
       as_root apk add --no-cache \
-        neovim git curl ripgrep fd build-base cmake ninja clang-extra-tools \
-        python3 py3-pip nodejs npm github-cli lazygit
+        neovim git curl ripgrep fd python3 py3-pip nodejs npm github-cli lazygit
       ;;
     brew)
-      run brew install neovim git curl ripgrep fd cmake ninja llvm python node gh lazygit
+      run brew install neovim git curl ripgrep fd python node gh lazygit
       ;;
     *)
       log "No supported package manager found. Install Neovim, git, ripgrep, fd, clangd, clang-format, Python, Node.js, npm, cmake, and ninja manually."
