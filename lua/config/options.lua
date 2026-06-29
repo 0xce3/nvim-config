@@ -51,6 +51,31 @@ opt.listchars = { tab = "  ", trail = ".", nbsp = "+" }
 
 opt.hidden = true
 
+-- `nvim .` should enter the workspace, not open Neovim's directory explorer.
+vim.api.nvim_create_autocmd("BufEnter", {
+  callback = function(args)
+    local name = vim.api.nvim_buf_get_name(args.buf)
+    if name == "" or vim.fn.isdirectory(name) ~= 1 then
+      return
+    end
+
+    if vim.b[args.buf].workspace_dir_handled then
+      return
+    end
+    vim.b[args.buf].workspace_dir_handled = true
+
+    local dir = vim.fn.fnamemodify(name, ":p:h")
+    vim.schedule(function()
+      if not vim.api.nvim_buf_is_valid(args.buf) then
+        return
+      end
+      vim.api.nvim_set_current_dir(dir)
+      vim.cmd("enew")
+      pcall(vim.api.nvim_buf_delete, args.buf, { force = true })
+    end)
+  end,
+})
+
 -- Keep folding cheap in large firmware trees; Treesitter foldexpr is evaluated
 -- frequently while moving through C/C++ buffers.
 opt.foldmethod = "indent"
@@ -91,17 +116,6 @@ function _G.fold_text()
   return text .. "   (" .. (fe - fs + 1) .. " lines)"
 end
 opt.foldtext = "v:lua.fold_text()"
-
--- Use indent-based folding only where Treesitter has no parser, so zc/zo still
--- work in plain text / config files.
-vim.api.nvim_create_autocmd("FileType", {
-  callback = function(args)
-    local ok = pcall(vim.treesitter.get_parser, args.buf)
-    if not ok then
-      vim.opt_local.foldmethod = "indent"
-    end
-  end,
-})
 
 -- bash -ic: interactive flag makes $- contain 'i', so ~/.bashrc runs fully
 -- (the default .bashrc guard "case $- in *i*)" requires this)
