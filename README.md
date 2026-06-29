@@ -58,6 +58,25 @@ For local testing:
 
 Exact pinned versions live in `lazy-lock.json`.
 
+## Devcontainer (Remote Workflow)
+
+This config supports a full VS Code-like devcontainer workflow. nvim runs on the
+host (WSL) with your full config/themes; the container provides toolchain + workspace.
+
+| Key | Command | Action |
+|-----|---------|--------|
+| `<leader>Dr` | `:DevcontainerReopen` | Detect `.devcontainer.json` → build/start → route LSP |
+| `<leader>Du` | `:DevcontainerUp` | Build and start devcontainer |
+| `<leader>Dc` | `:DevcontainerConnect` | List running containers → attach |
+| `<leader>DR` | `:DevcontainerRebuild` | Rebuild container from scratch |
+| `<leader>Dd` | `:DevcontainerStop` | Stop container |
+| `<leader>Ds` | `:DevcontainerShell` | Open shell in container |
+| `<leader>Dh` | `:DevcontainerHub` | Open workspace hub |
+| `<leader>hh` | – | Workspace hub (projects + containers) |
+
+When nvim starts without arguments, the Workspace Hub opens automatically
+showing recent projects, devcontainer projects, and running containers.
+
 ## Keybindings
 
 | Key | Action |
@@ -109,6 +128,9 @@ lua/config/keymaps.lua           global keymaps and formatting helpers
 lua/config/lazy.lua              lazy.nvim bootstrap
 lua/config/terminal.lua          reusable terminal buffer
 lua/config/vscode_debug.lua      generic VS Code launch/task debug helpers
+lua/config/container_detect.lua  Docker/devcontainer runtime detection
+lua/config/devcontainer.lua      devcontainer lifecycle (reopen/connect/stop)
+lua/config/workspace_hub.lua     telescope workspace hub picker
 lua/plugins/init.lua             plugin specs and per-plugin config
 lua/plugins/compile_commands.lua clangd compile_commands picker
 ```
