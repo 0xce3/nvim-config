@@ -115,7 +115,11 @@ local function replace_with_command(command)
   vim.fn.writefile({ "#!/usr/bin/env sh", "set -e", "clear", command }, script)
   vim.cmd("silent! wall")
   vim.cmd("redraw!")
-  vim.cmd("!sh " .. q(script))
+  if vim.fn.executable("script") == 1 then
+    vim.cmd("!script -q -e -c " .. q("sh " .. script) .. " /dev/null")
+  else
+    vim.cmd("!sh " .. q(script))
+  end
   pcall(vim.fn.delete, script)
 end
 
