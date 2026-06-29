@@ -178,14 +178,40 @@ local function up_command(root, rebuild)
 end
 
 local function container_ip(container)
-  local result = vim.system({ "docker", "inspect", "-f", "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container }, { text = true }):wait()
-  if result.code == 0 and result.stdout then
-    local ip = vim.trim(result.stdout)
-    if ip ~= "" then
-      return ip
+  local result = vim.system({ "docker", "inspect", container }, { text = true }):wait()
+  if result.code ~= 0 or not result.stdout or result.stdout == "" then
+    return nil
+  end
+
+  local ok, decoded = pcall(vim.json.decode, result.stdout)
+  local info = ok and decoded and decoded[1] or nil
+  if not info or not info.NetworkSettings then
+    return nil
+  end
+
+  local function valid_ipv4(ip)
+    return type(ip) == "string" and ip:match("^%d+%.%d+%.%d+%.%d+$") ~= nil
+  end
+
+  if valid_ipv4(info.NetworkSettings.IPAddress) then
+    return info.NetworkSettings.IPAddress
+  end
+
+  for _, network in pairs(info.NetworkSettings.Networks or {}) do
+    if valid_ipv4(network.IPAddress) then
+      return network.IPAddress
     end
   end
+
   return nil
+end
+
+local function container_ip_debug(container)
+  local result = vim.system({ "docker", "inspect", "-f", "{{json .NetworkSettings}}", container }, { text = true }):wait()
+  if result.code == 0 and result.stdout then
+    return vim.trim(result.stdout)
+  end
+  return result.stderr or ""
 end
 
 local function start_remote_server(container, workspace)
@@ -193,7 +219,7 @@ local function start_remote_server(container, workspace)
   local port = find_free_port()
   local ip = container_ip(container)
   if not ip then
-    notify("Could not determine container IP for " .. container, vim.log.levels.ERROR)
+    notify("Could not determine container IP for " .. container .. ": " .. container_ip_debug(container), vim.log.levels.ERROR)
     return
   end
 
