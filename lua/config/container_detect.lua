@@ -1,21 +1,40 @@
 local M = {}
 
-local docker_available = nil
-local running_cache = nil
-local cache_time = 0
+-- Module-level cache: never do IO synchronously during startup.
+-- The cache is populated eagerly after UIEnter by init.lua.
+local state = {
+  docker_available = nil,
+  running_containers = nil,
+  devcontainer_projects = nil,
+  cache_ready = false,
+  cache_time = 0,
+}
+
 local CACHE_TTL_MS = 5000
 
+function M.is_cache_ready()
+  return state.cache_ready
+end
+
+function M.invalidate_cache()
+  state.docker_available = nil
+  state.running_containers = nil
+  state.devcontainer_projects = nil
+  state.cache_ready = false
+  state.cache_time = 0
+end
+
 function M.is_docker_available()
-  if docker_available ~= nil then
-    return docker_available
+  if state.docker_available ~= nil then
+    return state.docker_available
   end
   if vim.fn.executable("docker") == 0 then
-    docker_available = false
+    state.docker_available = false
     return false
   end
   local ok, result = pcall(vim.system, { "docker", "info", "--format", "{{.ServerVersion}}" }, { text = true, timeout = 3000 })
-  docker_available = ok and result ~= nil and result.code == 0
-  return docker_available
+  state.docker_available = ok and result ~= nil and result.code == 0
+  return state.docker_available
 end
 
 function M.list_running_containers()
@@ -23,14 +42,14 @@ function M.list_running_containers()
     return {}
   end
 
-  if running_cache ~= nil and (vim.loop.hrtime() / 1e6 - cache_time) < CACHE_TTL_MS then
-    return running_cache
+  if state.running_containers ~= nil and (vim.loop.hrtime() / 1e6 - state.cache_time) < CACHE_TTL_MS then
+    return state.running_containers
   end
 
   local ok_result, result = pcall(vim.system, { "docker", "ps", "--format", "{{json .}}" }, { text = true, timeout = 5000 })
   if not ok_result or result == nil or result.code ~= 0 or not result.stdout or result.stdout == "" then
-    running_cache = {}
-    cache_time = vim.loop.hrtime() / 1e6
+    state.running_containers = {}
+    state.cache_time = vim.loop.hrtime() / 1e6
     return {}
   end
 
@@ -73,18 +92,43 @@ function M.list_running_containers()
     end
   end
 
-  running_cache = containers
-  cache_time = vim.loop.hrtime() / 1e6
+  state.running_containers = containers
+  state.cache_time = vim.loop.hrtime() / 1e6
   return containers
 end
 
-function M.list_running_containers_async(callback)
-  vim.schedule(function()
-    local result = M.list_running_containers()
-    if callback then
-      callback(result)
-    end
-  end)
+function M.get_cached_containers()
+  if not state.cache_ready then
+    return nil
+  end
+  if state.running_containers == nil then
+    return {}
+  end
+  return state.running_containers
+end
+
+function M.get_cached_devcontainer_projects()
+  if not state.cache_ready then
+    return nil
+  end
+  if state.devcontainer_projects == nil then
+    return {}
+  end
+  return state.devcontainer_projects
+end
+
+function M.refresh_cache(callback)
+  -- Populate all caches synchronously (called from vim.schedule, not at startup).
+  if not M.is_docker_available() then
+    state.docker_available = false
+  end
+  state.running_containers = M.list_running_containers()
+  state.devcontainer_projects = M.find_devcontainer_projects()
+  state.cache_ready = true
+  state.cache_time = vim.loop.hrtime() / 1e6
+  if callback then
+    callback()
+  end
 end
 
 function M.get_container_workspace_folder(container_id)
@@ -138,12 +182,6 @@ function M.find_devcontainer_projects(search_base)
   end
 
   return results
-end
-
-function M.invalidate_cache()
-  running_cache = nil
-  cache_time = 0
-  docker_available = nil
 end
 
 return M

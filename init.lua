@@ -5,6 +5,18 @@ require("config.format_specifiers").setup()
 require("config.preproc").setup()
 require("config.lazy")
 
+-- Warm container/devcontainer cache in the background after UI renders.
+-- This avoids blocking startup with docker/fd calls (which have timeouts
+-- but still cause a visible freeze when called synchronously).
+vim.api.nvim_create_autocmd("UIEnter", {
+  once = true,
+  callback = function()
+    vim.schedule(function()
+      pcall(require("config.container_detect").refresh_cache)
+    end)
+  end,
+})
+
 vim.api.nvim_create_autocmd("VimEnter", {
   once = true,
   callback = function()

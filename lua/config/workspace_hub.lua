@@ -63,46 +63,64 @@ function M.open(opts)
     end
   end
 
-  local ok_dc, devcontainer_projects = pcall(container_detect.find_devcontainer_projects)
-  local has_devcontainers = ok_dc and type(devcontainer_projects) == "table" and #devcontainer_projects > 0
+  -- Use cached data only – never call docker/fd synchronously.
+  if container_detect.is_cache_ready() then
+    local devcontainer_projects = container_detect.get_cached_devcontainer_projects()
+    local has_devcontainers = devcontainer_projects and #devcontainer_projects > 0
 
-  if has_devcontainers then
+    if has_devcontainers then
+      if #entries > 0 then
+        table.insert(entries, { type = "section", display = "", ordinal = "" })
+      end
+      table.insert(entries, { type = "section", display = "── Devcontainer Projects ──", ordinal = "" })
+      for _, p in ipairs(devcontainer_projects) do
+        table.insert(entries, {
+          type = "devcontainer",
+          display = "  " .. p.name .. "  " .. p.path,
+          ordinal = p.name .. " " .. p.path,
+          path = p.path,
+          name = p.name,
+          config_path = p.config_path,
+        })
+      end
+    end
+
+    local running_containers = container_detect.get_cached_containers()
+    local has_containers = running_containers and #running_containers > 0
+
+    if has_containers then
+      if #entries > 0 then
+        table.insert(entries, { type = "section", display = "", ordinal = "" })
+      end
+      table.insert(entries, { type = "section", display = "── Running Containers ──", ordinal = "" })
+      for _, c in ipairs(running_containers) do
+        local ws = c.workspace_folder ~= "" and "  " .. c.workspace_folder or ""
+        table.insert(entries, {
+          type = "container",
+          display = "  " .. c.name .. ws,
+          ordinal = c.name .. " " .. c.project,
+          id = c.id,
+          name = c.name,
+          workspace_folder = c.workspace_folder,
+          project_name = c.project,
+        })
+      end
+    end
+  else
+    -- Cache not ready yet – show a refresh hint.
     if #entries > 0 then
       table.insert(entries, { type = "section", display = "", ordinal = "" })
     end
-    table.insert(entries, { type = "section", display = "── Devcontainer Projects ──", ordinal = "" })
-    for _, p in ipairs(devcontainer_projects) do
-      table.insert(entries, {
-        type = "devcontainer",
-        display = "  " .. p.name .. "  " .. p.path,
-        ordinal = p.name .. " " .. p.path,
-        path = p.path,
-        name = p.name,
-        config_path = p.config_path,
-      })
-    end
-  end
-
-  local ok_cc, running_containers = pcall(container_detect.list_running_containers)
-  local has_containers = ok_cc and type(running_containers) == "table" and #running_containers > 0
-
-  if has_containers then
-    if #entries > 0 then
-      table.insert(entries, { type = "section", display = "", ordinal = "" })
-    end
-    table.insert(entries, { type = "section", display = "── Running Containers ──", ordinal = "" })
-    for _, c in ipairs(running_containers) do
-      local ws = c.workspace_folder ~= "" and "  " .. c.workspace_folder or ""
-      table.insert(entries, {
-        type = "container",
-        display = "  " .. c.name .. ws,
-        ordinal = c.name .. " " .. c.project,
-        id = c.id,
-        name = c.name,
-        workspace_folder = c.workspace_folder,
-        project_name = c.project,
-      })
-    end
+    table.insert(entries, {
+      type = "section",
+      display = "── Running Containers ──",
+      ordinal = "",
+    })
+    table.insert(entries, {
+      type = "section",
+      display = "  (cache loading – press <C-r> to refresh)",
+      ordinal = "",
+    })
   end
 
   if #entries == 0 then
