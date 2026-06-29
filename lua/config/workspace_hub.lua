@@ -149,18 +149,19 @@ function M.open(opts)
 end
 
 function M.handle_selection(entry)
+  local dc = require("config.devcontainer")
+
   if entry.type == "project" then
     vim.api.nvim_set_current_dir(entry.path)
     vim.env.PROJECT_ROOT = entry.path
     vim.env.WORKSPACE_FOLDER = entry.path
-    if vim.fn.filereadable(entry.path .. "/.devcontainer/devcontainer.json") == 1
-      or vim.fn.filereadable(entry.path .. "/devcontainer.json") == 1 then
+    if dc.has_devcontainer(entry.path) then
       vim.ui.select({ "Open normally", "Open in devcontainer" }, {
         prompt = entry.name .. " has a devcontainer.json:",
       }, function(choice)
         if choice == "Open in devcontainer" then
           vim.defer_fn(function()
-            pcall(vim.cmd, "ContainerOpen " .. vim.fn.fnameescape(entry.path))
+            dc.open(entry.path)
           end, 50)
         else
           vim.defer_fn(function()
@@ -178,7 +179,7 @@ function M.handle_selection(entry)
     vim.env.PROJECT_ROOT = entry.path
     vim.env.WORKSPACE_FOLDER = entry.path
     vim.defer_fn(function()
-      pcall(vim.cmd, "ContainerOpen " .. vim.fn.fnameescape(entry.path))
+      dc.open(entry.path)
     end, 50)
   elseif entry.type == "container" then
     local folder = entry.workspace_folder
@@ -186,7 +187,7 @@ function M.handle_selection(entry)
       vim.api.nvim_set_current_dir(folder)
     end
     vim.defer_fn(function()
-      pcall(vim.cmd, "ContainerExec " .. entry.id)
+      require("container").attach(entry.name)
     end, 50)
   end
 end

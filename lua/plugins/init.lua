@@ -236,19 +236,19 @@ return {
       end
 
       local function container_status()
-        local c = require("config.container_detect")
-        if not pcall(c.is_docker_available, c) or not c.is_docker_available() then
+        local dc = require("config.devcontainer")
+        if dc.is_connected() then
+          return dc.statusline()
+        end
+        local cd = require("config.container_detect")
+        if not pcall(cd.is_docker_available, cd) or not cd.is_docker_available() then
           return ""
         end
-        local containers = c.list_running_containers()
-        if #containers == 0 then
-          return ""
-        end
+        local containers = cd.list_running_containers()
         local names = {}
         for _, cont in ipairs(containers) do
           if cont.workspace_folder ~= "" and cont.workspace_folder ~= vim.fn.expand("~") then
-            local project = vim.fn.fnamemodify(cont.workspace_folder, ":t")
-            table.insert(names, project)
+            table.insert(names, vim.fn.fnamemodify(cont.workspace_folder, ":t"))
           end
         end
         if #names == 0 then
@@ -901,6 +901,36 @@ return {
           show_notifications = true,
         },
       })
+      require("config.devcontainer").setup()
+
+      vim.api.nvim_create_user_command("DevcontainerReopen", function(opts)
+        require("config.devcontainer").reopen(opts.args ~= "" and opts.args or nil)
+      end, { nargs = "?", desc = "Reopen project in devcontainer" })
+
+      vim.api.nvim_create_user_command("DevcontainerConnect", function()
+        require("config.devcontainer").connect()
+      end, { desc = "Connect to a running container" })
+
+      vim.api.nvim_create_user_command("DevcontainerHub", function()
+        require("config.workspace_hub").open()
+      end, { desc = "Open workspace hub" })
+
+      vim.api.nvim_create_user_command("DevcontainerUp", function(opts)
+        require("config.devcontainer").open(opts.args ~= "" and opts.args or nil)
+      end, { nargs = "?", desc = "Build and start devcontainer" })
+
+      vim.api.nvim_create_user_command("DevcontainerStop", function()
+        require("config.devcontainer").stop()
+      end, { desc = "Stop devcontainer" })
+
+      vim.api.nvim_create_user_command("DevcontainerRebuild", function()
+        local root = require("config.devcontainer").find_project_root()
+        require("config.devcontainer").rebuild(root)
+      end, { desc = "Rebuild devcontainer" })
+
+      vim.api.nvim_create_user_command("DevcontainerShell", function()
+        require("config.devcontainer").shell()
+      end, { desc = "Open shell in devcontainer" })
     end,
   },
 
@@ -1185,7 +1215,7 @@ return {
       })
       require("which-key").add({
         { "<leader>d", group = "debug/diagnostics" },
-        { "<leader>D", group = "devcontainer" },
+        { "<leader>D", group = "devcontainer (hub/reopen/stop)" },
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
         { "<leader>h", group = "workspace hub" },

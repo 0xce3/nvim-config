@@ -285,12 +285,14 @@ map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "
 
 map("n", "<leader>hh", function() require("config.workspace_hub").open() end, { desc = "Open workspace hub" })
 
-map("n", "<leader>Du", "<cmd>ContainerOpen<cr>", { desc = "Devcontainer: up/start" })
-map("n", "<leader>Dd", "<cmd>ContainerStop<cr>", { desc = "Devcontainer: stop" })
+map("n", "<leader>Du", "<cmd>DevcontainerUp<cr>", { desc = "Devcontainer: up (build+start)" })
+map("n", "<leader>Dr", "<cmd>DevcontainerReopen<cr>", { desc = "Devcontainer: reopen" })
+map("n", "<leader>Dd", "<cmd>DevcontainerStop<cr>", { desc = "Devcontainer: stop" })
 map("n", "<leader>Dk", "<cmd>ContainerKill<cr>", { desc = "Devcontainer: kill" })
-map("n", "<leader>Dr", "<cmd>ContainerRestart<cr>", { desc = "Devcontainer: restart" })
-map("n", "<leader>Ds", "<cmd>ContainerShell<cr>", { desc = "Devcontainer: shell" })
-map("n", "<leader>Dp", "<cmd>ContainerPicker<cr>", { desc = "Devcontainer: picker" })
+map("n", "<leader>DR", "<cmd>DevcontainerRebuild<cr>", { desc = "Devcontainer: rebuild" })
+map("n", "<leader>Ds", "<cmd>DevcontainerShell<cr>", { desc = "Devcontainer: shell" })
+map("n", "<leader>Dc", "<cmd>DevcontainerConnect<cr>", { desc = "Devcontainer: connect" })
+map("n", "<leader>Dh", "<cmd>DevcontainerHub<cr>", { desc = "Devcontainer: hub" })
 
 map("t", "<c-z>", [[<c-\><c-n>u]], { desc = "Undo in editor" })
 map("t", "<esc><esc>", [[<c-\><c-n>]], { desc = "Leave terminal mode" })
