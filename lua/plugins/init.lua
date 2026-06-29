@@ -699,30 +699,6 @@ return {
         sections = {
           { section = "header" },
           { section = "keys", gap = 1, padding = 1 },
-          function()
-            local container_detect = require("config.container_detect")
-            local containers = container_detect.list_running_containers()
-            if #containers == 0 then
-              return { title = "Running Devcontainers", lines = { "  (none running)  " }, hl = "Comment" }
-            end
-            local lines = {}
-            for _, c in ipairs(containers) do
-              local ws = c.workspace_folder ~= "" and "  " .. c.workspace_folder or ""
-              table.insert(lines, "   " .. c.name .. ws)
-            end
-            return { title = "Running Devcontainers", lines = lines, hl = "SpecialComment" }
-          end,
-          function()
-            local recent_projects = require("config.workspace_hub").get_recent_projects()
-            if #recent_projects == 0 then
-              return {}
-            end
-            local lines = {}
-            for _, p in ipairs(recent_projects) do
-              table.insert(lines, "    " .. p.name .. "  " .. p.path)
-            end
-            return { title = "Recent Projects", lines = lines, hl = "String" }
-          end,
           { section = "startup" },
         },
       },

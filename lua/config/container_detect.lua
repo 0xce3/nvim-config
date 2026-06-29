@@ -1,6 +1,9 @@
 local M = {}
 
 local docker_available = nil
+local running_cache = nil
+local cache_time = 0
+local CACHE_TTL_MS = 5000
 
 function M.is_docker_available()
   if docker_available ~= nil then
@@ -10,8 +13,8 @@ function M.is_docker_available()
     docker_available = false
     return false
   end
-  local ok, result = pcall(vim.system, { "docker", "info", "--format", "{{.ServerVersion}}" }, { text = true })
-  docker_available = ok and result.code == 0
+  local ok, result = pcall(vim.system, { "docker", "info", "--format", "{{.ServerVersion}}" }, { text = true, timeout = 3000 })
+  docker_available = ok and result ~= nil and result.code == 0
   return docker_available
 end
 
@@ -20,8 +23,14 @@ function M.list_running_containers()
     return {}
   end
 
-  local ok_result, result = pcall(vim.system, { "docker", "ps", "--format", "{{json .}}" }, { text = true })
-  if not ok_result or result.code ~= 0 or not result.stdout then
+  if running_cache ~= nil and (vim.loop.hrtime() / 1e6 - cache_time) < CACHE_TTL_MS then
+    return running_cache
+  end
+
+  local ok_result, result = pcall(vim.system, { "docker", "ps", "--format", "{{json .}}" }, { text = true, timeout = 5000 })
+  if not ok_result or result == nil or result.code ~= 0 or not result.stdout or result.stdout == "" then
+    running_cache = {}
+    cache_time = vim.loop.hrtime() / 1e6
     return {}
   end
 
@@ -31,9 +40,9 @@ function M.list_running_containers()
     if ok and data then
       local ok_inspect, inspect = pcall(vim.system,
         { "docker", "inspect", data.ID, "--format", "{{json .Config.Labels}}" },
-        { text = true })
+        { text = true, timeout = 3000 })
       local labels = {}
-      if ok_inspect and inspect.code == 0 and inspect.stdout then
+      if ok_inspect and inspect ~= nil and inspect.code == 0 and inspect.stdout then
         local ok2, lbls = pcall(vim.json.decode, inspect.stdout)
         if ok2 then
           labels = lbls
@@ -64,7 +73,18 @@ function M.list_running_containers()
     end
   end
 
+  running_cache = containers
+  cache_time = vim.loop.hrtime() / 1e6
   return containers
+end
+
+function M.list_running_containers_async(callback)
+  vim.schedule(function()
+    local result = M.list_running_containers()
+    if callback then
+      callback(result)
+    end
+  end)
 end
 
 function M.get_container_workspace_folder(container_id)
@@ -73,8 +93,8 @@ function M.get_container_workspace_folder(container_id)
   end
   local ok, result = pcall(vim.system,
     { "docker", "inspect", container_id, "--format", "{{index .Config.Labels \"devcontainer.local_folder\"}}" },
-    { text = true })
-  if ok and result.code == 0 and result.stdout then
+    { text = true, timeout = 3000 })
+  if ok and result ~= nil and result.code == 0 and result.stdout then
     local folder = vim.trim(result.stdout)
     return folder ~= "" and folder or nil
   end
@@ -83,19 +103,23 @@ end
 
 function M.find_devcontainer_projects(search_base)
   search_base = search_base or vim.env.HOME
+  if not search_base or vim.fn.isdirectory(search_base) == 0 then
+    return {}
+  end
+
   local results = {}
 
   local cmd
   if vim.fn.executable("fd") == 1 then
-    cmd = { "fd", "devcontainer.json", search_base, "--type", "f", "--hidden", "--no-ignore" }
+    cmd = { "fd", "devcontainer.json", search_base, "--type", "f", "--max-depth", "5", "--hidden", "--no-ignore" }
   elseif vim.fn.executable("find") == 1 then
-    cmd = { "find", search_base, "-type", "f", "-name", "devcontainer.json" }
+    cmd = { "find", search_base, "-maxdepth", "5", "-type", "f", "-name", "devcontainer.json" }
   else
     return results
   end
 
-  local ok_out, output = pcall(vim.system, cmd, { text = true })
-  if not ok_out or output.code ~= 0 or not output.stdout then
+  local ok_out, output = pcall(vim.system, cmd, { text = true, timeout = 10000 })
+  if not ok_out or output == nil or output.code ~= 0 or not output.stdout then
     return results
   end
 
@@ -103,7 +127,7 @@ function M.find_devcontainer_projects(search_base)
   for _, file in ipairs(vim.split(output.stdout, "\n", { trimempty = true })) do
     local project_dir = vim.fn.fnamemodify(file, ":h:h")
     local name = vim.fn.fnamemodify(project_dir, ":t")
-    if not seen[project_dir] then
+    if not seen[project_dir] and vim.fn.isdirectory(project_dir) == 1 then
       seen[project_dir] = true
       table.insert(results, {
         name = name,
@@ -114,6 +138,12 @@ function M.find_devcontainer_projects(search_base)
   end
 
   return results
+end
+
+function M.invalidate_cache()
+  running_cache = nil
+  cache_time = 0
+  docker_available = nil
 end
 
 return M

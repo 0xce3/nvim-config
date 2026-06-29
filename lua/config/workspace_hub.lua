@@ -50,12 +50,6 @@ function M.open(opts)
   local recent_projects = M.get_recent_projects()
   local has_projects = #recent_projects > 0
 
-  local devcontainer_projects = container_detect.find_devcontainer_projects()
-  local has_devcontainers = #devcontainer_projects > 0
-
-  local running_containers = container_detect.list_running_containers()
-  local has_containers = #running_containers > 0
-
   if has_projects then
     table.insert(entries, { type = "section", display = "── Recent Projects ──", ordinal = "" })
     for _, p in ipairs(recent_projects) do
@@ -68,6 +62,9 @@ function M.open(opts)
       })
     end
   end
+
+  local ok_dc, devcontainer_projects = pcall(container_detect.find_devcontainer_projects)
+  local has_devcontainers = ok_dc and type(devcontainer_projects) == "table" and #devcontainer_projects > 0
 
   if has_devcontainers then
     if #entries > 0 then
@@ -85,6 +82,9 @@ function M.open(opts)
       })
     end
   end
+
+  local ok_cc, running_containers = pcall(container_detect.list_running_containers)
+  local has_containers = ok_cc and type(running_containers) == "table" and #running_containers > 0
 
   if has_containers then
     if #entries > 0 then
