@@ -106,6 +106,10 @@ local function container_bootstrap_script(workspace, workspace_name)
   }, "\n")
 end
 
+local function container_bootstrap_command(workspace, workspace_name)
+  return "sh -lc " .. q(container_bootstrap_script(workspace, workspace_name):gsub("exec nvim %.", "true"))
+end
+
 local function run_terminal(command)
   require("config.terminal").run(command)
 end
@@ -153,15 +157,31 @@ local function exec_nvim_command(root)
 end
 
 local function docker_exec_nvim_command(container, workspace)
-  local script = container_bootstrap_script(workspace, vim.fn.fnamemodify(workspace, ":t"))
+  local workspace_name = vim.fn.fnamemodify(workspace, ":t")
+  local fallback_workspace = "/workspaces/" .. workspace_name
+  local bootstrap = container_bootstrap_command(workspace, workspace_name)
+  local open_workspace = table.concat({
+    "workspace=" .. q(workspace),
+    "if [ ! -d \"$workspace\" ]; then workspace=" .. q(fallback_workspace) .. "; fi",
+    "if [ ! -d \"$workspace\" ]; then workspace=" .. q("/workspace/" .. workspace_name) .. "; fi",
+    "if [ ! -d \"$workspace\" ]; then workspace=$PWD; fi",
+    "cd \"$workspace\"",
+    "exec nvim .",
+  }, "; ")
   return table.concat({
+    "docker",
+    "exec",
+    "-i",
+    q(container),
+    bootstrap,
+    "&&",
     "docker",
     "exec",
     "-it",
     q(container),
     "sh",
     "-lc",
-    q(script),
+    q(open_workspace),
   }, " ")
 end
 
