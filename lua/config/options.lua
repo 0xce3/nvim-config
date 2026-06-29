@@ -51,11 +51,10 @@ opt.listchars = { tab = "  ", trail = ".", nbsp = "+" }
 
 opt.hidden = true
 
--- Folding driven by Treesitter (functions, blocks, structs, ...). Files open
--- fully unfolded (foldlevel 99); use zc/zo/za to fold on demand, zR/zM to
--- open/close all. Falls back to indent folding for buffers without a parser.
-opt.foldmethod = "expr"
-opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+-- Keep folding cheap in large firmware trees; Treesitter foldexpr is evaluated
+-- frequently while moving through C/C++ buffers.
+opt.foldmethod = "indent"
+opt.foldexpr = ""
 opt.foldnestmax = 6
 opt.foldlevel = 99
 opt.foldlevelstart = 99

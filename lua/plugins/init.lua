@@ -228,7 +228,7 @@ return {
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
       local function clangd_build()
-        local name = require("config.clangd_build").active_name(vim.fn.getcwd())
+        local name = require("config.clangd_build").name(vim.fn.getcwd())
         if not name then
           return ""
         end

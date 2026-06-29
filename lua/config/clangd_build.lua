@@ -56,24 +56,9 @@ function M.active(project)
     return configured
   end
 
-  local saved = M.get(project)
-  if saved then
-    return saved
-  end
-
-  local matches = vim.fs.find("compile_commands.json", {
-    path = project,
-    type = "file",
-    limit = 20,
-  })
-  table.sort(matches)
-  for _, path in ipairs(matches) do
-    if path ~= project .. "/compile_commands.json" then
-      return vim.fn.fnamemodify(path, ":h")
-    end
-  end
-
-  return nil
+  -- Must stay cheap: lualine calls active_name() on every statusline redraw.
+  -- Project-wide discovery belongs in the explicit <leader>fc picker.
+  return M.get(project)
 end
 
 function M.active_name(project)

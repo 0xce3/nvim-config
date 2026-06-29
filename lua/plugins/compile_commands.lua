@@ -12,23 +12,7 @@ local store = require("config.clangd_build")
 -- Substrings; any compile_commands.json whose path contains one is hidden.
 local EXCLUDE = vim.g.compile_commands_exclude or {}
 
-local function find_ccjson(root)
-  local raw = {}
-  if vim.fn.executable("find") == 1 then
-    -- Run find directly (no shell) so the user's login-shell startup noise
-    -- ("bash: no job control...") never leaks into the results.
-    local res = vim.system(
-      { "find", root, "-type", "f", "-name", "compile_commands.json" },
-      { text = true }
-    ):wait()
-    if res.stdout and res.stdout ~= "" then
-      raw = vim.split(res.stdout, "\n", { trimempty = true })
-    end
-  end
-  if vim.tbl_isempty(raw) then
-    raw = vim.fs.find("compile_commands.json", { path = root, type = "file", limit = 1000 })
-  end
-
+local function filter_ccjson(root, raw)
   local root_file = root .. "/compile_commands.json"
   local results = {}
   for _, f in ipairs(raw) do
@@ -47,7 +31,30 @@ local function find_ccjson(root)
       end
     end
   end
+  table.sort(results)
   return results
+end
+
+local function find_ccjson(root, callback)
+  local raw = {}
+  if vim.fn.executable("find") == 1 then
+    -- Run find directly (no shell) so the user's login-shell startup noise
+    -- ("bash: no job control...") never leaks into the results.
+    vim.system({ "find", root, "-type", "f", "-name", "compile_commands.json" }, { text = true }, function(res)
+      if res.stdout and res.stdout ~= "" then
+        raw = vim.split(res.stdout, "\n", { trimempty = true })
+      end
+      vim.schedule(function()
+        callback(filter_ccjson(root, raw))
+      end)
+    end)
+    return
+  end
+
+  if vim.tbl_isempty(raw) then
+    raw = vim.fs.find("compile_commands.json", { path = root, type = "file", limit = 1000 })
+  end
+  callback(filter_ccjson(root, raw))
 end
 
 local function restart_clangd(build_dir)
@@ -78,51 +85,53 @@ local function switch_compile_commands()
   local root = vim.fn.getcwd()
   local saved = store.get(root)
 
-  local results = find_ccjson(root)
-  if vim.tbl_isempty(results) then
-    vim.notify("No build compile_commands.json found under " .. root, vim.log.levels.WARN)
-    return
-  end
+  vim.notify("Searching compile_commands.json...", vim.log.levels.INFO, { title = "clangd" })
+  find_ccjson(root, function(results)
+    if vim.tbl_isempty(results) then
+      vim.notify("No build compile_commands.json found under " .. root, vim.log.levels.WARN)
+      return
+    end
 
-  pickers
-    .new({}, {
-      prompt_title = "Switch clangd build (compile_commands.json)",
-      finder = finders.new_table({
-        results = results,
-        entry_maker = function(entry)
-          local rel = vim.fn.fnamemodify(entry, ":.")
-          local active = (vim.fn.fnamemodify(entry, ":h") == saved) and "  ●" or ""
-          return { value = entry, display = rel .. active, ordinal = rel }
-        end,
-      }),
-      sorter = conf.generic_sorter({}),
-      attach_mappings = function(prompt_bufnr)
-        actions.select_default:replace(function()
-          local selection = action_state.get_selected_entry()
-          actions.close(prompt_bufnr)
-          if not selection then
-            return
-          end
-          local target = selection.value
-          local build_dir = vim.fn.fnamemodify(target, ":h")
+    pickers
+      .new({}, {
+        prompt_title = "Switch clangd build (compile_commands.json)",
+        finder = finders.new_table({
+          results = results,
+          entry_maker = function(entry)
+            local rel = vim.fn.fnamemodify(entry, ":.")
+            local active = (vim.fn.fnamemodify(entry, ":h") == saved) and "  ●" or ""
+            return { value = entry, display = rel .. active, ordinal = rel }
+          end,
+        }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr)
+          actions.select_default:replace(function()
+            local selection = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
+            if not selection then
+              return
+            end
+            local target = selection.value
+            local build_dir = vim.fn.fnamemodify(target, ":h")
 
-          -- Remember the choice in Neovim's state dir (not in the repo).
-          store.set(root, build_dir)
+            -- Remember the choice in Neovim's state dir (not in the repo).
+            store.set(root, build_dir)
 
-          restart_clangd(build_dir)
-          pcall(function()
-            require("lualine").refresh({ place = { "statusline" } })
+            restart_clangd(build_dir)
+            pcall(function()
+              require("lualine").refresh({ place = { "statusline" } })
+            end)
+            vim.notify(
+              "clangd build -> " .. vim.fn.fnamemodify(build_dir, ":."),
+              vim.log.levels.INFO,
+              { title = "clangd" }
+            )
           end)
-          vim.notify(
-            "clangd build -> " .. vim.fn.fnamemodify(build_dir, ":."),
-            vim.log.levels.INFO,
-            { title = "clangd" }
-          )
-        end)
-        return true
-      end,
-    })
-    :find()
+          return true
+        end,
+      })
+      :find()
+  end)
 end
 
 return {
