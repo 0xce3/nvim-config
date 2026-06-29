@@ -236,7 +236,7 @@ return {
       end
 
       local function container_status()
-        return ""
+        return require("config.devcontainer").statusline()
       end
 
       require("lualine").setup({
@@ -671,8 +671,8 @@ return {
             { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
             { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
             { icon = " ", key = "h", desc = "Workspace Hub", action = ":lua require('config.workspace_hub').open()" },
-            { icon = " ", key = "o", desc = "Devcontainer: open", action = ":ContainerOpen" },
-            { icon = " ", key = "p", desc = "Devcontainer: picker", action = ":ContainerPicker" },
+            { icon = " ", key = "o", desc = "Reopen in Devcontainer", action = ":DevcontainerReopen" },
+            { icon = " ", key = "b", desc = "Rebuild Devcontainer", action = ":DevcontainerRebuild" },
             { icon = " ", key = "s", desc = "Restore Session", action = '<cmd>lua require("persistence").load()<CR>' },
             { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
             { icon = " ", key = "q", desc = "Quit", action = ":qa" },
@@ -859,36 +859,6 @@ return {
           show_notifications = true,
         },
       })
-      require("config.devcontainer").setup()
-
-      vim.api.nvim_create_user_command("DevcontainerReopen", function(opts)
-        require("config.devcontainer").reopen(opts.args ~= "" and opts.args or nil)
-      end, { nargs = "?", desc = "Reopen project in devcontainer" })
-
-      vim.api.nvim_create_user_command("DevcontainerConnect", function()
-        require("config.devcontainer").connect()
-      end, { desc = "Connect to a running container" })
-
-      vim.api.nvim_create_user_command("DevcontainerHub", function()
-        require("config.workspace_hub").open()
-      end, { desc = "Open workspace hub" })
-
-      vim.api.nvim_create_user_command("DevcontainerUp", function(opts)
-        require("config.devcontainer").open(opts.args ~= "" and opts.args or nil)
-      end, { nargs = "?", desc = "Build and start devcontainer" })
-
-      vim.api.nvim_create_user_command("DevcontainerStop", function()
-        require("config.devcontainer").stop()
-      end, { desc = "Stop devcontainer" })
-
-      vim.api.nvim_create_user_command("DevcontainerRebuild", function()
-        local root = require("config.devcontainer").find_project_root()
-        require("config.devcontainer").rebuild(root)
-      end, { desc = "Rebuild devcontainer" })
-
-      vim.api.nvim_create_user_command("DevcontainerShell", function()
-        require("config.devcontainer").shell()
-      end, { desc = "Open shell in devcontainer" })
     end,
   },
 
