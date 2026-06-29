@@ -111,9 +111,12 @@ local function run_terminal(command)
 end
 
 local function replace_with_command(command)
+  local script = vim.fn.tempname() .. ".sh"
+  vim.fn.writefile({ "#!/usr/bin/env sh", "set -e", "clear", command }, script)
   vim.cmd("silent! wall")
   vim.cmd("redraw!")
-  vim.cmd("silent !clear; " .. command)
+  vim.cmd("silent !sh " .. q(script))
+  pcall(vim.fn.delete, script)
 end
 
 local function up_command(root, rebuild)
