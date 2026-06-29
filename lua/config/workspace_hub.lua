@@ -174,10 +174,14 @@ function M.handle_selection(entry)
     vim.env.PROJECT_ROOT = entry.path
     vim.env.WORKSPACE_FOLDER = entry.path
     if dc.has_devcontainer(entry.path) then
-      vim.ui.select({ "Reopen in Devcontainer", "Open locally" }, {
+      vim.ui.select({ "Attach to Running Container", "Reopen in Devcontainer", "Open locally" }, {
         prompt = entry.name .. " has a devcontainer.json:",
       }, function(choice)
-        if choice == "Reopen in Devcontainer" then
+        if choice == "Attach to Running Container" then
+          vim.defer_fn(function()
+            dc.attach(nil, entry.path)
+          end, 50)
+        elseif choice == "Reopen in Devcontainer" then
           vim.defer_fn(function()
             dc.reopen(entry.path)
           end, 50)
@@ -204,10 +208,12 @@ function M.handle_selection(entry)
     if folder ~= "" and vim.fn.isdirectory(folder) == 1 then
       vim.api.nvim_set_current_dir(folder)
       vim.defer_fn(function()
-        dc.reopen(folder)
+        dc.attach(entry.name, folder)
       end, 50)
     else
-      vim.notify("Container has no devcontainer.local_folder label; open the project folder and use :DevcontainerReopen", vim.log.levels.WARN)
+      vim.defer_fn(function()
+        dc.attach(entry.name)
+      end, 50)
     end
   end
 end

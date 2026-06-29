@@ -70,7 +70,8 @@ local function ensure_cli()
   return nil
 end
 
-local function container_bootstrap_script(workspace)
+local function container_bootstrap_script(workspace, workspace_name)
+  local fallback_workspace = "/workspaces/" .. workspace_name
   return table.concat({
     "set -e",
     "export DEVCONTAINER=true",
@@ -96,7 +97,11 @@ local function container_bootstrap_script(workspace)
     "  rm -rf \"${XDG_CONFIG_HOME:-$HOME/.config}/nvim\"",
     "  git clone " .. q(CONFIG_REPO) .. " \"${XDG_CONFIG_HOME:-$HOME/.config}/nvim\"",
     "fi",
-    "cd " .. q(workspace),
+    "workspace=" .. q(workspace),
+    "if [ ! -d \"$workspace\" ]; then workspace=" .. q(fallback_workspace) .. "; fi",
+    "if [ ! -d \"$workspace\" ]; then workspace=" .. q("/workspace/" .. workspace_name) .. "; fi",
+    "if [ ! -d \"$workspace\" ]; then workspace=$PWD; fi",
+    "cd \"$workspace\"",
     "exec nvim .",
   }, "\n")
 end
@@ -122,7 +127,7 @@ local function exec_nvim_command(root)
   if not cli then
     return nil
   end
-  local script = container_bootstrap_script(root)
+  local script = container_bootstrap_script(root, vim.fn.fnamemodify(root, ":t"))
   return table.concat({
     cli,
     "exec",
@@ -132,6 +137,69 @@ local function exec_nvim_command(root)
     "-lc",
     q(script),
   }, " ")
+end
+
+local function docker_exec_nvim_command(container, workspace)
+  local script = container_bootstrap_script(workspace, vim.fn.fnamemodify(workspace, ":t"))
+  return table.concat({
+    "docker",
+    "exec",
+    "-it",
+    q(container),
+    "sh",
+    "-lc",
+    q(script),
+  }, " ")
+end
+
+local function list_running_containers()
+  if vim.fn.executable("docker") == 0 then
+    notify("docker is required to attach to existing containers", vim.log.levels.ERROR)
+    return {}
+  end
+  local result = vim.system({ "docker", "ps", "--format", "{{json .}}" }, { text = true }):wait()
+  if result.code ~= 0 or not result.stdout or result.stdout == "" then
+    return {}
+  end
+  local containers = {}
+  for _, line in ipairs(vim.split(result.stdout, "\n", { trimempty = true })) do
+    local ok, data = pcall(vim.json.decode, line)
+    if ok and data then
+      table.insert(containers, {
+        id = data.ID,
+        name = data.Names:gsub("^/", ""),
+        image = data.Image,
+        status = data.Status,
+      })
+    end
+  end
+  return containers
+end
+
+local function inspect_container_workspace(container, root)
+  local result = vim.system({ "docker", "inspect", container }, { text = true }):wait()
+  if result.code ~= 0 or not result.stdout or result.stdout == "" then
+    return "/workspaces/" .. vim.fn.fnamemodify(root, ":t")
+  end
+  local ok, decoded = pcall(vim.json.decode, result.stdout)
+  local info = ok and decoded and decoded[1] or nil
+  if not info then
+    return "/workspaces/" .. vim.fn.fnamemodify(root, ":t")
+  end
+
+  local labels = info.Config and info.Config.Labels or {}
+  if labels and labels["devcontainer.workspace_folder"] and labels["devcontainer.workspace_folder"] ~= "" then
+    return labels["devcontainer.workspace_folder"]
+  end
+
+  local root_name = vim.fn.fnamemodify(root, ":t")
+  for _, mount in ipairs(info.Mounts or {}) do
+    if mount.Source == root or vim.fn.fnamemodify(mount.Source or "", ":t") == root_name then
+      return mount.Destination
+    end
+  end
+
+  return "/workspaces/" .. root_name
 end
 
 local function open_in_devcontainer(root, opts)
@@ -178,7 +246,36 @@ function M.rebuild(project_path)
 end
 
 function M.connect()
-  M.open(M.find_project_root())
+  M.attach()
+end
+
+function M.attach(container_name, project_path)
+  local root = project_path or M.find_project_root()
+  if container_name and container_name ~= "" then
+    local workspace = inspect_container_workspace(container_name, root)
+    notify("Attaching to " .. container_name)
+    run_terminal(docker_exec_nvim_command(container_name, workspace))
+    return
+  end
+
+  local containers = list_running_containers()
+  if #containers == 0 then
+    notify("No running containers found", vim.log.levels.WARN)
+    return
+  end
+
+  local items = {}
+  for _, c in ipairs(containers) do
+    table.insert(items, c.name .. "  " .. c.image .. "  " .. c.status)
+  end
+
+  vim.ui.select(items, { prompt = "Attach nvim to running container:" }, function(choice, idx)
+    if not choice or not idx then
+      return
+    end
+    local selected = containers[idx]
+    M.attach(selected.name, root)
+  end)
 end
 
 function M.shell(project_path)
@@ -237,10 +334,12 @@ function M.prompt_for_current_project()
   if not M.has_devcontainer(root) then
     return
   end
-  vim.ui.select({ "Reopen in Devcontainer", "Open locally" }, {
+  vim.ui.select({ "Attach to Running Container", "Reopen in Devcontainer", "Open locally" }, {
     prompt = vim.fn.fnamemodify(root, ":t") .. " has a devcontainer.json",
   }, function(choice)
-    if choice == "Reopen in Devcontainer" then
+    if choice == "Attach to Running Container" then
+      M.attach(nil, root)
+    elseif choice == "Reopen in Devcontainer" then
       M.reopen(root)
     end
   end)
@@ -254,6 +353,10 @@ function M.setup()
   vim.api.nvim_create_user_command("DevcontainerConnect", function()
     M.connect()
   end, { desc = "Open nvim in this project's devcontainer" })
+
+  vim.api.nvim_create_user_command("DevcontainerAttach", function(opts)
+    M.attach(opts.args ~= "" and opts.args or nil)
+  end, { nargs = "?", complete = "shellcmd", desc = "Attach nvim to a running Docker container" })
 
   vim.api.nvim_create_user_command("DevcontainerHub", function()
     require("config.workspace_hub").open()

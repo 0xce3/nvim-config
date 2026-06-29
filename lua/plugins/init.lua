@@ -671,6 +671,7 @@ return {
             { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
             { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
             { icon = " ", key = "h", desc = "Workspace Hub", action = ":lua require('config.workspace_hub').open()" },
+            { icon = " ", key = "a", desc = "Attach Container", action = ":DevcontainerAttach" },
             { icon = " ", key = "o", desc = "Reopen in Devcontainer", action = ":DevcontainerReopen" },
             { icon = " ", key = "b", desc = "Rebuild Devcontainer", action = ":DevcontainerRebuild" },
             { icon = " ", key = "s", desc = "Restore Session", action = '<cmd>lua require("persistence").load()<CR>' },
