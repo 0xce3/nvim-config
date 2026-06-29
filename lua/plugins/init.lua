@@ -1041,11 +1041,9 @@ return {
 
   {
     "neovim/nvim-lspconfig",
+    ft = { "c", "cpp", "python", "rust", "lua", "go", "json", "yaml", "h", "hpp" },
+    cmd = { "LspInfo", "LspStop", "LspStart", "LspRestart" },
     config = function()
-      local function find_compile_commands_dir()
-        return require("config.clangd_build").active(vim.fn.getcwd())
-      end
-
       local function lsp_client_filter(name)
         if name and name ~= "" then
           return { name = name }
@@ -1138,14 +1136,12 @@ return {
       -- argument" diagnostics). Written outside any project repo.
       require("config.clangd_config").ensure()
 
-      local clangd_cmd = { "clangd" }
-      local compile_commands_dir = find_compile_commands_dir()
-      if compile_commands_dir then
-        table.insert(clangd_cmd, "--compile-commands-dir=" .. compile_commands_dir)
-      end
-
+      -- No --compile-commands-dir here. Clangd auto-discovers
+      -- compile_commands.json by searching upward from the opened file.
+      -- The <leader>fc picker (switch_compile_commands) sets the
+      -- NVIM_CLANGD_COMPILE_COMMANDS_DIR env var for the correct build.
       vim.lsp.config("clangd", {
-        cmd = clangd_cmd,
+        cmd = { "clangd" },
       })
 
       vim.lsp.config("pyright", {
