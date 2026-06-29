@@ -73,8 +73,8 @@ Exact pinned versions live in `lazy-lock.json`.
 | `<leader>fc` | Pick active `compile_commands.json` for clangd |
 | `<leader>tr` | Run VS Code task |
 | `<leader>tl` | Run VS Code launch config |
-| `<leader>tj` / `<F12>` | Toggle reusable terminal tab |
-| `<leader>tq` | Close reusable terminal tab |
+| `<leader>tj` / `<F12>` | Toggle reusable terminal split/buffer |
+| `<leader>tq` | Hide reusable terminal split |
 | `<F5>` | Continue debug session or run first launch config |
 | `<F9>` | Toggle breakpoint |
 | `<F10>` / `<F11>` / `<S-F11>` | Step over / into / out |
@@ -84,8 +84,7 @@ Exact pinned versions live in `lazy-lock.json`.
 ## VS Code Tasks And Launches
 
 Tasks are read from `.vscode/tasks.json` through `vs-tasks.nvim`. Task commands
-run in a single reusable in-Nvim terminal tab instead of creating a new terminal
-per task.
+run in a single reusable terminal buffer shown in a normal split.
 
 Debug launches are read from `.vscode/launch.json` where possible and executed
 through `nvim-dap`. `:DebugLaunch` runs the first launch config by default, or a
@@ -105,7 +104,7 @@ init.lua                         bootstrap
 lua/config/options.lua           options and clipboard/folding behavior
 lua/config/keymaps.lua           global keymaps and formatting helpers
 lua/config/lazy.lua              lazy.nvim bootstrap
-lua/config/terminal.lua          reusable terminal tab
+lua/config/terminal.lua          reusable terminal buffer
 lua/config/vscode_debug.lua      generic VS Code launch/task debug helpers
 lua/plugins/init.lua             plugin specs and per-plugin config
 lua/plugins/compile_commands.lua clangd compile_commands picker

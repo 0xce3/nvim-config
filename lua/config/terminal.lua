@@ -1,132 +1,142 @@
--- A single reusable terminal that lives in its own tab page.
+-- A single reusable terminal buffer for project tasks and quick shell access.
 --
--- Used for running project tasks and as a quick shell (F12). Exactly ONE
--- terminal tab is kept and re-used (tracked by tab + buffer handle) instead of
--- spawning a new terminal/tab per run. Typing `exit` (or <leader>tq) closes it.
+-- The terminal is shown in a normal split, not a tabpage. F12 toggles the split;
+-- tasks reuse the same terminal job and send commands to it.
 
 local M = {}
 
 local state = {
-  buf = nil, -- terminal buffer id
-  chan = nil, -- terminal job channel
-  tab = nil, -- dedicated tab page handle
-  prev_tab = nil, -- tab to jump back to on toggle
+  buf = nil,
+  chan = nil,
+  win = nil,
+  previous_win = nil,
 }
 
 local function buf_ok()
   return state.buf ~= nil and vim.api.nvim_buf_is_valid(state.buf)
 end
 
-local function tab_ok()
-  return state.tab ~= nil and vim.api.nvim_tabpage_is_valid(state.tab)
+local function win_ok()
+  return state.win ~= nil and vim.api.nvim_win_is_valid(state.win)
 end
 
--- Turn the current window's buffer (just created via :terminal) into the
--- tracked terminal, and auto-close the tab when the shell exits.
+local function find_window()
+  if not buf_ok() then
+    return nil
+  end
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == state.buf then
+      return win
+    end
+  end
+  return nil
+end
+
 local function capture()
   state.buf = vim.api.nvim_get_current_buf()
+  state.win = vim.api.nvim_get_current_win()
   state.chan = vim.b[state.buf].terminal_job_id
-  vim.bo[state.buf].buflisted = false
+  vim.bo[state.buf].buflisted = true
+  vim.bo[state.buf].bufhidden = "hide"
+  vim.api.nvim_buf_set_name(state.buf, "Task Terminal")
+
   vim.api.nvim_create_autocmd("TermClose", {
     buffer = state.buf,
     once = true,
     callback = function()
-      local tab = state.tab
-      state.buf, state.chan, state.tab = nil, nil, nil
-      vim.schedule(function()
-        if tab and vim.api.nvim_tabpage_is_valid(tab) and #vim.api.nvim_list_tabpages() > 1 then
-          pcall(vim.cmd, "tabclose " .. vim.api.nvim_tabpage_get_number(tab))
-        end
-      end)
+      state.buf, state.chan, state.win = nil, nil, nil
     end,
   })
 end
 
--- Focus the window showing the terminal buffer inside the tracked tab.
-local function focus_term_win()
-  if not (tab_ok() and buf_ok()) then
-    return false
+local function create_split()
+  vim.cmd("botright split")
+  vim.api.nvim_win_set_height(0, math.max(12, math.floor(vim.o.lines * 0.30)))
+  if buf_ok() then
+    vim.api.nvim_win_set_buf(0, state.buf)
+    state.win = vim.api.nvim_get_current_win()
+  else
+    vim.cmd("terminal")
+    capture()
   end
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(state.tab)) do
-    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == state.buf then
-      vim.api.nvim_set_current_win(win)
-      return true
-    end
-  end
-  return false
 end
 
--- Open/focus the single terminal tab, creating it (or its terminal) as needed.
 local function open()
-  if tab_ok() then
-    vim.api.nvim_set_current_tabpage(state.tab)
-    if buf_ok() then
-      if not focus_term_win() then
-        vim.api.nvim_set_current_buf(state.buf)
-      end
-    else
-      vim.cmd("terminal")
-      capture()
-    end
+  local existing = find_window()
+  if existing then
+    state.win = existing
+    vim.api.nvim_set_current_win(existing)
   else
-    vim.cmd("$tabnew")
-    state.tab = vim.api.nvim_get_current_tabpage()
-    if buf_ok() then
-      vim.api.nvim_set_current_buf(state.buf)
-    else
-      vim.cmd("terminal")
-      capture()
-    end
+    create_split()
   end
   vim.cmd("startinsert")
 end
 
--- F12: open/focus the terminal tab, or jump back if already on it.
 function M.toggle()
-  if tab_ok() and vim.api.nvim_get_current_tabpage() == state.tab then
-    if state.prev_tab and vim.api.nvim_tabpage_is_valid(state.prev_tab) then
-      vim.api.nvim_set_current_tabpage(state.prev_tab)
+  local current = vim.api.nvim_get_current_win()
+  local existing = find_window()
+
+  if existing and current == existing then
+    if state.previous_win and vim.api.nvim_win_is_valid(state.previous_win) then
+      vim.api.nvim_set_current_win(state.previous_win)
     else
-      pcall(vim.cmd, "tabprevious")
+      pcall(vim.cmd, "wincmd p")
     end
     return
   end
-  state.prev_tab = vim.api.nvim_get_current_tabpage()
+
+  if existing then
+    state.previous_win = current
+    state.win = existing
+    vim.api.nvim_set_current_win(existing)
+    vim.cmd("startinsert")
+    return
+  end
+
+  state.previous_win = current
   open()
 end
 
--- Run a shell command in the reusable terminal (creates + focuses it).
 function M.run(command)
   if not command or command == "" then
     return
   end
+
   local fresh = not buf_ok()
-  state.prev_tab = vim.api.nvim_get_current_tabpage()
+  if not win_ok() then
+    state.previous_win = vim.api.nvim_get_current_win()
+  end
   open()
+
   local function send()
     if state.chan then
       vim.fn.chansend(state.chan, command .. "\n")
     end
   end
+
   if fresh then
-    vim.defer_fn(send, 150) -- let the freshly started shell come up
+    vim.defer_fn(send, 150)
   else
     send()
   end
 end
 
--- Close the terminal tab and kill its shell.
 function M.close()
-  if tab_ok() and #vim.api.nvim_list_tabpages() > 1 then
-    pcall(vim.cmd, "tabclose " .. vim.api.nvim_tabpage_get_number(state.tab))
+  local win = find_window()
+  if win then
+    pcall(vim.api.nvim_win_close, win, true)
   end
+  state.win = nil
+end
+
+function M.kill()
   if state.chan then
     pcall(vim.fn.jobstop, state.chan)
   end
   if buf_ok() then
     pcall(vim.api.nvim_buf_delete, state.buf, { force = true })
   end
-  state.buf, state.chan, state.tab = nil, nil, nil
+  state.buf, state.chan, state.win = nil, nil, nil
 end
 
 return M

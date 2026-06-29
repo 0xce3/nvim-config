@@ -42,4 +42,46 @@ function M.set(project, dir)
   end
 end
 
+function M.name(project)
+  local dir = M.get(project)
+  if not dir then
+    return nil
+  end
+  return vim.fn.fnamemodify(dir, ":t")
+end
+
+function M.active(project)
+  local configured = vim.env.NVIM_CLANGD_COMPILE_COMMANDS_DIR
+  if configured and configured ~= "" and vim.fn.filereadable(configured .. "/compile_commands.json") == 1 then
+    return configured
+  end
+
+  local saved = M.get(project)
+  if saved then
+    return saved
+  end
+
+  local matches = vim.fs.find("compile_commands.json", {
+    path = project,
+    type = "file",
+    limit = 20,
+  })
+  table.sort(matches)
+  for _, path in ipairs(matches) do
+    if path ~= project .. "/compile_commands.json" then
+      return vim.fn.fnamemodify(path, ":h")
+    end
+  end
+
+  return nil
+end
+
+function M.active_name(project)
+  local dir = M.active(project)
+  if not dir then
+    return nil
+  end
+  return vim.fn.fnamemodify(dir, ":t")
+end
+
 return M

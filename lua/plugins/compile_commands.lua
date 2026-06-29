@@ -110,6 +110,9 @@ local function switch_compile_commands()
           store.set(root, build_dir)
 
           restart_clangd(build_dir)
+          pcall(function()
+            require("lualine").refresh({ place = { "statusline" } })
+          end)
           vim.notify(
             "clangd build -> " .. vim.fn.fnamemodify(build_dir, ":."),
             vim.log.levels.INFO,

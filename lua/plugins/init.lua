@@ -227,6 +227,14 @@ return {
     "nvim-lualine/lualine.nvim",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
+      local function clangd_build()
+        local name = require("config.clangd_build").active_name(vim.fn.getcwd())
+        if not name then
+          return ""
+        end
+        return "clangd:" .. name
+      end
+
       require("lualine").setup({
         options = {
           theme = "gruvbox",
@@ -239,7 +247,7 @@ return {
           lualine_a = { "mode" },
           lualine_b = { "branch", "diff", "diagnostics" },
           lualine_c = { { "filename", path = 1 } },
-          lualine_x = { "encoding", "fileformat", "filetype" },
+          lualine_x = { clangd_build, "encoding", "fileformat", "filetype" },
           lualine_y = { "progress" },
           lualine_z = { "location" },
         },
@@ -481,7 +489,7 @@ return {
         return prefix .. "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
       end
 
-      -- Tasks run in the single reusable terminal tab (see lua/config/terminal.lua).
+      -- Tasks run in the single reusable terminal buffer (see lua/config/terminal.lua).
       local term = require("config.terminal")
 
       vstask_job.start_job = function(opts)
@@ -562,7 +570,7 @@ return {
         require("vstask").command()
       end, { desc = "Run shell task" })
       map("n", "<leader>tj", term.toggle, { desc = "Toggle task terminal" })
-      map("n", "<leader>tq", term.close, { desc = "Close task terminal" })
+        map("n", "<leader>tq", term.close, { desc = "Hide task terminal" })
     end,
   },
 
@@ -919,36 +927,7 @@ return {
     "neovim/nvim-lspconfig",
     config = function()
       local function find_compile_commands_dir()
-        local configured_dir = vim.env.NVIM_CLANGD_COMPILE_COMMANDS_DIR
-        if configured_dir and configured_dir ~= "" then
-          local configured_path = configured_dir .. "/compile_commands.json"
-          if vim.fn.filereadable(configured_path) == 1 then
-            return configured_dir
-          end
-        end
-
-        -- Build last selected via the <leader>fc switcher, remembered in
-        -- Neovim's state dir (never in the repo). Prefer it so clangd starts on
-        -- the same build the picker shows as active, instead of falling back to
-        -- the first candidate below on every restart.
-        local saved = require("config.clangd_build").get(vim.fn.getcwd())
-        if saved then
-          return saved
-        end
-
-        local matches = vim.fs.find("compile_commands.json", {
-          path = vim.fn.getcwd(),
-          type = "file",
-          limit = 20,
-        })
-        table.sort(matches)
-        for _, path in ipairs(matches) do
-          if path ~= vim.fn.getcwd() .. "/compile_commands.json" then
-            return vim.fn.fnamemodify(path, ":h")
-          end
-        end
-
-        return nil
+        return require("config.clangd_build").active(vim.fn.getcwd())
       end
 
       local function lsp_client_filter(name)
@@ -1095,9 +1074,7 @@ return {
     event = "VimEnter",
     config = function()
       local persistence = require("persistence")
-      -- No "tabpages": only the current tab page (its buffers + window layout)
-      -- is saved/restored, so sessions never reopen a pile of stray tabs. The
-      -- F12 terminal lives in its own tab on demand and shouldn't be persisted.
+      -- No "tabpages": only buffers and the current window layout are restored.
       vim.opt.sessionoptions = { "buffers", "curdir", "winsize" }
       persistence.setup()
 
@@ -1106,7 +1083,7 @@ return {
         callback = function()
           vim.cmd("%argdel")
 
-          -- Close the reusable terminal tab so it isn't captured in the session.
+          -- Hide the reusable terminal split so it isn't captured in the session layout.
           pcall(function()
             require("config.terminal").close()
           end)

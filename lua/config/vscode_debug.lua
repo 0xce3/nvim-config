@@ -174,7 +174,7 @@ local function run_vscode_task(label)
     return false
   end
 
-  -- Run every VS Code task through the reusable in-Nvim terminal tab.
+  -- Run every VS Code task through the reusable in-Nvim terminal buffer.
   if task.dependsOn ~= nil then
     job.run_dependent_tasks(task, tasks)
   else
