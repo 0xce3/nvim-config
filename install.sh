@@ -94,11 +94,13 @@ install_packages() {
         as_root apt-get install -y npm || true
       fi
       install_lazygit_github
+      install_fzf_github
       ;;
     dnf)
       as_root dnf install -y \
         neovim git curl ripgrep fd-find python3 python3-pip nodejs npm gh
       install_lazygit_github
+      install_fzf_github
       ;;
     pacman)
       as_root pacman -Sy --needed --noconfirm \
@@ -109,7 +111,7 @@ install_packages() {
         neovim git curl ripgrep fd python3 py3-pip nodejs npm github-cli lazygit
       ;;
     brew)
-      run brew install neovim git curl ripgrep fd python node gh lazygit
+      run brew install neovim git curl ripgrep fd python node gh lazygit fzf
       ;;
     *)
       log "No supported package manager found. Install Neovim, git, ripgrep, fd, clangd, clang-format, Python, Node.js, npm, cmake, and ninja manually."
@@ -186,6 +188,42 @@ install_lazygit_github() {
   as_root install "$tmp/lazygit" /usr/local/bin/lazygit
   rm -rf "$tmp"
   log "lazygit installed to /usr/local/bin"
+}
+
+install_fzf_github() {
+  if [[ "$dry_run" -eq 1 ]]; then
+    log "fzf: would download latest release from GitHub and install to /usr/local/bin"
+    return 0
+  fi
+
+  # Only install if system version is too old (< 0.36).
+  local current
+  current="$(fzf --version 2>/dev/null | awk '{print $1}' || true)"
+  if printf '0.36.0\n%s\n' "${current:-0.0.0}" | sort -V -C 2>/dev/null; then
+    return 0
+  fi
+
+  local tmp arch url
+  tmp="$(mktemp -d)"
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64)  arch="amd64" ;;
+    aarch64) arch="arm64"  ;;
+    *)       log "Unsupported architecture: $arch"; return 1 ;;
+  esac
+
+  url="$(curl -fsSL https://api.github.com/repos/junegunn/fzf/releases/latest \
+    | grep "browser_download_url.*linux_${arch}.tar.gz" \
+    | cut -d '"' -f 4)"
+
+  [[ -n "$url" ]] || { log "Could not determine fzf download URL"; return 1; }
+
+  log "Downloading fzf from $url"
+  curl -fsSL "$url" -o "$tmp/fzf.tar.gz"
+  tar -xzf "$tmp/fzf.tar.gz" -C "$tmp" fzf
+  as_root install "$tmp/fzf" /usr/local/bin/fzf
+  rm -rf "$tmp"
+  log "fzf installed to /usr/local/bin"
 }
 
 check_neovim_version() {
