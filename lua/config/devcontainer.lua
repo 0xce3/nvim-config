@@ -110,6 +110,23 @@ local function run_terminal(command)
   require("config.terminal").run(command)
 end
 
+local function replace_with_command(command)
+  local launcher = table.concat({
+    "sleep 0.2",
+    "clear",
+    "exec </dev/tty >/dev/tty 2>/dev/tty",
+    command,
+  }, "; ")
+  local ok = vim.fn.jobstart({ "sh", "-lc", launcher }, { detach = true }) > 0
+  if not ok then
+    notify("Failed to launch replacement nvim", vim.log.levels.ERROR)
+    return
+  end
+  vim.schedule(function()
+    vim.cmd("silent! qall!")
+  end)
+end
+
 local function up_command(root, rebuild)
   local cli = ensure_cli()
   if not cli then
@@ -229,7 +246,7 @@ local function open_in_devcontainer(root, opts)
   end
 
   notify((opts.rebuild and "Rebuilding" or "Opening") .. " devcontainer for " .. root)
-  run_terminal(up .. " && " .. exec_nvim)
+  replace_with_command(up .. " && " .. exec_nvim)
   refresh_statusline()
 end
 
@@ -254,7 +271,7 @@ function M.attach(container_name, project_path)
   if container_name and container_name ~= "" then
     local workspace = inspect_container_workspace(container_name, root)
     notify("Attaching to " .. container_name)
-    run_terminal(docker_exec_nvim_command(container_name, workspace))
+    replace_with_command(docker_exec_nvim_command(container_name, workspace))
     return
   end
 
@@ -335,13 +352,23 @@ function M.menu(project_path)
   local finders = require("telescope.finders")
   local conf = require("telescope.config").values
 
-  local entries = {
-    { label = "Attach to running container", action = function() M.attach(nil, root) end, ordinal = "attach running container" },
-    { label = "Reopen in Devcontainer", action = function() M.reopen(root) end, ordinal = "reopen devcontainer" },
-    { label = "Rebuild Devcontainer", action = function() M.rebuild(root) end, ordinal = "rebuild devcontainer" },
-    { label = "Open Devcontainer Shell", action = function() M.shell(root) end, ordinal = "shell devcontainer" },
-    { label = "Stop Devcontainer", action = function() M.stop(root) end, ordinal = "stop devcontainer" },
-  }
+  local entries = {}
+  if M.is_inside_container() then
+    entries = {
+      { label = "Rebuild Devcontainer", action = function() M.rebuild(root) end, ordinal = "rebuild devcontainer" },
+      { label = "Open Local Workspace", action = function() notify("Open a local shell and run nvim " .. root, vim.log.levels.INFO) end, ordinal = "open local workspace" },
+      { label = "Open Devcontainer Shell", action = function() M.shell(root) end, ordinal = "shell devcontainer" },
+      { label = "Stop Devcontainer", action = function() M.stop(root) end, ordinal = "stop devcontainer" },
+    }
+  else
+    entries = {
+      { label = "Attach to running container", action = function() M.attach(nil, root) end, ordinal = "attach running container" },
+      { label = "Reopen in Devcontainer", action = function() M.reopen(root) end, ordinal = "reopen devcontainer" },
+      { label = "Rebuild Devcontainer", action = function() M.rebuild(root) end, ordinal = "rebuild devcontainer" },
+      { label = "Open Devcontainer Shell", action = function() M.shell(root) end, ordinal = "shell devcontainer" },
+      { label = "Stop Devcontainer", action = function() M.stop(root) end, ordinal = "stop devcontainer" },
+    }
+  end
 
   for _, c in ipairs(list_running_containers()) do
     table.insert(entries, {
@@ -409,7 +436,7 @@ end
 
 function M.statusline()
   if M.is_inside_container() then
-    return "devcontainer"
+    return ""
   end
   local cwd = vim.uv.cwd()
   if state.status_cwd == cwd and state.status_text then
@@ -418,11 +445,18 @@ function M.statusline()
   local root = M.find_project_root()
   state.status_cwd = cwd
   if M.has_devcontainer(root) then
-    state.status_text = "host:devcontainer"
+    state.status_text = ""
     return state.status_text
   end
-  state.status_text = "host"
+  state.status_text = ""
   return state.status_text
+end
+
+function M.statusline_color()
+  if M.is_inside_container() then
+    return { fg = "#2496ed", gui = "bold" }
+  end
+  return { fg = "#928374" }
 end
 
 function M.setup()
