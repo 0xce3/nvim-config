@@ -15,6 +15,10 @@ local function buf_ok()
   return state.buf ~= nil and vim.api.nvim_buf_is_valid(state.buf)
 end
 
+function M.is_terminal_buffer(bufnr)
+  return buf_ok() and bufnr == state.buf
+end
+
 local function capture()
   state.buf = vim.api.nvim_get_current_buf()
   state.chan = vim.b[state.buf].terminal_job_id

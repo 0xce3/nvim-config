@@ -63,8 +63,9 @@ Exact pinned versions live in `lazy-lock.json`.
 | Key | Action |
 |-----|--------|
 | `<leader>w` | Save file |
-| `<leader>e` | Open Telescope file browser at project root |
-| `<leader>x` / `<leader>X` | Close buffer / force close buffer |
+| `<leader>e` | Open workspace-scoped Telescope file browser |
+| `<leader>E` | Open unrestricted Telescope file browser |
+| `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
 | `<Tab>` / `<S-Tab>` | Next / previous buffer |
 | `<leader>1` ... `<leader>9` | Jump to buffer |
 | `<leader>gg` | Fugitive Git status |
@@ -85,6 +86,8 @@ Exact pinned versions live in `lazy-lock.json`.
 
 Tasks are read from `.vscode/tasks.json` through `vs-tasks.nvim`. Task commands
 run in a single reusable terminal buffer shown like any other buffer.
+
+Terminal buffers can be closed with `<leader>x`, `q`, or `:q` from normal mode.
 
 Debug launches are read from `.vscode/launch.json` where possible and executed
 through `nvim-dap`. `:DebugLaunch` runs the first launch config by default, or a

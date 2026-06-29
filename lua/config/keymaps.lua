@@ -53,6 +53,11 @@ end
 local function close_current_buffer(force)
   local current = vim.api.nvim_get_current_buf()
 
+  if require("config.terminal").is_terminal_buffer(current) then
+    require("config.terminal").kill()
+    return
+  end
+
   if vim.bo[current].modified and not force then
     vim.notify("Buffer hat ungespeicherte Aenderungen. Nutze :BufferClose! oder <leader>X.", vim.log.levels.WARN)
     return
@@ -74,6 +79,19 @@ end
 vim.api.nvim_create_user_command("BufferClose", function(opts)
   close_current_buffer(opts.bang)
 end, { bang = true, desc = "Close current buffer without closing the editor layout" })
+
+vim.api.nvim_create_autocmd("TermOpen", {
+  callback = function(event)
+    vim.keymap.set("n", "q", function()
+      if require("config.terminal").is_terminal_buffer(event.buf) then
+        require("config.terminal").kill()
+      else
+        vim.cmd("quit")
+      end
+    end, { buffer = event.buf, desc = "Close terminal buffer" })
+    vim.cmd([[cnoreabbrev <buffer> <expr> q getcmdtype() == ':' && getcmdline() == 'q' ? 'BufferClose' : 'q']])
+  end,
+})
 
 vim.api.nvim_create_user_command("Bd", function(opts)
   close_current_buffer(opts.bang)
@@ -184,7 +202,42 @@ map("n", "<leader>X", "<cmd>BufferClose!<cr>", { desc = "Force close buffer" })
 map("v", "<C-c>", '"+y', { desc = "Copy selection to clipboard" })
 map("v", "<C-x>", '"+d', { desc = "Cut selection to clipboard" })
 
+local function workspace_root()
+  local matches = vim.fs.find({ ".git", ".vscode" }, { upward = true, path = vim.uv.cwd() })
+  if #matches == 0 then
+    return vim.uv.cwd()
+  end
+  return vim.fs.dirname(matches[1])
+end
+
+local function open_file_browser(opts)
+  require("telescope").extensions.file_browser.file_browser(vim.tbl_extend("force", {
+    grouped = true,
+    hidden = true,
+    respect_gitignore = false,
+  }, opts or {}))
+end
+
 map("n", "<leader>e", function()
+  local root = workspace_root()
+  open_file_browser({
+    path = root,
+    cwd = root,
+    cwd_to_path = false,
+    mappings = {
+      i = {
+        ["<C-h>"] = false,
+        ["<BS>"] = false,
+      },
+      n = {
+        ["h"] = false,
+        ["-"] = false,
+      },
+    },
+  })
+end, { desc = "Open workspace file explorer" })
+
+map("n", "<leader>E", function()
   require("telescope").extensions.file_browser.file_browser({
     path = vim.uv.cwd(),
     cwd = vim.uv.cwd(),
@@ -192,7 +245,7 @@ map("n", "<leader>e", function()
     hidden = true,
     respect_gitignore = false,
   })
-end, { desc = "Open file explorer" })
+end, { desc = "Open unrestricted file explorer" })
 map("n", "<leader>gg", "<cmd>Git<cr>", { desc = "Open Git status" })
 map("n", "K", vim.diagnostic.open_float, { desc = "Show diagnostic" })
 map("n", "[d", function() vim.diagnostic.jump({ count = -1 }) end, { desc = "Previous diagnostic" })
