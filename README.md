@@ -73,8 +73,8 @@ Exact pinned versions live in `lazy-lock.json`.
 | `<leader>fc` | Pick active `compile_commands.json` for clangd |
 | `<leader>tr` | Run VS Code task |
 | `<leader>tl` | Run VS Code launch config |
-| `<leader>tj` / `<F12>` | Toggle reusable terminal split/buffer |
-| `<leader>tq` | Hide reusable terminal split |
+| `<leader>tj` / `<F12>` | Toggle reusable terminal buffer |
+| `<leader>tq` | Leave reusable terminal buffer |
 | `<F5>` | Continue debug session or run first launch config |
 | `<F9>` | Toggle breakpoint |
 | `<F10>` / `<F11>` / `<S-F11>` | Step over / into / out |
@@ -84,7 +84,7 @@ Exact pinned versions live in `lazy-lock.json`.
 ## VS Code Tasks And Launches
 
 Tasks are read from `.vscode/tasks.json` through `vs-tasks.nvim`. Task commands
-run in a single reusable terminal buffer shown in a normal split.
+run in a single reusable terminal buffer shown like any other buffer.
 
 Debug launches are read from `.vscode/launch.json` where possible and executed
 through `nvim-dap`. `:DebugLaunch` runs the first launch config by default, or a

@@ -6,6 +6,33 @@ end
 
 function M.find_task_root()
   local cwd = vim.uv.cwd()
+  local project_name = vim.fn.fnamemodify(cwd, ":t")
+
+  local function valid_root(path)
+    return path and path ~= "" and vim.fn.isdirectory(path) == 1 and vim.fn.filereadable(vim.fs.joinpath(path, ".vscode", "tasks.json")) == 1
+  end
+
+  if valid_root(vim.env.NVIM_TASK_WORKSPACE_FOLDER) then
+    return vim.env.NVIM_TASK_WORKSPACE_FOLDER
+  end
+
+  local home = vim.env.HOME or ""
+  for _, base in ipairs({ "workspace", "workspaces", "west" .. "_" .. "workspace" }) do
+    local candidate = vim.fs.joinpath(home, base, project_name)
+    if valid_root(candidate) then
+      return candidate
+    end
+  end
+
+  for name, type_ in vim.fs.dir(cwd) do
+    if type_ == "directory" and name:match("^%.") and name:lower():find("workspace", 1, true) then
+      local mirrored = vim.fs.joinpath(cwd, name, project_name)
+      if valid_root(mirrored) then
+        return mirrored
+      end
+    end
+  end
+
   local matches = vim.fs.find({ ".vscode", ".git" }, { upward = true, path = cwd })
   if #matches == 0 then
     return cwd

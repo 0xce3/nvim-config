@@ -380,6 +380,33 @@ return {
     config = function()
       local function find_task_root()
         local cwd = vim.uv.cwd()
+        local project_name = vim.fn.fnamemodify(cwd, ":t")
+
+        local function valid_root(path)
+          return path and path ~= "" and vim.fn.isdirectory(path) == 1 and vim.fn.filereadable(vim.fs.joinpath(path, ".vscode", "tasks.json")) == 1
+        end
+
+        if valid_root(vim.env.NVIM_TASK_WORKSPACE_FOLDER) then
+          return vim.env.NVIM_TASK_WORKSPACE_FOLDER
+        end
+
+        local home = vim.env.HOME or ""
+        for _, base in ipairs({ "workspace", "workspaces", "west" .. "_" .. "workspace" }) do
+          local candidate = vim.fs.joinpath(home, base, project_name)
+          if valid_root(candidate) then
+            return candidate
+          end
+        end
+
+        for name, type_ in vim.fs.dir(cwd) do
+          if type_ == "directory" and name:match("^%.") and name:lower():find("workspace", 1, true) then
+            local mirrored = vim.fs.joinpath(cwd, name, project_name)
+            if valid_root(mirrored) then
+              return mirrored
+            end
+          end
+        end
+
         local matches = vim.fs.find({ ".vscode", ".git" }, { upward = true, path = cwd })
         if #matches == 0 then
           return cwd
@@ -466,9 +493,8 @@ return {
         return build_launch(command, expanded_args)
       end
 
-      local clean_command = vstask_job.clean_command
       vstask_job.clean_command = function(command, options)
-        local cleaned = expand_vscode_vars(clean_command(command, options))
+        local cleaned = expand_vscode_vars(command)
         if type(options) == "table" and type(options.env) == "table" then
           local exports = {}
           for key, value in pairs(options.env) do
@@ -483,8 +509,10 @@ return {
           activate = ". " .. vim.fn.shellescape(vim.env.VIRTUAL_ENV .. "/bin/activate") .. " 2>/dev/null"
         end
         local prefix = activate and (activate .. " && ") or ""
+
         if type(options) == "table" and type(options.cwd) == "string" then
-          return prefix .. "{ " .. cleaned .. "; }"
+          local cwd = expand_vscode_vars(options.cwd)
+          return prefix .. "cd " .. vim.fn.shellescape(cwd) .. " && { " .. cleaned .. "; }"
         end
         return prefix .. "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
       end
@@ -570,7 +598,7 @@ return {
         require("vstask").command()
       end, { desc = "Run shell task" })
       map("n", "<leader>tj", term.toggle, { desc = "Toggle task terminal" })
-        map("n", "<leader>tq", term.close, { desc = "Hide task terminal" })
+        map("n", "<leader>tq", term.close, { desc = "Leave task terminal" })
     end,
   },
 
@@ -1083,7 +1111,7 @@ return {
         callback = function()
           vim.cmd("%argdel")
 
-          -- Hide the reusable terminal split so it isn't captured in the session layout.
+          -- Leave the reusable terminal buffer before saving the session layout.
           pcall(function()
             require("config.terminal").close()
           end)
