@@ -74,23 +74,25 @@ install_packages() {
       as_root apt-get install -y \
         neovim git curl ripgrep fd-find build-essential cmake ninja-build \
         clangd clang-format python3 python3-pip nodejs npm gh
+      install_lazygit_github
       ;;
     dnf)
       as_root dnf install -y \
         neovim git curl ripgrep fd-find gcc gcc-c++ make cmake ninja-build \
         clang-tools-extra python3 python3-pip nodejs npm gh
+      install_lazygit_github
       ;;
     pacman)
       as_root pacman -Sy --needed --noconfirm \
-        neovim git curl ripgrep fd base-devel cmake ninja clang python python-pip nodejs npm github-cli
+        neovim git curl ripgrep fd base-devel cmake ninja clang python python-pip nodejs npm github-cli lazygit
       ;;
     apk)
       as_root apk add --no-cache \
         neovim git curl ripgrep fd build-base cmake ninja clang-extra-tools \
-        python3 py3-pip nodejs npm github-cli
+        python3 py3-pip nodejs npm github-cli lazygit
       ;;
     brew)
-      run brew install neovim git curl ripgrep fd cmake ninja llvm python node gh
+      run brew install neovim git curl ripgrep fd cmake ninja llvm python node gh lazygit
       ;;
     *)
       log "No supported package manager found. Install Neovim, git, ripgrep, fd, clangd, clang-format, Python, Node.js, npm, cmake, and ninja manually."
@@ -155,6 +157,39 @@ install_language_tools() {
 
 sync_plugins() {
   run nvim --headless '+Lazy! sync' '+qa'
+}
+
+install_lazygit_github() {
+  if [[ "$dry_run" -eq 1 ]]; then
+    log "lazygit: would download latest release from GitHub and install to /usr/local/bin"
+    return 0
+  fi
+
+  if command -v lazygit >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local tmp arch url
+  tmp="$(mktemp -d)"
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64)  arch="x86_64" ;;
+    aarch64) arch="arm64"  ;;
+    *)       log "Unsupported architecture: $arch"; return 1 ;;
+  esac
+
+  url="$(curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest \
+    | grep "browser_download_url.*Linux_${arch}.tar.gz" \
+    | cut -d '"' -f 4)"
+
+  [[ -n "$url" ]] || { log "Could not determine lazygit download URL"; return 1; }
+
+  log "Downloading lazygit from $url"
+  curl -fsSL "$url" -o "$tmp/lazygit.tar.gz"
+  tar -xzf "$tmp/lazygit.tar.gz" -C "$tmp"
+  as_root install "$tmp/lazygit" /usr/local/bin/lazygit
+  rm -rf "$tmp"
+  log "lazygit installed to /usr/local/bin"
 }
 
 check_neovim_version() {
