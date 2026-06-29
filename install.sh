@@ -78,21 +78,12 @@ install_packages() {
     apt)
       as_root apt-get update || true
 
-      # Neovim 0.11+ needed – Ubuntu repositories ship ancient versions,
-      # so we add the official PPA and install from there.
-      if ! command -v nvim >/dev/null 2>&1; then
-        as_root apt-get install -y software-properties-common
-        as_root add-apt-repository -y ppa:neovim-ppa/unstable
-        as_root apt-get update || true
-      else
-        local nvim_ver
-        nvim_ver="$(nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//')"
-        if ! printf '0.11.0\n%s\n' "$nvim_ver" | sort -V -C 2>/dev/null; then
-          as_root apt-get install -y software-properties-common
-          as_root add-apt-repository -y ppa:neovim-ppa/unstable
-          as_root apt-get update || true
-        fi
-      fi
+      # Neovim 0.11+ needed – Ubuntu repositories ship ancient versions.
+      # Always add the PPA (it is idempotent) so that apt-get picks up the
+      # latest Neovim build regardless of what is already installed.
+      as_root apt-get install -y software-properties-common || true
+      as_root add-apt-repository -y ppa:neovim-ppa/unstable 2>/dev/null || true
+      as_root apt-get update || true
 
       # Host packages: only what nvim needs on WSL.
       # Toolchain (clangd, cmake, gcc, ninja, …) lives in the devcontainer.
@@ -125,35 +116,6 @@ install_packages() {
       exit 1
       ;;
   esac
-}
-
-backup_existing_config() {
-  [[ -e "$config_dir" ]] || return 0
-
-  if [[ -d "$config_dir/.git" ]]; then
-    log "Existing Neovim config is a git repository; updating it in place."
-    run git -C "$config_dir" remote set-url origin "$repo_url"
-    run git -C "$config_dir" pull --ff-only
-    return 0
-  fi
-
-  local backup_dir="${config_dir}.backup.$(date +%Y%m%d%H%M%S)"
-  log "Backing up existing Neovim config to $backup_dir"
-  run mv "$config_dir" "$backup_dir"
-}
-
-install_config() {
-  if [[ -d "$config_dir/.git" ]]; then
-    return 0
-  fi
-
-  # Remove a stale (non-git) directory from a previous failed install.
-  if [[ -e "$config_dir" ]]; then
-    run rm -rf "$config_dir"
-  fi
-
-  run mkdir -p "$(dirname "$config_dir")"
-  run git clone "$repo_url" "$config_dir"
 }
 
 install_python_tool() {
@@ -274,6 +236,29 @@ main() {
     shift
   done
 
+  # Bootstrap: if not running from within the cloned config directory,
+  # clone (or pull) the repo there and re-exec from it.
+  # This avoids CDN staleness when the script was piped via curl.
+  local self_dir
+  self_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P 2>/dev/null || true)"
+  if [[ "$self_dir" != "$config_dir" ]]; then
+    if [[ -d "$config_dir/.git" ]]; then
+      log "Updating existing config in $config_dir ..."
+      run git -C "$config_dir" pull --ff-only
+    else
+      if [[ -e "$config_dir" ]]; then
+        local backup_dir="${config_dir}.backup.$(date +%Y%m%d%H%M%S)"
+        log "Backing up existing config to $backup_dir"
+        run mv "$config_dir" "$backup_dir"
+      fi
+      run mkdir -p "$(dirname "$config_dir")"
+      log "Cloning config to $config_dir ..."
+      run git clone "$repo_url" "$config_dir"
+    fi
+    exec "$config_dir/install.sh" "$@"
+    # never reached
+  fi
+
   local manager
   manager="$(detect_package_manager)"
 
@@ -289,8 +274,6 @@ main() {
   fi
 
   check_neovim_version
-  backup_existing_config
-  install_config
   install_language_tools
 
   log "Lazy sync: installing or updating Neovim plugins."
