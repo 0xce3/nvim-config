@@ -111,20 +111,9 @@ local function run_terminal(command)
 end
 
 local function replace_with_command(command)
-  local launcher = table.concat({
-    "sleep 0.2",
-    "clear",
-    "exec </dev/tty >/dev/tty 2>/dev/tty",
-    command,
-  }, "; ")
-  local ok = vim.fn.jobstart({ "sh", "-lc", launcher }, { detach = true }) > 0
-  if not ok then
-    notify("Failed to launch replacement nvim", vim.log.levels.ERROR)
-    return
-  end
-  vim.schedule(function()
-    vim.cmd("silent! qall!")
-  end)
+  vim.cmd("silent! wall")
+  vim.cmd("redraw!")
+  vim.cmd("silent !clear; " .. command)
 end
 
 local function up_command(root, rebuild)
