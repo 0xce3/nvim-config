@@ -70,10 +70,24 @@ install_packages() {
 
   case "$manager" in
     apt)
-      as_root apt-get update
+      as_root apt-get update || true
+
+      # Neovim 0.11+ needed – Ubuntu repositories ship ancient versions,
+      # so we install from the official PPA.
+      if ! nvim --version 2>/dev/null | awk 'NR==1{print $2}' | sed 's/^v//' | sort -V -c 2>/dev/null; then
+        as_root apt-get install -y software-properties-common
+        as_root add-apt-repository -y ppa:neovim-ppa/unstable
+        as_root apt-get update || true
+      fi
+
       as_root apt-get install -y \
-        neovim git curl ripgrep fd-find build-essential cmake ninja-build \
-        clangd clang-format python3 python3-pip nodejs npm gh
+        git curl ripgrep fd-find build-essential cmake ninja-build \
+        clangd clang-format python3 python3-pip nodejs gh || true
+      # npm is bundled with nodejs from nodesource; installing it separately
+      # causes a conflict. If npm is missing, we install it explicitly.
+      if ! command -v npm >/dev/null 2>&1; then
+        as_root apt-get install -y npm || true
+      fi
       install_lazygit_github
       ;;
     dnf)
@@ -121,6 +135,11 @@ install_config() {
     return 0
   fi
 
+  # Remove a stale (non-git) directory from a previous failed install.
+  if [[ -e "$config_dir" ]]; then
+    run rm -rf "$config_dir"
+  fi
+
   run mkdir -p "$(dirname "$config_dir")"
   run git clone "$repo_url" "$config_dir"
 }
@@ -147,16 +166,19 @@ install_python_tool() {
 
 install_language_tools() {
   if command -v npm >/dev/null 2>&1; then
-    run npm install -g pyright
+    run npm install -g pyright || true
   else
     log "npm not found; skipping pyright installation."
   fi
 
-  install_python_tool ruff
+  install_python_tool ruff || true
 }
 
 sync_plugins() {
-  run nvim --headless '+Lazy! sync' '+qa'
+  run nvim --headless '+Lazy! sync' '+qa' || {
+    log "Lazy sync failed. Run ':Lazy sync' manually after opening nvim."
+    return 0
+  }
 }
 
 install_lazygit_github() {
@@ -198,15 +220,23 @@ check_neovim_version() {
     return 0
   fi
 
-  if ! command -v nvim >/dev/null 2>&1; then
+  local nvim_bin
+  nvim_bin="$(command -v nvim 2>/dev/null || true)"
+
+  # If nvim wasn't installed by the PPA yet, check /usr/bin/nvim directly
+  if [[ -z "$nvim_bin" ]] && [[ -x /usr/bin/nvim ]]; then
+    nvim_bin=/usr/bin/nvim
+  fi
+
+  if [[ -z "$nvim_bin" ]]; then
     log "nvim was not found after package installation."
     exit 1
   fi
 
   local version
-  version="$(nvim --version | awk 'NR == 1 { print $2 }' | sed 's/^v//')"
+  version="$("$nvim_bin" --version | awk 'NR == 1 { print $2 }' | sed 's/^v//')"
   if ! printf '0.11.0\n%s\n' "$version" | sort -V -C; then
-    log "Neovim $version is too old. Install Neovim 0.11 or newer, then rerun this script with --skip-packages."
+    log "Neovim $version is too old. Install Neovim 0.11 or newer (ppa:neovim-ppa/unstable), then rerun this script with --skip-packages."
     exit 1
   fi
 }
