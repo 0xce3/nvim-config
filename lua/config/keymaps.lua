@@ -283,6 +283,15 @@ end
 map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 
+map("n", "<leader>hh", function() require("config.workspace_hub").open() end, { desc = "Open workspace hub" })
+
+map("n", "<leader>Du", "<cmd>ContainerOpen<cr>", { desc = "Devcontainer: up/start" })
+map("n", "<leader>Dd", "<cmd>ContainerStop<cr>", { desc = "Devcontainer: stop" })
+map("n", "<leader>Dk", "<cmd>ContainerKill<cr>", { desc = "Devcontainer: kill" })
+map("n", "<leader>Dr", "<cmd>ContainerRestart<cr>", { desc = "Devcontainer: restart" })
+map("n", "<leader>Ds", "<cmd>ContainerShell<cr>", { desc = "Devcontainer: shell" })
+map("n", "<leader>Dp", "<cmd>ContainerPicker<cr>", { desc = "Devcontainer: picker" })
+
 map("t", "<c-z>", [[<c-\><c-n>u]], { desc = "Undo in editor" })
 map("t", "<esc><esc>", [[<c-\><c-n>]], { desc = "Leave terminal mode" })
 map("t", "<c-h>", [[<cmd>wincmd h<cr>]], { desc = "Move left" })

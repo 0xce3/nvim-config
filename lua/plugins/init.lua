@@ -235,6 +235,28 @@ return {
         return "clangd:" .. name
       end
 
+      local function container_status()
+        local c = require("config.container_detect")
+        if not pcall(c.is_docker_available, c) or not c.is_docker_available() then
+          return ""
+        end
+        local containers = c.list_running_containers()
+        if #containers == 0 then
+          return ""
+        end
+        local names = {}
+        for _, cont in ipairs(containers) do
+          if cont.workspace_folder ~= "" and cont.workspace_folder ~= vim.fn.expand("~") then
+            local project = vim.fn.fnamemodify(cont.workspace_folder, ":t")
+            table.insert(names, project)
+          end
+        end
+        if #names == 0 then
+          return ""
+        end
+        return " " .. table.concat(names, ",")
+      end
+
       require("lualine").setup({
         options = {
           theme = "gruvbox",
@@ -247,7 +269,7 @@ return {
           lualine_a = { "mode" },
           lualine_b = { "branch", "diff", "diagnostics" },
           lualine_c = { { "filename", path = 1 } },
-          lualine_x = { clangd_build, "encoding", "fileformat", "filetype" },
+          lualine_x = { clangd_build, container_status, "encoding", "fileformat", "filetype" },
           lualine_y = { "progress" },
           lualine_z = { "location" },
         },
@@ -650,9 +672,8 @@ return {
     "tpope/vim-fugitive",
   },
 
-  -- UI toolkit used by opencode.nvim (managed terminal) and lazygit. Every
-  -- other module is explicitly disabled so `:checkhealth snacks` doesn't probe
-  -- for tools we don't use (kitty/magick for images, etc.).
+  -- UI toolkit used by opencode.nvim (managed terminal), lazygit, and
+  -- the Workspace Hub dashboard. Every other module is explicitly disabled.
   {
     "folke/snacks.nvim",
     priority = 1000,
@@ -661,7 +682,50 @@ return {
       terminal = { enabled = true },
       lazygit = { enabled = true },
       bigfile = { enabled = false },
-      dashboard = { enabled = false },
+      dashboard = {
+        enabled = true,
+        preset = {
+          keys = {
+            { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
+            { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
+            { icon = " ", key = "h", desc = "Workspace Hub", action = ":lua require('config.workspace_hub').open()" },
+            { icon = " ", key = "o", desc = "Devcontainer: open", action = ":ContainerOpen" },
+            { icon = " ", key = "p", desc = "Devcontainer: picker", action = ":ContainerPicker" },
+            { icon = " ", key = "s", desc = "Restore Session", action = '<cmd>lua require("persistence").load()<CR>' },
+            { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
+            { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+          },
+        },
+        sections = {
+          { section = "header" },
+          { section = "keys", gap = 1, padding = 1 },
+          function()
+            local container_detect = require("config.container_detect")
+            local containers = container_detect.list_running_containers()
+            if #containers == 0 then
+              return { title = "Running Devcontainers", lines = { "  (none running)  " }, hl = "Comment" }
+            end
+            local lines = {}
+            for _, c in ipairs(containers) do
+              local ws = c.workspace_folder ~= "" and "  " .. c.workspace_folder or ""
+              table.insert(lines, "   " .. c.name .. ws)
+            end
+            return { title = "Running Devcontainers", lines = lines, hl = "SpecialComment" }
+          end,
+          function()
+            local recent_projects = require("config.workspace_hub").get_recent_projects()
+            if #recent_projects == 0 then
+              return {}
+            end
+            local lines = {}
+            for _, p in ipairs(recent_projects) do
+              table.insert(lines, "    " .. p.name .. "  " .. p.path)
+            end
+            return { title = "Recent Projects", lines = lines, hl = "String" }
+          end,
+          { section = "startup" },
+        },
+      },
       explorer = { enabled = false },
       image = { enabled = false },
       indent = { enabled = false },
@@ -817,9 +881,45 @@ return {
     end,
   },
 
-  -- Telescope is kept as a library for the vs-tasks task picker and the
-  -- <leader>fc compile_commands switcher. The day-to-day find/grep keymaps live
-  -- in fzf-lua (see lua/plugins/fzf.lua) which is faster on large repos.
+  -- Devcontainer management (build, start, stop, attach, exec) like VS Code.
+  {
+    "ksoichiro/container.nvim",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-telescope/telescope.nvim",
+    },
+    cmd = {
+      "ContainerOpen", "ContainerBuild", "ContainerStart",
+      "ContainerStop", "ContainerKill", "ContainerRestart",
+      "ContainerPicker", "ContainerExec", "ContainerShell",
+    },
+    config = function()
+      require("container").setup({
+        auto_open = "off",
+        ui = {
+          picker = "telescope",
+          show_notifications = true,
+        },
+      })
+    end,
+  },
+
+  -- Recent project history (auto-tracks directories you work in).
+  {
+    "ahmedkhalf/project.nvim",
+    config = function()
+      require("project_nvim").setup({
+        detection_methods = { "pattern" },
+        patterns = { ".git", ".vscode", "Makefile", "package.json" },
+        scope_chdir = "global",
+        silent_chdir = true,
+      })
+    end,
+  },
+
+  -- Telescope is kept as a library for the vs-tasks task picker, the
+  -- <leader>fc compile_commands switcher, and the Workspace Hub. The day-to-day
+  -- find/grep keymaps live in fzf-lua (see lua/plugins/fzf.lua).
   {
     "nvim-telescope/telescope.nvim",
     lazy = true,
@@ -1085,8 +1185,10 @@ return {
       })
       require("which-key").add({
         { "<leader>d", group = "debug/diagnostics" },
+        { "<leader>D", group = "devcontainer" },
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
+        { "<leader>h", group = "workspace hub" },
         { "<leader>l", group = "lsp" },
         { "<leader>o", group = "opencode" },
         { "<leader>p", group = "pull request / issues" },
