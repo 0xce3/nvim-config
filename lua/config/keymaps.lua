@@ -174,7 +174,7 @@ vim.api.nvim_create_user_command("Format", function()
   format_buffer(vim.api.nvim_get_current_buf())
 end, { desc = "Format current buffer" })
 
-vim.api.nvim_create_user_command("QmxDebug", function()
+vim.api.nvim_create_user_command("NvimDevDebug", function()
   local lines = {}
   local function add(label, value)
     table.insert(lines, label .. ": " .. tostring(value))
@@ -192,19 +192,28 @@ vim.api.nvim_create_user_command("QmxDebug", function()
   add("compile_commands exists", cc_dir and vim.fn.filereadable(cc_dir .. "/compile_commands.json") or "nil")
   add("clangd executable", vim.fn.exepath("clangd"))
   add("C/C++ formatting", "scripts/clangformat.sh compatible current-file format on save")
+  add("LspInfo command", vim.fn.exists(":LspInfo"))
 
-  local clangd_version = vim.system({ "clangd", "--version" }, { text = true }):wait()
-  add("clangd version", vim.trim((clangd_version.stdout or clangd_version.stderr or ""):gsub("\n.*", "")))
+  if vim.fn.executable("clangd") == 1 then
+    local clangd_version = vim.system({ "clangd", "--version" }, { text = true }):wait()
+    add("clangd version", vim.trim((clangd_version.stdout or clangd_version.stderr or ""):gsub("\n.*", "")))
+  else
+    add("clangd version", "not executable")
+  end
+  table.insert(lines, "")
+  table.insert(lines, "LSP log:")
+  table.insert(lines, vim.lsp.get_log_path())
+
   table.insert(lines, "")
   table.insert(lines, "LSP clients:")
   for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
     table.insert(lines, vim.inspect({ name = client.name, cmd = client.config.cmd, root_dir = client.config.root_dir }))
   end
 
-  local out = "/tmp/nvim-qmx-debug.txt"
+  local out = "/tmp/nvim-dev-debug.txt"
   vim.fn.writefile(lines, out)
   vim.cmd("edit " .. out)
-end, { desc = "Write qmx nvim debug info" })
+end, { desc = "Write nvim devcontainer debug info" })
 
 vim.api.nvim_create_autocmd("BufWritePre", {
   callback = function(event)
@@ -260,34 +269,20 @@ map("n", "<leader>X", "<cmd>BufferClose!<cr>", { desc = "Force close buffer" })
 map("v", "<C-c>", '"+y', { desc = "Copy selection to clipboard" })
 map("v", "<C-x>", '"+d', { desc = "Cut selection to clipboard" })
 
-local function workspace_root()
-  local matches = vim.fs.find({ ".git", ".vscode" }, { upward = true, path = vim.uv.cwd() })
-  if #matches == 0 then
-    return vim.uv.cwd()
-  end
-  return vim.fs.dirname(matches[1])
-end
-
 local function open_file_browser(opts)
   require("telescope").extensions.file_browser.file_browser(vim.tbl_extend("force", {
     grouped = true,
     hidden = true,
     respect_gitignore = false,
+    git_status = true,
+    select_buffer = true,
   }, opts or {}))
 end
 
-map("n", "<leader>e", function()
-  local root = workspace_root()
-  require("fzf-lua").files({ cwd = root })
-end, { desc = "Find workspace files" })
-
 map("n", "<leader>E", function()
-  require("telescope").extensions.file_browser.file_browser({
+  open_file_browser({
     path = vim.uv.cwd(),
     cwd = vim.uv.cwd(),
-    grouped = true,
-    hidden = true,
-    respect_gitignore = false,
   })
 end, { desc = "Open unrestricted file explorer" })
 map("n", "<leader>gg", "<cmd>Git<cr>", { desc = "Open Git status" })

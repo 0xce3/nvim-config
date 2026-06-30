@@ -25,6 +25,15 @@ quote() {
   printf '%q' "$1"
 }
 
+nvim_remote_expr() {
+  local addr="$1" expr="$2"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 2s nvim --server "$addr" --remote-expr "$expr" >/dev/null 2>&1
+  else
+    nvim --server "$addr" --remote-expr "$expr" >/dev/null 2>&1
+  fi
+}
+
 project_root() {
   local dir
   dir="$(cd "$target" 2>/dev/null && pwd -P)" || die "not a directory: $target"
@@ -118,6 +127,24 @@ find_devcontainer_container() {
   docker ps --format '{{.Names}}\t{{.Image}}' | awk -F '\t' -v image="$image_name" 'index($2, image) == 1 { print $1; exit }'
 }
 
+ensure_devcontainer_running() {
+  local container=""
+  container="$(find_devcontainer_container)"
+  if [[ -n "$container" ]]; then
+    printf '%s\n' "$container"
+    return 0
+  fi
+
+  log "nvim-dev: no running devcontainer found; starting one for $root"
+  local dc_cmd
+  dc_cmd="$(devcontainer_cmd)"
+  eval "$dc_cmd" up --workspace-folder "$(quote "$root")" >&2
+
+  container="$(find_devcontainer_container)"
+  [[ -n "$container" ]] || die "devcontainer started, but no matching running container was found"
+  printf '%s\n' "$container"
+}
+
 bootstrap_and_start_server() {
   local container="$1" workspace="$2" port="$3" root_name
   root_name="$(basename "$root")"
@@ -176,16 +203,37 @@ if [ ! -d \"\$workspace\" ]; then workspace=/workspaces/$(quote "$root_name"); f
 if [ ! -d \"\$workspace\" ]; then workspace=/workspace/$(quote "$root_name"); fi
 if [ ! -d \"\$workspace\" ]; then workspace=\$PWD; fi
 cd \"\$workspace\"
+printf '%s\n' $(quote "$port") > /tmp/$(quote "nvim-dev-$root_name.port")
 exec nvim --listen 0.0.0.0:$port --headless"
 
   docker exec -d "$container" sh -lc "$script" >/dev/null
+}
+
+running_server_port() {
+  local container="$1" root_name
+  root_name="$(basename "$root")"
+
+  docker exec "$container" sh -lc "
+file=/tmp/$(quote "nvim-dev-$root_name.port")
+[ -f \"\$file\" ] || exit 0
+port=\$(cat \"\$file\" 2>/dev/null || true)
+case \"\$port\" in ''|*[!0-9]*) exit 0 ;; esac
+if command -v timeout >/dev/null 2>&1; then
+  timeout 2s nvim --server 127.0.0.1:\$port --remote-expr 1 >/dev/null 2>&1
+else
+  nvim --server 127.0.0.1:\$port --remote-expr 1 >/dev/null 2>&1
+fi
+if [ \$? -eq 0 ]; then
+  printf '%s\n' \"\$port\"
+fi
+" 2>/dev/null || true
 }
 
 wait_for_server() {
   local addr="$1"
   local i
   for i in $(seq 1 100); do
-    if nvim --server "$addr" --remote-expr 1 >/dev/null 2>&1; then
+    if nvim_remote_expr "$addr" 1; then
       return 0
     fi
     sleep 0.1
@@ -206,10 +254,7 @@ container="${NVIM_DEV_CONTAINER:-}"
 
 case "$action" in
   attach)
-    container="${container:-$(find_devcontainer_container)}"
-    if [[ -z "$container" ]]; then
-      container="$(choose_container)"
-    fi
+    container="${container:-$(ensure_devcontainer_running)}"
     ;;
   up|reopen)
     dc_cmd="$(devcontainer_cmd)"
@@ -230,11 +275,19 @@ esac
 
 workspace="$(container_workspace "$container")"
 host="$(container_host "$container")"
-port="${NVIM_DEV_PORT:-$((41000 + RANDOM % 10000))}"
+existing_port="$(running_server_port "$container")"
+port="${NVIM_DEV_PORT:-$existing_port}"
+if [[ -z "$port" ]]; then
+  port="$((41000 + RANDOM % 10000))"
+fi
 addr="$host:$port"
 
 log "nvim-dev: container=$container workspace=$workspace addr=$addr"
-bootstrap_and_start_server "$container" "$workspace" "$port"
+if [[ -n "$existing_port" && "$existing_port" == "$port" ]]; then
+  log "nvim-dev: reusing existing container nvim server"
+else
+  bootstrap_and_start_server "$container" "$workspace" "$port"
+fi
 wait_for_server "$addr" || die "timed out waiting for container nvim server at $addr"
 
 exec nvim --server "$addr" --remote-ui

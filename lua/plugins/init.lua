@@ -655,6 +655,80 @@ return {
   },
 
   {
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-tree/nvim-web-devicons",
+      "MunifTanjim/nui.nvim",
+    },
+    cmd = "Neotree",
+    keys = {
+      { "<leader>e", "<cmd>Neotree filesystem reveal left<cr>", desc = "Open file explorer" },
+    },
+    config = function()
+      require("neo-tree").setup({
+        close_if_last_window = false,
+        enable_git_status = true,
+        enable_diagnostics = true,
+        filesystem = {
+          bind_to_cwd = false,
+          follow_current_file = { enabled = true },
+          use_libuv_file_watcher = true,
+          filtered_items = {
+            visible = true,
+            hide_dotfiles = false,
+            hide_gitignored = false,
+          },
+        },
+        default_component_configs = {
+          git_status = {
+            symbols = {
+              added = "A",
+              modified = "M",
+              deleted = "D",
+              renamed = "R",
+              untracked = "?",
+              ignored = "I",
+              unstaged = "U",
+              staged = "S",
+              conflict = "C",
+            },
+          },
+          diagnostics = {
+            symbols = {
+              hint = "H",
+              info = "I",
+              warn = "W",
+              error = "E",
+            },
+          },
+        },
+        window = {
+          width = 36,
+          mappings = {
+            ["a"] = "add",
+            ["d"] = "delete",
+            ["r"] = "rename",
+            ["m"] = "move",
+          },
+        },
+      })
+
+      vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#83a598" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitAdded", { fg = "#b8bb26" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitModified", { fg = "#fabd2f" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitUntracked", { fg = "#b8bb26" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitDeleted", { fg = "#fb4934" })
+      vim.api.nvim_set_hl(0, "NeoTreeGitConflict", { fg = "#fb4934", bold = true })
+      vim.api.nvim_set_hl(0, "NeoTreeDiagnosticError", { fg = "#fb4934" })
+      vim.api.nvim_set_hl(0, "NeoTreeDiagnosticWarn", { fg = "#fabd2f" })
+      vim.api.nvim_set_hl(0, "NeoTreeDiagnosticInfo", { fg = "#83a598" })
+      vim.api.nvim_set_hl(0, "NeoTreeDiagnosticHint", { fg = "#8ec07c" })
+    end,
+  },
+
+  {
     "tpope/vim-fugitive",
   },
 
@@ -893,10 +967,34 @@ return {
     },
     config = function()
       local telescope = require("telescope")
+      local fb_actions = require("telescope").extensions.file_browser.actions
       telescope.setup({
         defaults = {
           layout_strategy = "horizontal",
           layout_config = { preview_width = 0.55 },
+        },
+        extensions = {
+          file_browser = {
+            grouped = true,
+            hidden = true,
+            respect_gitignore = false,
+            git_status = true,
+            hijack_netrw = true,
+            mappings = {
+              i = {
+                ["<C-a>"] = fb_actions.create,
+                ["<C-d>"] = fb_actions.remove,
+                ["<C-r>"] = fb_actions.rename,
+                ["<C-m>"] = fb_actions.move,
+              },
+              n = {
+                ["a"] = fb_actions.create,
+                ["d"] = fb_actions.remove,
+                ["r"] = fb_actions.rename,
+                ["m"] = fb_actions.move,
+              },
+            },
+          },
         },
       })
       telescope.load_extension("fzf")
@@ -910,11 +1008,11 @@ return {
     build = ":TSUpdate",
     config = function()
       vim.api.nvim_create_autocmd("FileType", {
-        pattern = { "markdown", "markdown_inline" },
+        pattern = { "markdown", "markdown_inline", "TelescopePrompt", "TelescopeResults", "TelescopePreview", "fzf" },
         callback = function(event)
           pcall(vim.treesitter.stop, event.buf)
         end,
-        desc = "Disable Treesitter for Markdown conceal queries",
+        desc = "Disable Treesitter where parser decorations are noisy",
       })
 
       require("nvim-treesitter.configs").setup({
@@ -1063,6 +1161,15 @@ return {
         end, 100)
       end
 
+      local function clangd_cmd()
+        local cmd = { "clangd" }
+        local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
+        if compile_commands_dir then
+          table.insert(cmd, "--compile-commands-dir=" .. compile_commands_dir)
+        end
+        return cmd
+      end
+
       vim.api.nvim_create_user_command("LspInfo", lsp_info, {
         desc = "Show active LSP clients",
       })
@@ -1082,8 +1189,9 @@ return {
       })
 
       vim.api.nvim_create_user_command("LspStart", function(opts)
-        if opts.args ~= "" then
-          vim.lsp.enable(opts.args, true)
+        if opts.args == "" or opts.args == "clangd" then
+          vim.lsp.config("clangd", { cmd = clangd_cmd() })
+          vim.lsp.enable("clangd", true)
         end
         reload_current_buffer()
       end, {
@@ -1092,6 +1200,10 @@ return {
       })
 
       vim.api.nvim_create_user_command("LspRestart", function(opts)
+        if opts.args == "" or opts.args == "clangd" then
+          vim.lsp.config("clangd", { cmd = clangd_cmd() })
+          vim.lsp.enable("clangd", true)
+        end
         for _, client in ipairs(vim.lsp.get_clients(lsp_client_filter(opts.args))) do
           client:stop(true)
         end
@@ -1111,14 +1223,8 @@ return {
       -- argument" diagnostics). Written outside any project repo.
       require("config.clangd_config").ensure()
 
-      local clangd_cmd = { "clangd" }
-      local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
-      if compile_commands_dir then
-        table.insert(clangd_cmd, "--compile-commands-dir=" .. compile_commands_dir)
-      end
-
       vim.lsp.config("clangd", {
-        cmd = clangd_cmd,
+        cmd = clangd_cmd(),
       })
 
       vim.lsp.config("pyright", {
@@ -1165,8 +1271,7 @@ return {
     event = "VimEnter",
     config = function()
       local persistence = require("persistence")
-      -- No "tabpages": only buffers and the current window layout are restored.
-      vim.opt.sessionoptions = { "buffers", "curdir", "winsize" }
+      vim.opt.sessionoptions = { "buffers", "curdir", "folds", "globals", "help", "tabpages", "winsize" }
       persistence.setup()
 
       vim.api.nvim_create_autocmd("User", {
@@ -1182,14 +1287,15 @@ return {
           for _, buf in ipairs(vim.api.nvim_list_bufs()) do
             local name = vim.api.nvim_buf_get_name(buf)
             local is_dir = name ~= "" and vim.fn.isdirectory(name) == 1
-            if vim.api.nvim_buf_is_valid(buf) and is_dir then
+            local buftype = vim.bo[buf].buftype
+            if vim.api.nvim_buf_is_valid(buf) and (is_dir or buftype == "nofile" or buftype == "terminal" or buftype == "prompt") then
               pcall(vim.api.nvim_buf_delete, buf, { force = true })
             end
           end
         end,
       })
 
-      if vim.env.DEVCONTAINER ~= "true" and vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
+      if vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
         vim.schedule(function()
           if vim.v.this_session == "" then
             persistence.load()

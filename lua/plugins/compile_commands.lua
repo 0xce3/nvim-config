@@ -60,6 +60,7 @@ end
 local function restart_clangd(build_dir)
   -- Point clangd at the chosen build's compile_commands.json directory.
   vim.lsp.config("clangd", { cmd = { "clangd", "--compile-commands-dir=" .. build_dir } })
+  vim.lsp.enable("clangd", true)
 
   -- Stop the running clangd GRACEFULLY (no force): a forced stop sends a signal
   -- and clangd then exits with status 1, which Neovim reports as the scary
