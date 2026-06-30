@@ -197,6 +197,10 @@ local function container_ip(container)
     return info.NetworkSettings.IPAddress
   end
 
+  if info.NetworkSettings.Networks and info.NetworkSettings.Networks.host then
+    return "127.0.0.1"
+  end
+
   for _, network in pairs(info.NetworkSettings.Networks or {}) do
     if valid_ipv4(network.IPAddress) then
       return network.IPAddress
