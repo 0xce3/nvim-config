@@ -97,14 +97,57 @@ vim.api.nvim_create_user_command("Bd", function(opts)
   close_current_buffer(opts.bang)
 end, { bang = true, desc = "Close current buffer without closing the editor layout" })
 
+local c_like_filetypes = {
+  c = true,
+  cpp = true,
+  h = true,
+  hpp = true,
+}
+
+local function repo_root_for_file(filename)
+  local dir = vim.fn.fnamemodify(filename, ":p:h")
+  local result = vim.system({ "git", "rev-parse", "--show-toplevel" }, { cwd = dir, text = true }):wait()
+  if result.code ~= 0 or not result.stdout or result.stdout == "" then
+    return nil
+  end
+  return vim.trim(result.stdout)
+end
+
+local function compliance_clang_format_file(bufnr)
+  local filename = vim.api.nvim_buf_get_name(bufnr)
+  if filename == "" or vim.fn.filereadable(filename) ~= 1 then
+    return
+  end
+
+  local root = repo_root_for_file(filename)
+  if not root or vim.fn.filereadable(root .. "/scripts/clangformat.sh") ~= 1 then
+    return
+  end
+
+  local rel = vim.fn.fnamemodify(filename, ":p"):sub(#root + 2)
+  if rel:find("^modules/trusted%-firmware%-m/") or rel == "multisensor_firmware_generated.h" then
+    return
+  end
+
+  local result = vim.system({ "clang-format", "--assume-filename=./.clang-format", "-i", rel }, {
+    cwd = root,
+    text = true,
+  }):wait()
+  if result.code ~= 0 then
+    vim.notify(result.stderr ~= "" and result.stderr or "clang-format failed", vim.log.levels.WARN)
+    return
+  end
+
+  vim.cmd("checktime " .. bufnr)
+end
+
 local function format_buffer(bufnr)
   if not vim.bo[bufnr].modifiable or vim.bo[bufnr].readonly then
     return
   end
 
   local filetype = vim.bo[bufnr].filetype
-  if filetype == "c" or filetype == "cpp" or filetype == "h" or filetype == "hpp" then
-    vim.notify("C/C++ formatting is disabled; clangd diagnostics use the selected compile_commands.json.", vim.log.levels.INFO)
+  if c_like_filetypes[filetype] then
     return
   end
 
@@ -148,7 +191,7 @@ vim.api.nvim_create_user_command("QmxDebug", function()
   add("clangd_build.active", cc_dir)
   add("compile_commands exists", cc_dir and vim.fn.filereadable(cc_dir .. "/compile_commands.json") or "nil")
   add("clangd executable", vim.fn.exepath("clangd"))
-  add("C/C++ formatting", "disabled")
+  add("C/C++ formatting", "scripts/clangformat.sh compatible current-file format on save")
 
   local clangd_version = vim.system({ "clangd", "--version" }, { text = true }):wait()
   add("clangd version", vim.trim((clangd_version.stdout or clangd_version.stderr or ""):gsub("\n.*", "")))
@@ -171,6 +214,15 @@ vim.api.nvim_create_autocmd("BufWritePre", {
     format_buffer(event.buf)
   end,
   desc = "Format buffer before saving",
+})
+
+vim.api.nvim_create_autocmd("BufWritePost", {
+  callback = function(event)
+    if c_like_filetypes[vim.bo[event.buf].filetype] then
+      compliance_clang_format_file(event.buf)
+    end
+  end,
+  desc = "Format C/C++ buffers using the repo compliance clang-format invocation",
 })
 
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })
