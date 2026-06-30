@@ -253,9 +253,9 @@ return {
         },
         sections = {
           lualine_a = { "mode" },
-          lualine_b = { "branch", "diff", "diagnostics" },
+          lualine_b = { { container_status, color = container_status_color }, "branch", "diff", "diagnostics" },
           lualine_c = { { "filename", path = 1 } },
-          lualine_x = { clangd_build, { container_status, color = container_status_color }, "encoding", "fileformat", "filetype" },
+          lualine_x = { clangd_build, "encoding", "fileformat", "filetype" },
           lualine_y = { "progress" },
           lualine_z = { "location" },
         },

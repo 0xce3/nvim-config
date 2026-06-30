@@ -543,7 +543,7 @@ end
 
 function M.statusline()
   if M.is_inside_container() then
-    return ""
+    return " dev"
   end
   local cwd = vim.uv.cwd()
   if state.status_cwd == cwd and state.status_text then
@@ -552,10 +552,10 @@ function M.statusline()
   local root = M.find_project_root()
   state.status_cwd = cwd
   if M.has_devcontainer(root) then
-    state.status_text = ""
+    state.status_text = " local"
     return state.status_text
   end
-  state.status_text = ""
+  state.status_text = " local"
   return state.status_text
 end
 
