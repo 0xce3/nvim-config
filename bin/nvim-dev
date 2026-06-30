@@ -147,6 +147,7 @@ else
   rm -rf \"\${XDG_CONFIG_HOME:-\$HOME/.config}/nvim\"
   git clone $(quote "$repo_url") \"\${XDG_CONFIG_HOME:-\$HOME/.config}/nvim\"
 fi
+nvim --headless '+Lazy! sync' '+qa' || true
 workspace=$(quote "$workspace")
 if [ ! -d \"\$workspace\" ]; then workspace=/workspaces/$(quote "$root_name"); fi
 if [ ! -d \"\$workspace\" ]; then workspace=/workspace/$(quote "$root_name"); fi

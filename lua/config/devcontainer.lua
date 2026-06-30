@@ -97,6 +97,7 @@ local function container_bootstrap_script(workspace, workspace_name)
     "  rm -rf \"${XDG_CONFIG_HOME:-$HOME/.config}/nvim\"",
     "  git clone " .. q(CONFIG_REPO) .. " \"${XDG_CONFIG_HOME:-$HOME/.config}/nvim\"",
     "fi",
+    "nvim --headless '+Lazy! sync' '+qa' || true",
     "workspace=" .. q(workspace),
     "if [ ! -d \"$workspace\" ]; then workspace=" .. q(fallback_workspace) .. "; fi",
     "if [ ! -d \"$workspace\" ]; then workspace=" .. q("/workspace/" .. workspace_name) .. "; fi",
