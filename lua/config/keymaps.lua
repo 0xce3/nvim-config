@@ -97,34 +97,6 @@ vim.api.nvim_create_user_command("Bd", function(opts)
   close_current_buffer(opts.bang)
 end, { bang = true, desc = "Close current buffer without closing the editor layout" })
 
-local function clang_format_buffer(bufnr)
-  if vim.fn.executable("clang-format") == 0 then
-    return false
-  end
-
-  local filename = vim.api.nvim_buf_get_name(bufnr)
-  local input = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
-  if vim.bo[bufnr].endofline then
-    input = input .. "\n"
-  end
-
-  local result = vim.system({ "clang-format", "--assume-filename", filename }, {
-    stdin = input,
-    text = true,
-  }):wait()
-
-  if result.code ~= 0 then
-    vim.notify(result.stderr ~= "" and result.stderr or "clang-format failed", vim.log.levels.WARN)
-    return false
-  end
-
-  local output = vim.split(result.stdout:gsub("\n$", ""), "\n", { plain = true })
-  local view = vim.fn.winsaveview()
-  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, output)
-  vim.fn.winrestview(view)
-  return true
-end
-
 local function format_buffer(bufnr)
   if not vim.bo[bufnr].modifiable or vim.bo[bufnr].readonly then
     return
@@ -132,9 +104,8 @@ local function format_buffer(bufnr)
 
   local filetype = vim.bo[bufnr].filetype
   if filetype == "c" or filetype == "cpp" or filetype == "h" or filetype == "hpp" then
-    if clang_format_buffer(bufnr) then
-      return
-    end
+    vim.notify("C/C++ formatting is disabled; clangd diagnostics use the selected compile_commands.json.", vim.log.levels.INFO)
+    return
   end
 
   local has_formatter = false
@@ -177,13 +148,10 @@ vim.api.nvim_create_user_command("QmxDebug", function()
   add("clangd_build.active", cc_dir)
   add("compile_commands exists", cc_dir and vim.fn.filereadable(cc_dir .. "/compile_commands.json") or "nil")
   add("clangd executable", vim.fn.exepath("clangd"))
-  add("clang-format executable", vim.fn.exepath("clang-format"))
+  add("C/C++ formatting", "disabled")
 
   local clangd_version = vim.system({ "clangd", "--version" }, { text = true }):wait()
   add("clangd version", vim.trim((clangd_version.stdout or clangd_version.stderr or ""):gsub("\n.*", "")))
-  local format_version = vim.system({ "clang-format", "--version" }, { text = true }):wait()
-  add("clang-format version", vim.trim((format_version.stdout or format_version.stderr or ""):gsub("\n.*", "")))
-
   table.insert(lines, "")
   table.insert(lines, "LSP clients:")
   for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
