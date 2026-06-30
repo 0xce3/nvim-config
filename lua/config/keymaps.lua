@@ -160,8 +160,46 @@ vim.api.nvim_create_user_command("Format", function()
   format_buffer(vim.api.nvim_get_current_buf())
 end, { desc = "Format current buffer" })
 
+vim.api.nvim_create_user_command("QmxDebug", function()
+  local lines = {}
+  local function add(label, value)
+    table.insert(lines, label .. ": " .. tostring(value))
+  end
+
+  local file = vim.api.nvim_buf_get_name(0)
+  local cc_dir = require("config.clangd_build").active(vim.fn.getcwd())
+  add("cwd", vim.uv.cwd())
+  add("file", file)
+  add("filetype", vim.bo.filetype)
+  add("DEVCONTAINER", vim.env.DEVCONTAINER)
+  add("dockerenv", vim.fn.filereadable("/.dockerenv"))
+  add("NVIM_CLANGD_COMPILE_COMMANDS_DIR", vim.env.NVIM_CLANGD_COMPILE_COMMANDS_DIR)
+  add("clangd_build.active", cc_dir)
+  add("compile_commands exists", cc_dir and vim.fn.filereadable(cc_dir .. "/compile_commands.json") or "nil")
+  add("clangd executable", vim.fn.exepath("clangd"))
+  add("clang-format executable", vim.fn.exepath("clang-format"))
+
+  local clangd_version = vim.system({ "clangd", "--version" }, { text = true }):wait()
+  add("clangd version", vim.trim((clangd_version.stdout or clangd_version.stderr or ""):gsub("\n.*", "")))
+  local format_version = vim.system({ "clang-format", "--version" }, { text = true }):wait()
+  add("clang-format version", vim.trim((format_version.stdout or format_version.stderr or ""):gsub("\n.*", "")))
+
+  table.insert(lines, "")
+  table.insert(lines, "LSP clients:")
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+    table.insert(lines, vim.inspect({ name = client.name, cmd = client.config.cmd, root_dir = client.config.root_dir }))
+  end
+
+  local out = "/tmp/nvim-qmx-debug.txt"
+  vim.fn.writefile(lines, out)
+  vim.cmd("edit " .. out)
+end, { desc = "Write qmx nvim debug info" })
+
 vim.api.nvim_create_autocmd("BufWritePre", {
   callback = function(event)
+    if vim.env.DEVCONTAINER == "true" then
+      return
+    end
     format_buffer(event.buf)
   end,
   desc = "Format buffer before saving",
