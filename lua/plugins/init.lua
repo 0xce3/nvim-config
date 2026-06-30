@@ -1187,7 +1187,7 @@ return {
         end,
       })
 
-      if vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
+      if vim.env.DEVCONTAINER ~= "true" and vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
         vim.schedule(function()
           if vim.v.this_session == "" then
             persistence.load()
