@@ -157,6 +157,13 @@ sync_plugins() {
   }
 }
 
+install_nvim_dev_launcher() {
+  local target_dir="$HOME/.local/bin"
+  run mkdir -p "$target_dir"
+  run install -m 0755 "$config_dir/bin/nvim-dev" "$target_dir/nvim-dev"
+  log "nvim-dev installed to $target_dir/nvim-dev"
+}
+
 install_lazygit_github() {
   if [[ "$dry_run" -eq 1 ]]; then
     log "lazygit: would download latest release from GitHub and install to /usr/local/bin"
@@ -313,6 +320,7 @@ main() {
 
   check_neovim_version
   install_language_tools
+  install_nvim_dev_launcher
 
   log "Lazy sync: installing or updating Neovim plugins."
   sync_plugins
