@@ -220,22 +220,8 @@ end
 
 map("n", "<leader>e", function()
   local root = workspace_root()
-  open_file_browser({
-    path = root,
-    cwd = root,
-    cwd_to_path = false,
-    mappings = {
-      i = {
-        ["<C-h>"] = false,
-        ["<BS>"] = false,
-      },
-      n = {
-        ["h"] = false,
-        ["-"] = false,
-      },
-    },
-  })
-end, { desc = "Open workspace file explorer" })
+  require("fzf-lua").files({ cwd = root })
+end, { desc = "Find workspace files" })
 
 map("n", "<leader>E", function()
   require("telescope").extensions.file_browser.file_browser({
