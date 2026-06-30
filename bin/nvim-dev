@@ -122,9 +122,32 @@ bootstrap_and_start_server() {
   local container="$1" workspace="$2" port="$3" root_name
   root_name="$(basename "$root")"
 
+  local host_state_file="${XDG_STATE_HOME:-$HOME/.local/state}/nvim/clangd_build_dirs.json"
+  local host_build_dir=""
+  local remote_build_dir=""
+  if [[ -f "$host_state_file" ]]; then
+    host_build_dir="$(python3 - "$host_state_file" "$root" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], 'r', encoding='utf-8'))
+    print(data.get(sys.argv[2], ''))
+except Exception:
+    pass
+PY
+)"
+  fi
+  if [[ -n "$host_build_dir" ]]; then
+    case "$host_build_dir" in
+      "$root"/*) remote_build_dir="$workspace/${host_build_dir#"$root"/}" ;;
+    esac
+  fi
+
   local script
   script="set -e
 export DEVCONTAINER=true
+if [ -n $(quote "$remote_build_dir") ] && [ -f $(quote "$remote_build_dir/compile_commands.json") ]; then
+  export NVIM_CLANGD_COMPILE_COMMANDS_DIR=$(quote "$remote_build_dir")
+fi
 if ! command -v nvim >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi

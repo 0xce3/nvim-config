@@ -1111,12 +1111,14 @@ return {
       -- argument" diagnostics). Written outside any project repo.
       require("config.clangd_config").ensure()
 
-      -- No --compile-commands-dir here. Clangd auto-discovers
-      -- compile_commands.json by searching upward from the opened file.
-      -- The <leader>fc picker (switch_compile_commands) sets the
-      -- NVIM_CLANGD_COMPILE_COMMANDS_DIR env var for the correct build.
+      local clangd_cmd = { "clangd" }
+      local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
+      if compile_commands_dir then
+        table.insert(clangd_cmd, "--compile-commands-dir=" .. compile_commands_dir)
+      end
+
       vim.lsp.config("clangd", {
-        cmd = { "clangd" },
+        cmd = clangd_cmd,
       })
 
       vim.lsp.config("pyright", {
