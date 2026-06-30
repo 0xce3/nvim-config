@@ -129,11 +129,12 @@ local function open_remote_ui(addr)
   local buf = vim.api.nvim_get_current_buf()
   vim.bo[buf].buflisted = true
   vim.bo[buf].bufhidden = "wipe"
-  vim.api.nvim_buf_set_name(buf, "Devcontainer Remote UI")
+  vim.bo[buf].filetype = "devcontainer-remote-ui"
+  vim.api.nvim_buf_set_name(buf, "Devcontainer Remote UI (" .. addr .. ")")
 
   local previous_laststatus = vim.o.laststatus
   vim.o.laststatus = 0
-  vim.fn.termopen("nvim --server " .. q(addr) .. " --remote-ui", {
+  local job = vim.fn.termopen("nvim --server " .. q(addr) .. " --remote-ui", {
     on_exit = function(_, code)
       vim.schedule(function()
         vim.o.laststatus = previous_laststatus
@@ -143,6 +144,30 @@ local function open_remote_ui(addr)
       end)
     end,
   })
+
+  vim.b[buf].devcontainer_remote_ui = true
+  vim.b[buf].terminal_job_id = job
+  vim.keymap.set("n", "q", function()
+    pcall(vim.fn.jobstop, job)
+  end, { buffer = buf, desc = "Close devcontainer remote UI" })
+
+  vim.api.nvim_create_autocmd("BufEnter", {
+    buffer = buf,
+    callback = function()
+      vim.schedule(function()
+        if vim.api.nvim_get_current_buf() == buf then
+          vim.cmd("startinsert")
+        end
+      end)
+    end,
+  })
+
+  vim.schedule(function()
+    if vim.api.nvim_buf_is_valid(buf) then
+      pcall(vim.api.nvim_buf_set_name, buf, "Devcontainer Remote UI (" .. addr .. ")")
+    end
+  end)
+
   vim.cmd("startinsert")
 end
 
@@ -536,7 +561,7 @@ end
 
 function M.statusline_color()
   if M.is_inside_container() then
-    return { fg = "#2496ed", gui = "bold" }
+    return { fg = "#8ec07c", gui = "bold" }
   end
   return { fg = "#928374" }
 end
