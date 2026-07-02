@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_opencode="${OPENCODE_REAL_BIN:-$HOME/.opencode/bin/opencode}"
+
+if [[ ! -x "$real_opencode" ]]; then
+  printf 'opencode wrapper: real opencode binary not found: %s\n' "$real_opencode" >&2
+  exit 127
+fi
+
+has_port=0
+has_hostname=0
+for arg in "$@"; do
+  case "$arg" in
+    --port|--port=*) has_port=1 ;;
+    --hostname|--hostname=*) has_hostname=1 ;;
+  esac
+done
+
+args=()
+if [[ "$has_port" -eq 0 ]]; then
+  args+=(--port "${OPENCODE_PORT:-4096}")
+fi
+if [[ "$has_hostname" -eq 0 ]]; then
+  args+=(--hostname "${OPENCODE_HOSTNAME:-0.0.0.0}")
+fi
+
+exec "$real_opencode" "${args[@]}" "$@"

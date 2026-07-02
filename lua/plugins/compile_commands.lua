@@ -14,11 +14,12 @@ local EXCLUDE = vim.g.compile_commands_exclude or {}
 
 local function filter_ccjson(root, raw)
   local root_file = root .. "/compile_commands.json"
+  local main_app_prefix = root .. "/main_app/"
   local results = {}
   for _, f in ipairs(raw) do
     -- Keep only real compile_commands.json paths (guards against any stray
     -- non-path lines), drop any stray root file and excluded builds.
-    if f:match("compile_commands%.json$") and f ~= root_file then
+    if f:match("compile_commands%.json$") and f ~= root_file and f:sub(1, #main_app_prefix) == main_app_prefix then
       local skip = false
       for _, pat in ipairs(EXCLUDE) do
         if f:find(pat, 1, true) then
@@ -37,10 +38,15 @@ end
 
 local function find_ccjson(root, callback)
   local raw = {}
+  local search_root = root .. "/main_app"
+  if vim.fn.isdirectory(search_root) ~= 1 then
+    callback({})
+    return
+  end
   if vim.fn.executable("find") == 1 then
     -- Run find directly (no shell) so the user's login-shell startup noise
     -- ("bash: no job control...") never leaks into the results.
-    vim.system({ "find", root, "-type", "f", "-name", "compile_commands.json" }, { text = true }, function(res)
+    vim.system({ "find", search_root, "-type", "f", "-name", "compile_commands.json" }, { text = true }, function(res)
       if res.stdout and res.stdout ~= "" then
         raw = vim.split(res.stdout, "\n", { trimempty = true })
       end
@@ -52,7 +58,7 @@ local function find_ccjson(root, callback)
   end
 
   if vim.tbl_isempty(raw) then
-    raw = vim.fs.find("compile_commands.json", { path = root, type = "file", limit = 1000 })
+    raw = vim.fs.find("compile_commands.json", { path = search_root, type = "file", limit = 1000 })
   end
   callback(filter_ccjson(root, raw))
 end
@@ -89,7 +95,7 @@ local function switch_compile_commands()
   vim.notify("Searching compile_commands.json...", vim.log.levels.INFO, { title = "clangd" })
   find_ccjson(root, function(results)
     if vim.tbl_isempty(results) then
-      vim.notify("No build compile_commands.json found under " .. root, vim.log.levels.WARN)
+      vim.notify("No build compile_commands.json found under " .. root .. "/main_app", vim.log.levels.WARN)
       return
     end
 

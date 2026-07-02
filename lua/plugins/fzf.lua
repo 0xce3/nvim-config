@@ -1,6 +1,10 @@
 -- fzf-lua: the day-to-day fuzzy finder (files / live grep / word under cursor /
 -- buffers / symbols). Faster than Telescope on large repos. Telescope stays
 -- installed only as a library for vs-tasks and the <leader>fc build switcher.
+local function workspace_root()
+  return vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
+end
+
 return {
   {
     "ibhagwan/fzf-lua",
@@ -10,8 +14,15 @@ return {
       { "<C-p>",      function() require("fzf-lua").files() end,                desc = "Find files" },
       { "<leader>ff", function() require("fzf-lua").files() end,                desc = "Find files" },
       { "<leader>fg", function() require("fzf-lua").live_grep() end,            desc = "Live grep" },
-      { "<leader>fw", function() require("fzf-lua").grep_cword() end,           desc = "Grep word under cursor" },
-      { "<leader>fw", function() require("fzf-lua").grep_visual() end,          mode = "x", desc = "Grep selection" },
+      {
+        "<leader>fw",
+        function()
+          local root = vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
+          require("fzf-lua").grep_visual({ cwd = root })
+        end,
+        mode = "x",
+        desc = "Grep selection (workspace)",
+      },
       { "<leader>fb", function() require("fzf-lua").buffers() end,              desc = "Find buffers" },
       { "<leader>fh", function() require("fzf-lua").helptags() end,             desc = "Help tags" },
       { "<leader>fr", function() require("fzf-lua").oldfiles() end,             desc = "Recent files" },

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+user_bin="$HOME/.local/bin"
+mkdir -p "$user_bin"
+
+cat > "$user_bin/nvim" <<'SH'
+#!/usr/bin/env bash
+exec "$HOME/.config/nvim/bin/nvim" "$@"
+SH
+
+cat > "$user_bin/nvim-dev" <<'SH'
+#!/usr/bin/env bash
+exec "$HOME/.config/nvim/bin/nvim-dev" "$@"
+SH
+
+cat > "$user_bin/opencode" <<'SH'
+#!/usr/bin/env bash
+exec "$HOME/.config/nvim/bin/opencode" "$@"
+SH
+
+chmod +x "$user_bin/nvim" "$user_bin/nvim-dev" "$user_bin/opencode"
+printf 'installed nvim wrappers to %s\n' "$user_bin"

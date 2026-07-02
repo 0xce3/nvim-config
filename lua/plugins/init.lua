@@ -591,8 +591,11 @@ return {
 
       local map = vim.keymap.set
       map("n", "<leader>tr", function()
-        require("vstask").tasks()
+        require("config.vscode_debug").pick_task()
       end, { desc = "Run VS Code task" })
+      map("n", "<leader>cc", function()
+        require("config.vscode_debug").run_task("Compliance check with fix (Delta)")
+      end, { desc = "Compliance fix delta" })
       map("n", "<leader>tt", function()
         require("vstask").jobs()
       end, { desc = "Show task jobs" })
@@ -664,7 +667,7 @@ return {
     },
     cmd = "Neotree",
     keys = {
-      { "<leader>e", "<cmd>Neotree filesystem reveal left<cr>", desc = "Open file explorer" },
+      { "<leader>e", "<cmd>Neotree filesystem reveal left toggle<cr>", desc = "Toggle file explorer" },
     },
     config = function()
       require("neo-tree").setup({
@@ -705,8 +708,11 @@ return {
           },
         },
         window = {
+          position = "left",
           width = 36,
           mappings = {
+            ["q"] = "close_window",
+            ["<Esc>"] = "close_window",
             ["a"] = "add",
             ["d"] = "delete",
             ["r"] = "rename",
@@ -740,33 +746,13 @@ return {
     lazy = false,
     opts = {
       terminal = { enabled = true },
+      input = { enabled = true },
       lazygit = { enabled = true },
       bigfile = { enabled = false },
-      dashboard = {
-        enabled = true,
-        preset = {
-          keys = {
-            { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
-            { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
-            { icon = " ", key = "h", desc = "Workspace Hub", action = ":lua require('config.workspace_hub').open()" },
-            { icon = " ", key = "a", desc = "Attach Container", action = ":DevcontainerAttach" },
-            { icon = " ", key = "o", desc = "Reopen in Devcontainer", action = ":DevcontainerReopen" },
-            { icon = " ", key = "b", desc = "Rebuild Devcontainer", action = ":DevcontainerRebuild" },
-            { icon = " ", key = "s", desc = "Restore Session", action = '<cmd>lua require("persistence").load()<CR>' },
-            { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
-            { icon = " ", key = "q", desc = "Quit", action = ":qa" },
-          },
-        },
-        sections = {
-          { section = "header" },
-          { section = "keys", gap = 1, padding = 1 },
-          { section = "startup" },
-        },
-      },
+      dashboard = { enabled = false },
       explorer = { enabled = false },
       image = { enabled = false },
       indent = { enabled = false },
-      input = { enabled = false },
       notifier = { enabled = false },
       picker = { enabled = false },
       quickfile = { enabled = false },
@@ -801,10 +787,18 @@ return {
       {
         "<leader>oa",
         function()
-          require("opencode").ask("@this: ", { submit = true })
+          require("opencode").ask("@buffer: ")
         end,
-        mode = { "n", "x" },
-        desc = "Ask opencode",
+        mode = "n",
+        desc = "Ask opencode about buffer",
+      },
+      {
+        "<leader>oa",
+        function()
+          require("opencode").ask("@this: ")
+        end,
+        mode = "x",
+        desc = "Ask opencode about selection",
       },
       {
         "<leader>oo",
@@ -817,11 +811,9 @@ return {
       {
         "<leader>ot",
         function()
-          require("snacks.terminal").toggle("opencode --port", {
-            win = { position = "right", width = 0.40, enter = false },
-          })
+          vim.notify("Run opencode --port in WSL and set OPENCODE_SERVER_URL if needed", vim.log.levels.INFO, { title = "opencode" })
         end,
-        desc = "Toggle opencode window",
+        desc = "Show opencode server hint",
       },
       {
         "<leader>on",
@@ -905,12 +897,55 @@ return {
       },
     },
     init = function()
+      local function mapped_path(buf)
+        local path = vim.api.nvim_buf_get_name(buf)
+        local container_root = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
+        local host_root = vim.env.NVIM_DEV_HOST_ROOT
+        if path ~= "" and container_root and host_root then
+          local prefix = container_root:match("/$") and container_root or container_root .. "/"
+          if path:find(prefix, 1, true) == 1 then
+            return host_root .. "/" .. path:sub(#prefix + 1)
+          end
+        end
+        return path
+      end
+
+      local function format_mapped(context, opts)
+        local path = mapped_path(opts.buf or context.buf)
+        if path == "" then
+          return nil
+        end
+        return require("opencode").format({
+          path = path,
+          from = opts.from,
+          to = opts.to,
+          rel = context.server.cwd,
+        })
+      end
+
       vim.g.opencode_opts = {
         server = {
-          start = function()
-            require("snacks.terminal").open("opencode --port", {
-              win = { position = "right", width = 0.40, enter = false },
+          url = vim.env.OPENCODE_SERVER_URL or (vim.env.DEVCONTAINER and "http://127.0.0.1:4096" or nil),
+          start = false,
+        },
+        contexts = {
+          ["@this"] = function(context)
+            if context.range then
+              local from = { context.range.from[1] }
+              local to = { context.range.to[1] }
+              if context.range.kind ~= "line" then
+                from[2] = context.range.from[2] + 1
+                to[2] = context.range.to[2] + 1
+              end
+              return format_mapped(context, { buf = context.buf, from = from, to = to })
+            end
+            return format_mapped(context, {
+              buf = context.buf,
+              from = { context.cursor[1], context.cursor[2] + 1 },
             })
+          end,
+          ["@buffer"] = function(context)
+            return format_mapped(context, { buf = context.buf })
           end,
         },
       }
@@ -967,7 +1002,12 @@ return {
     },
     config = function()
       local telescope = require("telescope")
+      local actions = require("telescope.actions")
       local fb_actions = require("telescope").extensions.file_browser.actions
+      vim.api.nvim_set_hl(0, "TelescopeResultsDiffAdd", { fg = "#98c379" })
+      vim.api.nvim_set_hl(0, "TelescopeResultsDiffChange", { fg = "#e5c07b" })
+      vim.api.nvim_set_hl(0, "TelescopeResultsDiffDelete", { fg = "#e06c75" })
+      vim.api.nvim_set_hl(0, "TelescopeResultsDiffUntracked", { fg = "#98c379" })
       telescope.setup({
         defaults = {
           layout_strategy = "horizontal",
@@ -979,6 +1019,16 @@ return {
             hidden = true,
             respect_gitignore = false,
             git_status = true,
+            initial_mode = "normal",
+            git_icons = {
+              added = "+",
+              changed = "~",
+              deleted = "-",
+              renamed = "→",
+              untracked = "?",
+            },
+            dir_icon = "",
+            dir_icon_hl = "Directory",
             hijack_netrw = true,
             mappings = {
               i = {
@@ -992,6 +1042,7 @@ return {
                 ["d"] = fb_actions.remove,
                 ["r"] = fb_actions.rename,
                 ["m"] = fb_actions.move,
+                ["q"] = actions.close,
               },
             },
           },

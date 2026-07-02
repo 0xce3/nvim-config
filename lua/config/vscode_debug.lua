@@ -184,7 +184,7 @@ local function build_task_cmd(task, tasks, job)
   return table.concat(commands, " && ")
 end
 
-local function run_vscode_task(label)
+function M.run_task(label)
   local parse = require("vstask.Parse")
   local job   = require("vstask.Job")
   local tasks = parse.Tasks()
@@ -215,6 +215,72 @@ local function run_vscode_task(label)
     })
   end
   return true
+end
+
+function M.task_labels()
+  local ok, parse = pcall(require, "vstask.Parse")
+  if not ok then
+    notify("vstask.Parse not available", vim.log.levels.ERROR)
+    return {}
+  end
+
+  return vim.tbl_map(function(task)
+    return task.label
+  end, vim.tbl_filter(function(task)
+    return type(task.label) == "string" and task.label ~= ""
+  end, parse.Tasks()))
+end
+
+local recent_task_file = vim.fs.joinpath(vim.fn.stdpath("state"), "vscode-task-last.txt")
+
+local function read_recent_task()
+  local lines = vim.fn.readfile(recent_task_file)
+  return lines[1]
+end
+
+local function write_recent_task(label)
+  vim.fn.mkdir(vim.fn.fnamemodify(recent_task_file, ":h"), "p")
+  vim.fn.writefile({ label }, recent_task_file)
+end
+
+function M.pick_task()
+  local labels = M.task_labels()
+  if #labels == 0 then
+    notify("No VS Code tasks found", vim.log.levels.WARN)
+    return
+  end
+
+  local favorites = {
+    "Flash qmx63 (NS_SOSI) (GCC)",
+    "Build qmx63 (NS_SOSI) (GCC)",
+    "Rebuild qmx63 (NS_SOSI) (GCC)",
+  }
+  local recent = read_recent_task()
+  local seen = {}
+  local ordered = {}
+
+  local function add(label)
+    if label and not seen[label] and vim.tbl_contains(labels, label) then
+      seen[label] = true
+      table.insert(ordered, label)
+    end
+  end
+
+  add(recent)
+  for _, label in ipairs(favorites) do
+    add(label)
+  end
+  for _, label in ipairs(labels) do
+    add(label)
+  end
+
+  vim.ui.select(ordered, { prompt = "VS Code task" }, function(choice)
+    if not choice then
+      return
+    end
+    write_recent_task(choice)
+    M.run_task(choice)
+  end)
 end
 
 local function split_host_port(address)
@@ -299,7 +365,7 @@ function M.run_launch(name)
 
       if type(launch.preLaunchTask) == "string" then
         notify("Starting " .. launch.preLaunchTask)
-        if not run_vscode_task(launch.preLaunchTask) then
+        if not M.run_task(launch.preLaunchTask) then
           return
         end
       end
@@ -322,7 +388,7 @@ function M.stop_post_debug_task(name)
   local task_root = M.find_task_root()
   local launch = find_launch(name, task_root)
   if launch ~= nil and type(launch.postDebugTask) == "string" then
-    run_vscode_task(launch.postDebugTask)
+    M.run_task(launch.postDebugTask)
   end
 end
 

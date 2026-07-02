@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+target="${1:-.}"
+
+if [[ -t 2 && "${NO_COLOR:-}" == "" ]]; then
+  c_reset=$'\033[0m'
+  c_dim=$'\033[2m'
+  c_green=$'\033[32m'
+  c_yellow=$'\033[33m'
+  c_blue=$'\033[34m'
+  c_cyan=$'\033[36m'
+  c_bold=$'\033[1m'
+else
+  c_reset= c_dim= c_green= c_yellow= c_blue= c_cyan= c_bold=
+fi
+
+log() { printf '%b\n' "$*" >&2; }
+
+real_nvim() {
+  if [[ -n "${NVIM_REAL_BIN:-}" && -x "${NVIM_REAL_BIN:-}" ]]; then
+    printf '%s\n' "$NVIM_REAL_BIN"
+    return 0
+  fi
+
+  local candidate candidate_dir
+  IFS=: read -ra path_entries <<< "$PATH"
+  for candidate_dir in "${path_entries[@]}"; do
+    candidate="$candidate_dir/nvim"
+    if [[ -x "$candidate" && "$candidate" != "$HOME/.local/bin/nvim" && "$candidate" != "$HOME/.config/nvim/bin/nvim" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+project_root() {
+  local dir
+  dir="$(cd "$target" 2>/dev/null && pwd -P)" || return 1
+  while [[ "$dir" != / ]]; do
+    if [[ -f "$dir/.devcontainer/devcontainer.json" || -f "$dir/devcontainer.json" || -d "$dir/.git" ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  cd "$target" && pwd -P
+}
+
+has_devcontainer() {
+  [[ -f "$1/.devcontainer/devcontainer.json" || -f "$1/devcontainer.json" ]]
+}
+
+choose_mode() {
+  if [[ "${NVIM_DEV_DEFAULT:-}" == "local" || "${NVIM_DEV_DEFAULT:-}" == "remote" ]]; then
+    printf '%s\n' "$NVIM_DEV_DEFAULT"
+    return 0
+  fi
+
+  if [[ ! -t 0 || ! -t 2 ]]; then
+    printf 'local\n'
+    return 0
+  fi
+
+  log "${c_cyan}${c_bold}╭─ nvim${c_reset} ${c_dim}devcontainer-aware launcher${c_reset}"
+  log "${c_blue}▸${c_reset} ${c_bold}devcontainer detected${c_reset} ${c_dim}$root${c_reset}"
+
+  if command -v fzf >/dev/null 2>&1; then
+    local choice
+    choice="$(printf 'remote\tattach devcontainer nvim server\nlocal\topen host nvim\n' | fzf \
+      --ansi \
+      --height=8 \
+      --layout=reverse \
+      --border=rounded \
+      --prompt='nvim mode> ' \
+      --header='↑/↓ select, Enter confirm, Esc defaults to local' \
+      --with-nth=1,2 \
+      --delimiter='\t' | cut -f1 || true)"
+    case "$choice" in
+      remote|local) printf '%s\n' "$choice"; return 0 ;;
+      *) printf 'local\n'; return 0 ;;
+    esac
+  fi
+
+  log "  ${c_green}1${c_reset}) local  ${c_dim}open host nvim${c_reset}"
+  log "  ${c_yellow}2${c_reset}) remote ${c_dim}attach devcontainer nvim server${c_reset}"
+  printf '%b' "${c_blue}?${c_reset} mode [local/remote] ${c_dim}(default: remote)${c_reset}: " >&2
+
+  local answer
+  read -r answer
+  case "${answer,,}" in
+    ""|r|remote|2) printf 'remote\n' ;;
+    l|local|1) printf 'local\n' ;;
+    *) printf 'remote\n' ;;
+  esac
+}
+
+nvim_bin="$(real_nvim)" || { log "nvim wrapper: real nvim binary not found"; exit 127; }
+root="$(project_root || true)"
+
+if [[ -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
+  mode="$(choose_mode)"
+  if [[ "$mode" == "remote" ]]; then
+    exec "$HOME/.config/nvim/bin/nvim-dev" "$target"
+  fi
+fi
+
+exec "$nvim_bin" "$@"

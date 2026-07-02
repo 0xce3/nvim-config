@@ -120,7 +120,11 @@ local function compliance_clang_format_file(bufnr)
   end
 
   local root = repo_root_for_file(filename)
-  if not root or vim.fn.filereadable(root .. "/scripts/clangformat.sh") ~= 1 then
+  if not root or vim.fn.filereadable(root .. "/.clang-format") ~= 1 then
+    return
+  end
+
+  if vim.fn.executable("clang-format") ~= 1 then
     return
   end
 
@@ -129,7 +133,7 @@ local function compliance_clang_format_file(bufnr)
     return
   end
 
-  local result = vim.system({ "clang-format", "--assume-filename=./.clang-format", "-i", rel }, {
+  local result = vim.system({ "clang-format", "--style=file", "-i", rel }, {
     cwd = root,
     text = true,
   }):wait()
@@ -171,7 +175,12 @@ local function format_buffer(bufnr)
 end
 
 vim.api.nvim_create_user_command("Format", function()
-  format_buffer(vim.api.nvim_get_current_buf())
+  local bufnr = vim.api.nvim_get_current_buf()
+  if c_like_filetypes[vim.bo[bufnr].filetype] then
+    compliance_clang_format_file(bufnr)
+    return
+  end
+  format_buffer(bufnr)
 end, { desc = "Format current buffer" })
 
 vim.api.nvim_create_user_command("NvimDevDebug", function()
@@ -191,7 +200,7 @@ vim.api.nvim_create_user_command("NvimDevDebug", function()
   add("clangd_build.active", cc_dir)
   add("compile_commands exists", cc_dir and vim.fn.filereadable(cc_dir .. "/compile_commands.json") or "nil")
   add("clangd executable", vim.fn.exepath("clangd"))
-  add("C/C++ formatting", "scripts/clangformat.sh compatible current-file format on save")
+  add("C/C++ formatting", "clang-format --style=file using repo .clang-format")
   add("LspInfo command", vim.fn.exists(":LspInfo"))
 
   if vim.fn.executable("clangd") == 1 then
@@ -231,7 +240,7 @@ vim.api.nvim_create_autocmd("BufWritePost", {
       compliance_clang_format_file(event.buf)
     end
   end,
-  desc = "Format C/C++ buffers using the repo compliance clang-format invocation",
+  desc = "Format C/C++ buffers using repo .clang-format",
 })
 
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })
@@ -306,7 +315,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     map("n", "gd", vim.lsp.buf.definition, opts("Go to definition"))
     map("n", "gD", vim.lsp.buf.declaration, opts("Go to declaration"))
-    map("n", "gi", vim.lsp.buf.implementation, opts("Go to implementation"))
+    map("n", "gi", "<C-o>", opts("Jump back"))
+    map("n", "gI", vim.lsp.buf.implementation, opts("Go to implementation"))
     map("n", "gr", vim.lsp.buf.references, opts("Go to references"))
     map("n", "gh", vim.lsp.buf.hover, opts("Show hover documentation"))
     map("n", "<leader>lr", vim.lsp.buf.rename, opts("Rename symbol"))
