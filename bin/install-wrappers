@@ -20,4 +20,11 @@ exec "$HOME/.config/nvim/bin/opencode" "$@"
 SH
 
 chmod +x "$user_bin/nvim" "$user_bin/nvim-dev" "$user_bin/opencode"
+
+opencode_config="$HOME/.config/opencode"
+mkdir -p "$opencode_config/themes"
+install -m 0644 "$HOME/.config/nvim/opencode/tui.json" "$opencode_config/tui.json"
+install -m 0644 "$HOME/.config/nvim/opencode/themes/gruvbox-soft-dark.json" "$opencode_config/themes/gruvbox-soft-dark.json"
+
 printf 'installed nvim wrappers to %s\n' "$user_bin"
+printf 'installed opencode theme to %s\n' "$opencode_config"

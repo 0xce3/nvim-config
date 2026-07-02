@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target="${1:-.}"
+if [[ "$#" -eq 0 ]]; then
+  target="$HOME"
+else
+  target="$1"
+fi
 
 if [[ -t 2 && "${NO_COLOR:-}" == "" ]]; then
   c_reset=$'\033[0m'
@@ -99,11 +103,16 @@ choose_mode() {
 nvim_bin="$(real_nvim)" || { log "nvim wrapper: real nvim binary not found"; exit 127; }
 root="$(project_root || true)"
 
-if [[ -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
+if [[ "$#" -gt 0 && -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
   mode="$(choose_mode)"
   if [[ "$mode" == "remote" ]]; then
     exec "$HOME/.config/nvim/bin/nvim-dev" "$target"
   fi
+fi
+
+if [[ "$#" -eq 0 ]]; then
+  cd "$HOME"
+  exec "$nvim_bin" "$HOME"
 fi
 
 exec "$nvim_bin" "$@"

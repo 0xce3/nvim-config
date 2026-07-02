@@ -324,15 +324,13 @@ state_dir="\${XDG_STATE_HOME:-\$HOME/.local/state}/nvim"
 mkdir -p "\$data_dir" "\$state_dir"
 lock_file="\$config_dir/lazy-lock.json"
 hash_file="\$state_dir/nvim-dev-lazy-lock.sha256"
-current_hash=""
-previous_hash=""
+current_hash_file="\$state_dir/nvim-dev-lazy-lock.current.sha256"
 if [ -f "\$lock_file" ] && command -v sha256sum >/dev/null 2>&1; then
-  current_hash="\`sha256sum \$lock_file | cut -d ' ' -f 1\`"
-  previous_hash="\`cat \$hash_file 2>/dev/null || true\`"
+  sha256sum "\$lock_file" > "\$current_hash_file"
 fi
-if [ "\${NVIM_DEV_SYNC_PLUGINS:-auto}" = always ] || [ ! -d "\$data_dir/lazy/lazy.nvim" ] || { [ -n "\$current_hash" ] && [ "\$current_hash" != "\$previous_hash" ]; }; then
+if [ "\${NVIM_DEV_SYNC_PLUGINS:-auto}" = always ] || [ ! -d "\$data_dir/lazy/lazy.nvim" ] || { [ -f "\$current_hash_file" ] && ! cmp -s "\$current_hash_file" "\$hash_file"; }; then
   nvim --headless '+Lazy! sync' '+qa' || true
-  if [ -n "\$current_hash" ]; then printf '%s\n' "\$current_hash" > "\$hash_file"; fi
+  if [ -f "\$current_hash_file" ]; then mv "\$current_hash_file" "\$hash_file"; fi
 fi
 workspace=$(quote "$workspace")
 if [ ! -d \"\$workspace\" ]; then workspace=/workspaces/$(quote "$root_name"); fi
