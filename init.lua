@@ -3,7 +3,6 @@ require("config.keymaps")
 require("config.filetypes")
 require("config.format_specifiers").setup()
 require("config.preproc").setup()
-require("config.devcontainer").setup()
 require("config.skeleton").setup()
 require("config.lazy")
 

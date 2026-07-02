@@ -62,22 +62,14 @@ Exact pinned versions live in `lazy-lock.json`.
 
 ## Devcontainer (Remote Workflow)
 
-This config supports a full VS Code-like devcontainer workflow. nvim runs on the
-host (WSL) with your full config/themes; the container provides toolchain + workspace.
+This config supports a devcontainer workflow through the shell launcher. Run
+`nvim .` in a project with `.devcontainer/devcontainer.json`; the wrapper asks
+whether to open local host nvim or attach to a containerized nvim server.
 
-| Key | Command | Action |
-|-----|---------|--------|
-| `<leader>Dr` | `:DevcontainerReopen` | Detect `.devcontainer.json` → build/start → route LSP |
-| `<leader>Du` | `:DevcontainerUp` | Build and start devcontainer |
-| `<leader>Dc` | `:DevcontainerConnect` | List running containers → attach |
-| `<leader>DR` | `:DevcontainerRebuild` | Rebuild container from scratch |
-| `<leader>Dd` | `:DevcontainerStop` | Stop container |
-| `<leader>Ds` | `:DevcontainerShell` | Open shell in container |
-| `<leader>Dh` | `:DevcontainerHub` | Open workspace hub |
-| `<leader>hh` | – | Workspace hub (projects + containers) |
+The legacy in-editor `:Devcontainer*` commands are intentionally not included.
+Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 
-When nvim starts without arguments, the Workspace Hub opens automatically
-showing recent projects, devcontainer projects, and running containers.
+`<leader>hh` opens the Workspace Hub for recent local projects.
 
 ## Keybindings
 

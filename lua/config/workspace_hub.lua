@@ -3,10 +3,6 @@ local M = {}
 local function get_icon(entry_type)
   if entry_type == "project" then
     return " "
-  elseif entry_type == "devcontainer" then
-    return " "
-  elseif entry_type == "container" then
-    return "ﴱ "
   end
   return "  "
 end
@@ -38,7 +34,6 @@ end
 
 function M.open(opts)
   opts = opts or {}
-  local container_detect = require("config.container_detect")
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
   local finders = require("telescope.finders")
@@ -63,68 +58,8 @@ function M.open(opts)
     end
   end
 
-  -- Use cached data only – never call docker/fd synchronously.
-  if container_detect.is_cache_ready() then
-    local devcontainer_projects = container_detect.get_cached_devcontainer_projects()
-    local has_devcontainers = devcontainer_projects and #devcontainer_projects > 0
-
-    if has_devcontainers then
-      if #entries > 0 then
-        table.insert(entries, { type = "section", display = "", ordinal = "" })
-      end
-      table.insert(entries, { type = "section", display = "── Devcontainer Projects ──", ordinal = "" })
-      for _, p in ipairs(devcontainer_projects) do
-        table.insert(entries, {
-          type = "devcontainer",
-          display = "  " .. p.name .. "  " .. p.path,
-          ordinal = p.name .. " " .. p.path,
-          path = p.path,
-          name = p.name,
-          config_path = p.config_path,
-        })
-      end
-    end
-
-    local running_containers = container_detect.get_cached_containers()
-    local has_containers = running_containers and #running_containers > 0
-
-    if has_containers then
-      if #entries > 0 then
-        table.insert(entries, { type = "section", display = "", ordinal = "" })
-      end
-      table.insert(entries, { type = "section", display = "── Running Containers ──", ordinal = "" })
-      for _, c in ipairs(running_containers) do
-        local ws = c.workspace_folder ~= "" and "  " .. c.workspace_folder or ""
-        table.insert(entries, {
-          type = "container",
-          display = "  " .. c.name .. ws,
-          ordinal = c.name .. " " .. c.project,
-          id = c.id,
-          name = c.name,
-          workspace_folder = c.workspace_folder,
-          project_name = c.project,
-        })
-      end
-    end
-  else
-    -- Cache not ready yet – show a refresh hint.
-    if #entries > 0 then
-      table.insert(entries, { type = "section", display = "", ordinal = "" })
-    end
-    table.insert(entries, {
-      type = "section",
-      display = "── Running Containers ──",
-      ordinal = "",
-    })
-    table.insert(entries, {
-      type = "section",
-      display = "  (cache loading – press <C-r> to refresh)",
-      ordinal = "",
-    })
-  end
-
   if #entries == 0 then
-    vim.notify("No projects or running containers found", vim.log.levels.INFO)
+    vim.notify("No recent projects found", vim.log.levels.INFO)
     return
   end
 
@@ -167,40 +102,13 @@ function M.open(opts)
 end
 
 function M.handle_selection(entry)
-  local dc = require("config.devcontainer")
-
   if entry.type == "project" then
     vim.api.nvim_set_current_dir(entry.path)
     vim.env.PROJECT_ROOT = entry.path
     vim.env.WORKSPACE_FOLDER = entry.path
-    if dc.has_devcontainer(entry.path) then
-      vim.defer_fn(function()
-        dc.menu(entry.path)
-      end, 50)
-    else
-      vim.defer_fn(function()
-        require("telescope.builtin").find_files({ cwd = entry.path })
-      end, 50)
-    end
-  elseif entry.type == "devcontainer" then
-    vim.api.nvim_set_current_dir(entry.path)
-    vim.env.PROJECT_ROOT = entry.path
-    vim.env.WORKSPACE_FOLDER = entry.path
     vim.defer_fn(function()
-      dc.reopen(entry.path)
+      require("telescope.builtin").find_files({ cwd = entry.path })
     end, 50)
-  elseif entry.type == "container" then
-    local folder = entry.workspace_folder
-    if folder ~= "" and vim.fn.isdirectory(folder) == 1 then
-      vim.api.nvim_set_current_dir(folder)
-      vim.defer_fn(function()
-        dc.attach(entry.name, folder)
-      end, 50)
-    else
-      vim.defer_fn(function()
-        dc.attach(entry.name)
-      end, 50)
-    end
   end
 end
 

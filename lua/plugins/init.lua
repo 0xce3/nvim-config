@@ -236,11 +236,11 @@ return {
       end
 
       local function container_status()
-        return require("config.devcontainer").statusline()
+        return vim.env.DEVCONTAINER and "container" or "local"
       end
 
       local function container_status_color()
-        return require("config.devcontainer").statusline_color()
+        return vim.env.DEVCONTAINER and "String" or "Comment"
       end
 
       require("lualine").setup({
@@ -953,29 +953,6 @@ return {
     end,
   },
 
-  -- Devcontainer management (build, start, stop, attach, exec) like VS Code.
-  {
-    "ksoichiro/container.nvim",
-    dependencies = {
-      "nvim-lua/plenary.nvim",
-      "nvim-telescope/telescope.nvim",
-    },
-    cmd = {
-      "ContainerOpen", "ContainerBuild", "ContainerStart",
-      "ContainerStop", "ContainerKill", "ContainerRestart",
-      "ContainerPicker", "ContainerExec", "ContainerShell",
-    },
-    config = function()
-      require("container").setup({
-        auto_open = "off",
-        ui = {
-          picker = "telescope",
-          show_notifications = true,
-        },
-      })
-    end,
-  },
-
   -- Recent project history (auto-tracks directories you work in).
   {
     "ahmedkhalf/project.nvim",
@@ -1303,7 +1280,6 @@ return {
       })
       require("which-key").add({
         { "<leader>d", group = "debug/diagnostics" },
-        { "<leader>D", group = "devcontainer (hub/reopen/stop)" },
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
         { "<leader>h", group = "workspace hub" },

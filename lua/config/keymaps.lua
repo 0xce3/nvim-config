@@ -334,16 +334,6 @@ map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "
 
 map("n", "<leader>hh", function() require("config.workspace_hub").open() end, { desc = "Open workspace hub" })
 
-map("n", "<leader>Du", "<cmd>DevcontainerUp<cr>", { desc = "Devcontainer: up (build+start)" })
-map("n", "<leader>Dr", "<cmd>DevcontainerReopen<cr>", { desc = "Devcontainer: reopen" })
-map("n", "<leader>Dd", "<cmd>DevcontainerStop<cr>", { desc = "Devcontainer: stop" })
-map("n", "<leader>Dk", "<cmd>DevcontainerStop<cr>", { desc = "Devcontainer: kill/stop" })
-map("n", "<leader>DR", "<cmd>DevcontainerRebuild<cr>", { desc = "Devcontainer: rebuild" })
-map("n", "<leader>Ds", "<cmd>DevcontainerShell<cr>", { desc = "Devcontainer: shell" })
-map("n", "<leader>Da", "<cmd>DevcontainerAttach<cr>", { desc = "Devcontainer: attach running" })
-map("n", "<leader>Dc", "<cmd>DevcontainerMenu<cr>", { desc = "Devcontainer: command menu" })
-map("n", "<leader>Dh", "<cmd>DevcontainerHub<cr>", { desc = "Devcontainer: menu" })
-
 map("t", "<c-z>", [[<c-\><c-n>u]], { desc = "Undo in editor" })
 map("t", "<esc><esc>", [[<c-\><c-n>]], { desc = "Leave terminal mode" })
 map("t", "<c-h>", [[<cmd>wincmd h<cr>]], { desc = "Move left" })
