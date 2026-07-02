@@ -231,16 +231,51 @@ function M.task_labels()
   end, parse.Tasks()))
 end
 
-local recent_task_file = vim.fs.joinpath(vim.fn.stdpath("state"), "vscode-task-last.txt")
+local state_dir = vim.fn.stdpath("state")
+local recent_task_file = vim.fs.joinpath(state_dir, "vscode-task-last.txt")
+local favorites_file = vim.fs.joinpath(state_dir, "vscode-favorites.txt")
+
+local function read_file(path)
+  if vim.fn.filereadable(path) == 0 then
+    return {}
+  end
+  local ok, lines = pcall(vim.fn.readfile, path)
+  if ok and lines then
+    return lines
+  end
+  return {}
+end
+
+local function write_file(path, lines)
+  vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
+  vim.fn.writefile(lines, path)
+end
 
 local function read_recent_task()
-  local lines = vim.fn.readfile(recent_task_file)
+  local lines = read_file(recent_task_file)
   return lines[1]
 end
 
 local function write_recent_task(label)
-  vim.fn.mkdir(vim.fn.fnamemodify(recent_task_file, ":h"), "p")
-  vim.fn.writefile({ label }, recent_task_file)
+  write_file(recent_task_file, { label })
+end
+
+local function read_favorites()
+  local lines = read_file(favorites_file)
+  local set = {}
+  for _, label in ipairs(lines) do
+    set[label] = true
+  end
+  return set
+end
+
+local function write_favorites(set)
+  local lines = {}
+  for label, _ in pairs(set) do
+    table.insert(lines, label)
+  end
+  table.sort(lines)
+  write_file(favorites_file, lines)
 end
 
 function M.pick_task()
@@ -250,12 +285,8 @@ function M.pick_task()
     return
   end
 
-  local favorites = {
-    "Flash qmx63 (NS_SOSI) (GCC)",
-    "Build qmx63 (NS_SOSI) (GCC)",
-    "Rebuild qmx63 (NS_SOSI) (GCC)",
-  }
   local recent = read_recent_task()
+  local favorites = read_favorites()
   local seen = {}
   local ordered = {}
 
@@ -267,20 +298,73 @@ function M.pick_task()
   end
 
   add(recent)
-  for _, label in ipairs(favorites) do
-    add(label)
+  for _, label in ipairs(labels) do
+    if favorites[label] then
+      add(label)
+    end
   end
   for _, label in ipairs(labels) do
     add(label)
   end
 
-  vim.ui.select(ordered, { prompt = "VS Code task" }, function(choice)
-    if not choice then
-      return
-    end
-    write_recent_task(choice)
-    M.run_task(choice)
-  end)
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  local function make_finder()
+    return finders.new_table({
+      results = ordered,
+      entry_maker = function(label)
+        local icon = ""
+        if favorites[label] then
+          icon = "★ "
+        end
+        return {
+          value = label,
+          display = icon .. label,
+          ordinal = (favorites[label] and "!" or " ") .. label,
+        }
+      end,
+    })
+  end
+
+  pickers
+    .new({}, {
+      prompt_title = "VS Code task",
+      finder = make_finder(),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if not selection then
+            return
+          end
+          write_recent_task(selection.value)
+          M.run_task(selection.value)
+        end)
+
+        map("i", "<Tab>", function()
+          local selection = action_state.get_selected_entry()
+          if not selection then
+            return
+          end
+          local label = selection.value
+          if favorites[label] then
+            favorites[label] = nil
+          elseif vim.tbl_contains(labels, label) then
+            favorites[label] = true
+          end
+          write_favorites(favorites)
+          local picker = action_state.get_current_picker(prompt_bufnr)
+          picker:refresh(make_finder(), { reset_prompt = false })
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 local function split_host_port(address)
