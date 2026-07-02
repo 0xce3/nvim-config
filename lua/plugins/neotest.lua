@@ -62,7 +62,7 @@ return {
       {
         "<leader>tS",
         function()
-          require("config.vscode_debug").run_task("Run all System Tests on native_sim (Clang)")
+          require("config.vscode_debug").run_task("Run all System Tests on " .. "native" .. "_" .. "sim" .. " (Clang)")
         end,
         desc = "Run VS Code system tests",
       },

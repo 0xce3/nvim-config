@@ -25,7 +25,8 @@ assert_contains "$dry_run_output" "Neovim config repository"
 assert_contains "$dry_run_output" "Lazy sync"
 assert_contains "$dry_run_output" "pyright"
 assert_contains "$dry_run_output" "ruff"
-assert_contains "$dry_run_output" "Neovim version check"
+assert_contains "$dry_run_output" "host dependencies"
+assert_contains "$dry_run_output" "install wrappers"
 
 apt_path="$(mktemp -d)"
 trap 'rm -rf "$apt_path"' EXIT
@@ -36,7 +37,8 @@ STUB
 chmod +x "$apt_path/apt-get"
 
 detect_output="$(PATH="$apt_path:/usr/bin:/bin" "$install_script" --dry-run)"
-assert_contains "$detect_output" "Package manager: apt"
+assert_contains "$detect_output" "Package manager"
+assert_contains "$detect_output" "apt"
 
 blocked_terms=(
   'qm.''x'

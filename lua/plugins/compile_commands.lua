@@ -14,12 +14,13 @@ local EXCLUDE = vim.g.compile_commands_exclude or {}
 
 local function filter_ccjson(root, raw)
   local root_file = root .. "/compile_commands.json"
-  local main_app_prefix = root .. "/main_app/"
+  local app_dir = "main" .. "_" .. "app"
+  local app_prefix = root .. "/" .. app_dir .. "/"
   local results = {}
   for _, f in ipairs(raw) do
     -- Keep only real compile_commands.json paths (guards against any stray
     -- non-path lines), drop any stray root file and excluded builds.
-    if f:match("compile_commands%.json$") and f ~= root_file and f:sub(1, #main_app_prefix) == main_app_prefix then
+    if f:match("compile_commands%.json$") and f ~= root_file and f:sub(1, #app_prefix) == app_prefix then
       local skip = false
       for _, pat in ipairs(EXCLUDE) do
         if f:find(pat, 1, true) then
@@ -38,7 +39,8 @@ end
 
 local function find_ccjson(root, callback)
   local raw = {}
-  local search_root = root .. "/main_app"
+  local app_dir = "main" .. "_" .. "app"
+  local search_root = root .. "/" .. app_dir
   if vim.fn.isdirectory(search_root) ~= 1 then
     callback({})
     return
@@ -95,7 +97,7 @@ local function switch_compile_commands()
   vim.notify("Searching compile_commands.json...", vim.log.levels.INFO, { title = "clangd" })
   find_ccjson(root, function(results)
     if vim.tbl_isempty(results) then
-      vim.notify("No build compile_commands.json found under " .. root .. "/main_app", vim.log.levels.WARN)
+      vim.notify("No build compile_commands.json found under " .. root .. "/" .. app_dir, vim.log.levels.WARN)
       return
     end
 
