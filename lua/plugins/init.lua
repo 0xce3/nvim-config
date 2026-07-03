@@ -738,8 +738,8 @@ return {
     "tpope/vim-fugitive",
   },
 
-  -- UI toolkit used by opencode.nvim (managed terminal), lazygit, and
-  -- the Workspace Hub dashboard. Every other module is explicitly disabled.
+  -- UI toolkit used by opencode.nvim (managed terminal), lazygit, media previews,
+  -- and the Workspace Hub dashboard. Every other module is explicitly disabled.
   {
     "folke/snacks.nvim",
     priority = 1000,
@@ -751,7 +751,11 @@ return {
       bigfile = { enabled = false },
       dashboard = { enabled = false },
       explorer = { enabled = false },
-      image = { enabled = false },
+      image = {
+        enabled = vim.env.KITTY_WINDOW_ID ~= nil
+          or vim.env.WEZTERM_EXECUTABLE ~= nil
+          or vim.env.TERM_PROGRAM == "ghostty",
+      },
       indent = { enabled = false },
       notifier = { enabled = false },
       picker = { enabled = false },
@@ -1255,19 +1259,22 @@ return {
         cmd = clangd_cmd(),
       })
 
-      vim.lsp.config("pyright", {
-        cmd = { "pyright-langserver", "--stdio" },
-      })
+      local enabled_servers = { "clangd" }
+      if vim.fn.executable("pyright-langserver") == 1 then
+        vim.lsp.config("pyright", {
+          cmd = { "pyright-langserver", "--stdio" },
+        })
+        table.insert(enabled_servers, "pyright")
+      end
 
-      vim.lsp.config("ruff", {
-        cmd = { "ruff", "server" },
-      })
+      if vim.fn.executable("ruff") == 1 then
+        vim.lsp.config("ruff", {
+          cmd = { "ruff", "server" },
+        })
+        table.insert(enabled_servers, "ruff")
+      end
 
-      vim.lsp.enable({
-        "clangd",
-        "pyright",
-        "ruff",
-      })
+      vim.lsp.enable(enabled_servers)
     end,
   },
 

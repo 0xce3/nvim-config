@@ -3,6 +3,11 @@ vim.g.maplocalleader = " "
 
 local opt = vim.opt
 
+vim.g.loaded_node_provider = 0
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_python3_provider = 0
+vim.g.loaded_ruby_provider = 0
+
 opt.number = true
 opt.relativenumber = true
 -- Full mouse support in Neovim (click files, resize splits,
@@ -117,10 +122,25 @@ function _G.fold_text()
 end
 opt.foldtext = "v:lua.fold_text()"
 
--- bash -ic: interactive flag makes $- contain 'i', so ~/.bashrc runs fully
--- (the default .bashrc guard "case $- in *i*)" requires this)
+if vim.env.TERM == nil or vim.env.TERM == "" then
+  vim.env.TERM = "xterm-256color"
+end
+
+local path_entries = {
+  vim.fn.expand("~/.local/bin"),
+  vim.fn.expand("~/.config/nvim/bin"),
+}
+for i = #path_entries, 1, -1 do
+  local entry = path_entries[i]
+  if vim.fn.isdirectory(entry) == 1 and not vim.env.PATH:find(entry, 1, true) then
+    vim.env.PATH = entry .. ":" .. vim.env.PATH
+  end
+end
+
+-- Use a login-compatible shell without forcing interactive mode. Interactive
+-- shells print job-control noise during health checks and background jobs.
 opt.shell = "bash"
-opt.shellcmdflag = "-ic"
+opt.shellcmdflag = "-lc"
 
 vim.cmd("syntax enable")
 vim.cmd("filetype plugin indent on")

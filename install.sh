@@ -138,17 +138,27 @@ pkg_name() {
     apt:node) printf 'nodejs' ;;
     apt:npm) printf 'npm' ;;
     apt:gh) printf 'gh' ;;
+    apt:convert) printf 'imagemagick' ;;
+    apt:gs) printf 'ghostscript' ;;
     dnf:rg) printf 'ripgrep' ;;
     dnf:fd) printf 'fd-find' ;;
     dnf:node) printf 'nodejs' ;;
     dnf:pip3) printf 'python3-pip' ;;
+    dnf:convert) printf 'ImageMagick' ;;
+    dnf:gs) printf 'ghostscript' ;;
     pacman:python3) printf 'python' ;;
     pacman:pip3) printf 'python-pip' ;;
     pacman:gh) printf 'github-cli' ;;
+    pacman:convert) printf 'imagemagick' ;;
+    pacman:gs) printf 'ghostscript' ;;
     apk:pip3) printf 'py3-pip' ;;
     apk:gh) printf 'github-cli' ;;
+    apk:convert) printf 'imagemagick' ;;
+    apk:gs) printf 'ghostscript' ;;
     brew:python3) printf 'python' ;;
     brew:pip3) printf 'python' ;;
+    brew:convert) printf 'imagemagick' ;;
+    brew:gs) printf 'ghostscript' ;;
     *) printf '%s' "$cmd" ;;
   esac
 }
@@ -254,6 +264,19 @@ install_language_tools() {
   fi
 }
 
+install_media_tools() {
+  step "media preview tools" "snacks.image"
+  ensure_command "$manager" kitty "" "inline image rendering in terminal"
+  ensure_command "$manager" convert "" "image conversion for previews"
+  ensure_command "$manager" gs "" "PDF rendering for previews"
+  ensure_command "$manager" chafa "" "terminal image fallback previews"
+  if ! command -v mmdc >/dev/null 2>&1; then
+    warn "mmdc missing" "Mermaid previews need @mermaid-js/mermaid-cli or snap install mermaid-cli"
+  else
+    ok "mmdc" "installed"
+  fi
+}
+
 sync_plugins() {
   step "Lazy sync" "install/update plugins"
   local nvim_bin
@@ -326,6 +349,7 @@ main() {
   install_lazygit_github
   install_wrappers
   install_language_tools
+  install_media_tools
   sync_plugins
 
   ok "setup complete" "open a project and run: nvim ."

@@ -27,9 +27,32 @@ local function pytest_args()
   local root = task_root()
   local settings = read_vscode_settings(root)
   local args = settings["python.testing.pytestArgs"] or { "tests/system" }
-  return vim.tbl_map(function(arg)
-    return expand_vars(arg, root)
-  end, args)
+  local test_root = vim.fs.joinpath(root, "tests", "system")
+  local result = {}
+  for _, arg in ipairs(args) do
+    arg = expand_vars(arg, root)
+    if type(arg) == "string" and arg:match("^%-%-rootdir=") then
+      table.insert(result, "--rootdir=" .. test_root)
+    elseif type(arg) == "string" and arg:sub(1, 1) ~= "-" and (arg == "tests/system" or arg == test_root) then
+      -- Neotest appends the selected file/test itself. Keeping VS Code's
+      -- positional test target here makes pytest receive duplicate targets.
+    else
+      table.insert(result, arg)
+    end
+  end
+  if vim.fn.filereadable(vim.fs.joinpath(test_root, "pytest.ini")) == 1 then
+    local has_rootdir = false
+    for _, arg in ipairs(result) do
+      if type(arg) == "string" and arg:match("^%-%-rootdir=") then
+        has_rootdir = true
+        break
+      end
+    end
+    if not has_rootdir then
+      table.insert(result, "--rootdir=" .. test_root)
+    end
+  end
+  return result
 end
 
 local function python_path()
@@ -40,6 +63,29 @@ local function python_path()
     return configured
   end
   return vim.fn.exepath("python3") ~= "" and vim.fn.exepath("python3") or "python3"
+end
+
+local function is_under(path, root)
+  local prefix = root:match("/$") and root or root .. "/"
+  return path == root or path:find(prefix, 1, true) == 1
+end
+
+local function python_adapter()
+  local adapter = require("neotest-python")({
+    python = python_path,
+    pytest_discover_instances = true,
+    args = pytest_args,
+  })
+  local fallback_root = adapter.root
+  adapter.root = function(path)
+    local root = task_root()
+    local test_root = root and vim.fs.joinpath(root, "tests", "system") or nil
+    if type(path) == "string" and root and test_root and vim.fn.isdirectory(test_root) == 1 and is_under(path, root) then
+      return test_root
+    end
+    return fallback_root(path)
+  end
+  return adapter
 end
 
 return {
@@ -70,11 +116,7 @@ return {
     config = function()
       require("neotest").setup({
         adapters = {
-          require("neotest-python")({
-            python = python_path,
-            pytest_discover_instances = true,
-            args = pytest_args,
-          }),
+          python_adapter(),
         },
         output = {
           open_on_run = false,
