@@ -24,6 +24,11 @@ local function capture()
   state.chan = vim.b[state.buf].terminal_job_id
   vim.bo[state.buf].buflisted = true
   vim.bo[state.buf].bufhidden = "hide"
+
+  local existing = vim.fn.bufnr("Task Terminal")
+  if existing ~= -1 and existing ~= state.buf then
+    pcall(vim.api.nvim_buf_delete, existing, { force = true })
+  end
   vim.api.nvim_buf_set_name(state.buf, "Task Terminal")
 
   vim.api.nvim_create_autocmd("TermClose", {
