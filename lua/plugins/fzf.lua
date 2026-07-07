@@ -67,6 +67,7 @@ return {
           builtin = {
             ["<C-d>"] = "preview-page-down",
             ["<C-u>"] = "preview-page-up",
+            ["<C-k>"] = "yank",
           },
           fzf = {
             ["ctrl-q"] = "select-all+accept", -- send all matches to quickfix

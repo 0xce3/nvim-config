@@ -1349,4 +1349,19 @@ return {
       end, { desc = "Do not save session" })
     end,
   },
+  {
+    "mistweaverco/kulala.nvim",
+    keys = {
+      { "<leader>Rr", desc = "Run request under cursor" },
+      { "<leader>Ra", desc = "Run all requests" },
+      { "<leader>Rs", desc = "Open scratchpad" },
+      { "<leader>Rc", desc = "Copy as cURL" },
+    },
+    ft = { "http", "rest" },
+    opts = {
+      global_keymaps = true,
+      global_keymaps_prefix = "<leader>R",
+      kulala_keymaps_prefix = "",
+    },
+  },
 }
