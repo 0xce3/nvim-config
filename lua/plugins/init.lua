@@ -1363,5 +1363,20 @@ return {
       global_keymaps_prefix = "<leader>R",
       kulala_keymaps_prefix = "",
     },
+    config = function(_, opts)
+      require("kulala").setup(opts)
+      -- Register OpenAPI import command and keymap
+      vim.api.nvim_create_user_command("OpenApiImport", function(cmd_opts)
+        local openapi = require("openapi")
+        if cmd_opts.args and cmd_opts.args ~= "" then
+          openapi.import_from(cmd_opts.args)
+        else
+          openapi.import()
+        end
+      end, { nargs = "?", desc = "Import OpenAPI spec and convert to .http" })
+      vim.keymap.set("n", "<leader>Ri", function()
+        require("openapi").import()
+      end, { desc = "Import OpenAPI spec to .http" })
+    end,
   },
 }

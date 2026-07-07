@@ -407,7 +407,7 @@ sync_nvim_config_to_container() {
 ensure_container_tools() {
   local container="$1" start config_hash check_out
   start=$SECONDS
-  step "check tools" "nvim git rg fzf clang-format lazygit"
+  step "check tools" "nvim git rg fzf clang-format lazygit node"
 
   config_hash="$(tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner --exclude=nvim/.git -C "$HOME/.config" -cf - nvim 2>/dev/null | sha256sum | cut -d ' ' -f 1 || true)"
 
@@ -430,14 +430,14 @@ ensure_container_tools() {
 
   docker exec -u root "$container" sh -lc '
 set -e
-for cmd in nvim git rg fzf curl tar clang-format lazygit; do
+for cmd in nvim git rg fzf curl tar clang-format lazygit node; do
   command -v "$cmd" >/dev/null 2>&1 || { missing=1; break; }
 done
 if [ -n "${missing:-}" ]; then
   if command -v apt-get >/dev/null 2>&1; then
     rm -f /etc/apt/sources.list.d/lazygit-team-ubuntu-release-*.list /etc/apt/sources.list.d/lazygit-team-ubuntu-release-*.sources
     apt-get update
-    apt-get install -y software-properties-common curl git ripgrep fd-find fzf tar python3 python3-pip clang-format
+    apt-get install -y software-properties-common curl git ripgrep fd-find fzf tar python3 python3-pip nodejs npm clang-format
     if ! command -v lazygit >/dev/null 2>&1; then
       arch="$(uname -m)"
       case "$arch" in
@@ -464,6 +464,10 @@ if [ -n "${missing:-}" ]; then
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y neovim git ripgrep fd-find fzf curl tar python3 nodejs npm clang-tools-extra || true
   fi
+fi
+# Install kulala-fmt for OpenAPI => .http conversion
+if command -v npm >/dev/null 2>&1 && ! command -v kulala-fmt >/dev/null 2>&1; then
+  npm install -g @mistweaverco/kulala-fmt 2>/dev/null || true
 fi
 ' || die "failed to ensure required tools in container"
 
