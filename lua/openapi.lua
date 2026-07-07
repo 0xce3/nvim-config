@@ -6,46 +6,37 @@ local API_PATTERNS = {
 }
 
 local function find_files()
-  local files = {}
+  local seen = {}
   for _, pattern in ipairs(API_PATTERNS) do
-    local matches = vim.fn.glob(pattern, false, true)
-    for _, f in ipairs(matches) do
-      if vim.fn.filereadable(f) == 1 then
-        files[f] = true
-      end
+    for _, f in ipairs(vim.fn.glob(pattern, false, true)) do
+      if vim.fn.filereadable(f) == 1 then seen[f] = true end
     end
   end
-  local sorted = vim.tbl_keys(files)
+  local sorted = vim.tbl_keys(seen)
   table.sort(sorted)
   return sorted
 end
 
-local function convert_with_kulala_fmt(input)
-  local cmd = string.format("kulala-fmt convert --from openapi %s", vim.fn.shellescape(input))
-  local result = vim.fn.system(cmd)
-  if vim.v.shell_error ~= 0 then
-    return nil, result
+local function open_http_buffer(input, lines)
+  if not lines or #lines == 0 then
+    vim.notify("openapi: Conversion produced no output", vim.log.levels.ERROR)
+    return
   end
-  local base = input:gsub("%.[^.]*$", "")
-  local generated = base .. ".http"
-  if vim.fn.filereadable(generated) ~= 1 then
-    generated = vim.fn.fnamemodify(input, ":t:r") .. ".http"
-    if vim.fn.filereadable(generated) ~= 1 then
-      return nil, "Could not find generated .http file"
-    end
-  end
-  local lines = vim.fn.readfile(generated)
-  vim.fn.delete(generated)
-  return lines, nil
+  local buf = vim.api.nvim_create_buf(false, true)
+  pcall(vim.api.nvim_buf_set_name, buf,
+    "openapi://" .. vim.fn.fnamemodify(input, ":t:r") .. ".http")
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].filetype = "http"
+  vim.api.nvim_set_current_buf(buf)
+  vim.notify("openapi: Imported " .. vim.fn.fnamemodify(input, ":t"), vim.log.levels.INFO)
 end
 
-local function convert_with_python(input)
-  local script = [[
+local PYTHON_SCRIPT = [[
 import json, sys
 try:
     import yaml
 except ImportError:
-    import subprocess, os
+    import subprocess
     subprocess.run([sys.executable, "-m", "pip", "install", "pyyaml", "-q"],
         capture_output=True)
     import yaml
@@ -58,12 +49,10 @@ def to_http(data):
     lines.append(f"# {info.get('title', 'API')}")
     lines.append(f"# Base URL: {base_url}")
     lines.append("")
-    paths = data.get("paths", {})
-    for path, methods in paths.items():
+    for path, methods in data.get("paths", {}).items():
         for method in ("get","post","put","patch","delete","options","head"):
-            spec = methods.get(method)
-            if not spec:
-                continue
+            spec = methods.get(method) or next((v for k,v in methods.items() if k.upper()==method.upper()), None)
+            if not spec: continue
             name = spec.get("summary") or spec.get("operationId") or f"{method.upper()} {path}"
             lines.append(f"### {name}")
             lines.append(f"{method.upper()} {base_url}{path}")
@@ -75,40 +64,26 @@ def to_http(data):
             for ct, ct_spec in content.items():
                 lines.append(f"Content-Type: {ct}")
                 schema = ct_spec.get("schema", {})
-                example = None
-                if "example" in schema:
-                    example = schema["example"]
-                elif "$ref" in schema:
+                example = schema.get("example") or (schema.get("properties") and {k: v.get("example", "") for k, v in schema["properties"].items()}) or None
+                if example is None and "$ref" in schema:
                     ref = schema["$ref"].split("/")
                     root = data
-                    for part in ref[1:]:
-                        root = root.get(part, {})
+                    for part in ref[1:]: root = root.get(part, {})
                     example = root.get("example")
                 if example is not None:
-                    try:
-                        lines.append("")
-                        lines.append(json.dumps(example, indent=2, default=str))
-                    except:
-                        pass
+                    lines.append("")
+                    try: lines.append(json.dumps(example, indent=2, default=str))
+                    except: pass
                 break
             lines.append("")
     return lines
 
 with open(sys.argv[1]) as f:
     raw = f.read()
-try:
-    data = json.loads(raw)
-except:
-    data = yaml.safe_load(raw)
-if data:
-    sys.stdout.write("\n".join(to_http(data)))
+try: data = json.loads(raw)
+except: data = yaml.safe_load(raw)
+sys.stdout.write("\n".join(to_http(data)))
 ]]
-  local result = vim.fn.system({ "python3", "-c", script, input })
-  if vim.v.shell_error ~= 0 then
-    return nil, result
-  end
-  return vim.fn.split(result, "\n"), nil
-end
 
 function M.import_from(input)
   input = vim.fn.expand(input)
@@ -117,38 +92,49 @@ function M.import_from(input)
     return
   end
 
-  local lines, err
+  vim.notify("openapi: Converting " .. vim.fn.fnamemodify(input, ":t") .. "...", vim.log.levels.INFO)
+
+  local function try_python()
+    vim.system({ "python3", "-c", PYTHON_SCRIPT, input }, { text = true }, function(r)
+      if r.code == 0 and r.stdout and #r.stdout > 0 then
+        open_http_buffer(input, vim.fn.split(r.stdout, "\n"))
+      else
+        vim.notify("openapi: Failed: " .. (r.stderr or "unknown"), vim.log.levels.ERROR)
+      end
+    end)
+  end
 
   if vim.fn.executable("kulala-fmt") == 1 then
-    lines, err = convert_with_kulala_fmt(input)
+    vim.system({ "kulala-fmt", "convert", "--from", "openapi", input }, { text = true }, function(r)
+      if r.code ~= 0 then
+        vim.notify("openapi: kulala-fmt failed, trying Python fallback", vim.log.levels.WARN)
+        try_python()
+        return
+      end
+      local generated
+      for _, ext in ipairs({ ".http", ".rest" }) do
+        local candidate = input:gsub("%.[^.]*$", "") .. ext
+        if vim.fn.filereadable(candidate) == 1 then generated = candidate; break end
+      end
+      if not generated then
+        try_python()
+        return
+      end
+      local lines = vim.fn.readfile(generated)
+      vim.fn.delete(generated)
+      open_http_buffer(input, lines)
+    end)
+  elseif vim.fn.executable("python3") == 1 then
+    try_python()
+  else
+    vim.notify("openapi: Neither kulala-fmt nor python3 available", vim.log.levels.ERROR)
   end
-
-  if not lines then
-    if vim.fn.executable("python3") == 1 then
-      lines, err = convert_with_python(input)
-    else
-      err = "Neither kulala-fmt nor python3 available in container"
-    end
-  end
-
-  if not lines then
-    vim.notify("openapi: Conversion failed: " .. (err or "unknown error"), vim.log.levels.ERROR)
-    return
-  end
-
-  local buf = vim.api.nvim_create_buf(false, true)
-  local ok, _ = pcall(vim.api.nvim_buf_set_name, buf,
-    "openapi://" .. vim.fn.fnamemodify(input, ":t:r") .. ".http")
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].filetype = "http"
-  vim.api.nvim_set_current_buf(buf)
-  vim.notify("openapi: Imported " .. vim.fn.fnamemodify(input, ":t"), vim.log.levels.INFO)
 end
 
 function M.import()
   local files = find_files()
   if #files == 0 then
-    vim.notify("openapi: No OpenAPI spec files found in project", vim.log.levels.WARN)
+    vim.notify("openapi: No OpenAPI spec files found", vim.log.levels.WARN)
     return
   end
   if #files == 1 then
@@ -163,16 +149,14 @@ function M.import()
   end)
 end
 
-local group = vim.api.nvim_create_augroup("openapi_import", { clear = true })
+vim.api.nvim_create_augroup("openapi_import", { clear = true })
 vim.api.nvim_create_autocmd("BufRead", {
-  group = group,
+  group = "openapi_import",
   pattern = API_PATTERNS,
   callback = function()
     vim.defer_fn(function()
-      vim.notify(
-        "OpenAPI spec detected. Use <leader>Rf or :OpenApiImport",
-        vim.log.levels.INFO
-      )
+      vim.notify("OpenAPI spec detected. Use <leader>Rf or :OpenApiImport",
+        vim.log.levels.INFO)
     end, 500)
   end,
 })
