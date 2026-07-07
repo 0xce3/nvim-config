@@ -6,6 +6,7 @@ local API_NAMES = {
 }
 
 local function find_files()
+  -- Fast: git ls-files uses index, no filesystem walk
   if vim.fn.executable("git") == 1 and vim.fn.isdirectory(".git") == 1 then
     local patterns = {}
     for _, name in ipairs(API_NAMES) do
@@ -21,9 +22,25 @@ local function find_files()
     table.sort(files)
     return files
   end
+
+  -- Fallback: vim.fs.find mit Limit (trotzdem blockierend bei großen Trees)
   local found = vim.fs.find(API_NAMES, { type = "file", limit = 10 })
   table.sort(found)
   return found
+end
+
+local function open_http_buffer(input, lines)
+  if not lines or #lines == 0 then
+    vim.notify("openapi: Conversion produced no output", vim.log.levels.ERROR)
+    return
+  end
+  local buf = vim.api.nvim_create_buf(false, true)
+  pcall(vim.api.nvim_buf_set_name, buf,
+    "openapi://" .. vim.fn.fnamemodify(input, ":t:r") .. ".http")
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].filetype = "http"
+  vim.api.nvim_set_current_buf(buf)
+  vim.notify("openapi: Imported " .. vim.fn.fnamemodify(input, ":t"), vim.log.levels.INFO)
 end
 
 local PYTHON_SCRIPT = [[
@@ -80,82 +97,6 @@ except: data = yaml.safe_load(raw)
 sys.stdout.write("\n".join(to_http(data)))
 ]]
 
---- Parse endpoint entries from .http lines.
---- Returns list of { name, method, path, line }
-local function parse_endpoints(lines)
-  local endpoints = {}
-  local current_name, current_method, current_path, current_line
-
-  for i, line in ipairs(lines) do
-    local name_match = line:match("^###%s*(.+)$")
-    if name_match then
-      if current_name then
-        table.insert(endpoints, { name = current_name, method = current_method, path = current_path, line = current_line })
-      end
-      current_name = name_match
-    end
-
-    local method_match = line:match("^(%u+)%s+(%S+)")
-    if method_match and current_name then
-      current_method = method_match
-      current_path = line:match("^%u+%s+(.+)")
-      current_line = i
-    end
-  end
-  if current_name then
-    table.insert(endpoints, { name = current_name, method = current_method, path = current_path, line = current_line })
-  end
-  return endpoints
-end
-
-local hidden_buf = nil
-
---- Show a picker with all endpoints and run the selected one.
-local function show_endpoint_picker(lines, input)
-  local endpoints = parse_endpoints(lines)
-  if #endpoints == 0 then
-    vim.notify("openapi: No endpoints found in spec", vim.log.levels.WARN)
-    return
-  end
-
-  hidden_buf = vim.api.nvim_create_buf(false, true)
-  pcall(vim.api.nvim_buf_set_name, hidden_buf,
-    "openapi://" .. vim.fn.fnamemodify(input, ":t:r") .. ".http")
-  vim.api.nvim_buf_set_lines(hidden_buf, 0, -1, false, lines)
-  vim.bo[hidden_buf].filetype = "http"
-  vim.bo[hidden_buf].buflisted = true
-
-  vim.schedule(function()
-    vim.ui.select(endpoints, {
-      prompt = "Select endpoint (" .. #endpoints .. " available)",
-      format_item = function(e)
-        local method = e.method or "?"
-        return string.format("%-6s %s", method, e.name)
-      end,
-    }, function(choice)
-      if not choice then return end
-
-      -- Store the current buffer so we can restore later
-      local prev_buf = vim.api.nvim_get_current_buf()
-      local prev_win = vim.api.nvim_get_current_win()
-
-      -- Switch to hidden .http buffer and position cursor
-      vim.api.nvim_set_current_buf(hidden_buf)
-      if choice.line then
-        pcall(vim.api.nvim_win_set_cursor, 0, { choice.line, 0 })
-      end
-
-      -- Execute the request via kulala
-      local ok, err = pcall(require("kulala").run)
-      if not ok then
-        vim.notify("openapi: " .. tostring(err), vim.log.levels.ERROR)
-        -- Restore buffer if kulala failed
-        pcall(vim.api.nvim_set_current_buf, prev_buf)
-      end
-    end)
-  end)
-end
-
 function M.import_from(input)
   input = vim.fn.expand(input)
   if vim.fn.filereadable(input) ~= 1 then
@@ -170,45 +111,46 @@ function M.import_from(input)
   local function try_python()
     if done then return end
     vim.system({ "python3", "-c", PYTHON_SCRIPT, input }, { text = true }, function(r)
-      if done then return end
-      if r.code ~= 0 then
+      if not done and r.code == 0 and r.stdout and #r.stdout > 0 then
+        done = true
+        vim.schedule(function()
+          open_http_buffer(input, vim.split(r.stdout, "\n"))
+        end)
+      elseif not done then
+        done = true
         vim.schedule(function()
           vim.notify("openapi: Failed: " .. (r.stderr or "unknown"), vim.log.levels.ERROR)
         end)
-        return
       end
-      vim.schedule(function()
-        show_endpoint_picker(vim.split(r.stdout, "\n"), input)
-      end)
-    end)
-  end
-
-  local function handle_kulala_result(r)
-    if done then return end
-    if r.code ~= 0 then
-      vim.schedule(function()
-        vim.notify("openapi: kulala-fmt failed, trying Python fallback", vim.log.levels.WARN)
-        try_python()
-      end)
-      return
-    end
-    vim.schedule(function()
-      if done then return end
-      local generated
-      for _, ext in ipairs({ ".http", ".rest" }) do
-        local candidate = input:gsub("%.[^.]*$", "") .. ext
-        if vim.fn.filereadable(candidate) == 1 then generated = candidate; break end
-      end
-      if not generated then try_python() return end
-      done = true
-      local lines = vim.fn.readfile(generated)
-      vim.fn.delete(generated)
-      show_endpoint_picker(lines, input)
     end)
   end
 
   if vim.fn.executable("kulala-fmt") == 1 then
-    vim.system({ "kulala-fmt", "convert", "--from", "openapi", input }, { text = true }, handle_kulala_result)
+    vim.system({ "kulala-fmt", "convert", "--from", "openapi", input }, { text = true }, function(r)
+      if r.code ~= 0 then
+        vim.schedule(function()
+          vim.notify("openapi: kulala-fmt failed, trying Python fallback", vim.log.levels.WARN)
+          try_python()
+        end)
+        return
+      end
+      vim.schedule(function()
+        if done then return end
+        local generated
+        for _, ext in ipairs({ ".http", ".rest" }) do
+          local candidate = input:gsub("%.[^.]*$", "") .. ext
+          if vim.fn.filereadable(candidate) == 1 then generated = candidate; break end
+        end
+        if not generated then
+          try_python()
+          return
+        end
+        done = true
+        local lines = vim.fn.readfile(generated)
+        vim.fn.delete(generated)
+        open_http_buffer(input, lines)
+      end)
+    end)
   elseif vim.fn.executable("python3") == 1 then
     try_python()
   else
@@ -226,18 +168,20 @@ function M.import()
     M.import_from(files[1])
     return
   end
-  vim.ui.select(files, {
-    prompt = "Select OpenAPI spec to import",
-    format_item = function(f) return vim.fn.fnamemodify(f, ":~:.") end,
-  }, function(choice)
-    if choice then M.import_from(choice) end
+  vim.schedule(function()
+    vim.ui.select(files, {
+      prompt = "Select OpenAPI spec to import",
+      format_item = function(f) return vim.fn.fnamemodify(f, ":~:.") end,
+    }, function(choice)
+      if choice then M.import_from(choice) end
+    end)
   end)
 end
 
 vim.api.nvim_create_augroup("openapi_import", { clear = true })
 vim.api.nvim_create_autocmd("BufRead", {
   group = "openapi_import",
-  pattern = API_NAMES,
+  pattern = API_PATTERNS,
   callback = function()
     vim.defer_fn(function()
       vim.notify("OpenAPI spec detected. Use <leader>Rf or :OpenApiImport",
