@@ -1,20 +1,32 @@
 local M = {}
 
-local API_PATTERNS = {
-  "**/openapi.yaml", "**/openapi.yml", "**/openapi.json",
-  "**/swagger.yaml", "**/swagger.yml", "**/swagger.json",
+local API_NAMES = {
+  "openapi.yaml", "openapi.yml", "openapi.json",
+  "swagger.yaml", "swagger.yml", "swagger.json",
 }
 
 local function find_files()
-  local seen = {}
-  for _, pattern in ipairs(API_PATTERNS) do
-    for _, f in ipairs(vim.fn.glob(pattern, false, true)) do
-      if vim.fn.filereadable(f) == 1 then seen[f] = true end
+  -- Fast: git ls-files uses index, no filesystem walk
+  if vim.fn.executable("git") == 1 and vim.fn.isdirectory(".git") == 1 then
+    local patterns = {}
+    for _, name in ipairs(API_NAMES) do
+      table.insert(patterns, ":(glob)**/" .. name)
     end
+    local result = vim.fn.systemlist({ "git", "ls-files", "--", unpack(patterns) })
+    local files = {}
+    for _, f in ipairs(result) do
+      if f ~= "" and vim.fn.filereadable(f) == 1 then
+        table.insert(files, vim.fn.getcwd() .. "/" .. f)
+      end
+    end
+    table.sort(files)
+    return files
   end
-  local sorted = vim.tbl_keys(seen)
-  table.sort(sorted)
-  return sorted
+
+  -- Fallback: vim.fs.find mit Limit (trotzdem blockierend bei großen Trees)
+  local found = vim.fs.find(API_NAMES, { type = "file", limit = 10 })
+  table.sort(found)
+  return found
 end
 
 local function open_http_buffer(input, lines)
@@ -141,11 +153,13 @@ function M.import()
     M.import_from(files[1])
     return
   end
-  vim.ui.select(files, {
-    prompt = "Select OpenAPI spec to import",
-    format_item = function(f) return vim.fn.fnamemodify(f, ":~:.") end,
-  }, function(choice)
-    if choice then M.import_from(choice) end
+  vim.schedule(function()
+    vim.ui.select(files, {
+      prompt = "Select OpenAPI spec to import",
+      format_item = function(f) return vim.fn.fnamemodify(f, ":~:.") end,
+    }, function(choice)
+      if choice then M.import_from(choice) end
+    end)
   end)
 end
 
