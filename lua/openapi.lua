@@ -170,7 +170,7 @@ vim.api.nvim_create_autocmd("BufRead", {
   callback = function()
     vim.defer_fn(function()
       vim.notify(
-        "OpenAPI spec detected. Use <leader>Ri or :OpenApiImport",
+        "OpenAPI spec detected. Use <leader>Rf or :OpenApiImport",
         vim.log.levels.INFO
       )
     end, 500)

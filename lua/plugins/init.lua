@@ -1374,7 +1374,7 @@ return {
           openapi.import()
         end
       end, { nargs = "?", desc = "Import OpenAPI spec and convert to .http" })
-      vim.keymap.set("n", "<leader>Ri", function()
+      vim.keymap.set("n", "<leader>Rf", function()
         require("openapi").import()
       end, { desc = "Import OpenAPI spec to .http" })
     end,
