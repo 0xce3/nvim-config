@@ -106,12 +106,21 @@ function M.import_from(input)
 
   vim.notify("openapi: Converting " .. vim.fn.fnamemodify(input, ":t") .. "...", vim.log.levels.INFO)
 
+  local done = false
+
   local function try_python()
+    if done then return end
     vim.system({ "python3", "-c", PYTHON_SCRIPT, input }, { text = true }, function(r)
-      if r.code == 0 and r.stdout and #r.stdout > 0 then
-        open_http_buffer(input, vim.fn.split(r.stdout, "\n"))
-      else
-        vim.notify("openapi: Failed: " .. (r.stderr or "unknown"), vim.log.levels.ERROR)
+      if not done and r.code == 0 and r.stdout and #r.stdout > 0 then
+        done = true
+        vim.schedule(function()
+          open_http_buffer(input, vim.split(r.stdout, "\n"))
+        end)
+      elseif not done then
+        done = true
+        vim.schedule(function()
+          vim.notify("openapi: Failed: " .. (r.stderr or "unknown"), vim.log.levels.ERROR)
+        end)
       end
     end)
   end
@@ -119,22 +128,28 @@ function M.import_from(input)
   if vim.fn.executable("kulala-fmt") == 1 then
     vim.system({ "kulala-fmt", "convert", "--from", "openapi", input }, { text = true }, function(r)
       if r.code ~= 0 then
-        vim.notify("openapi: kulala-fmt failed, trying Python fallback", vim.log.levels.WARN)
-        try_python()
+        vim.schedule(function()
+          vim.notify("openapi: kulala-fmt failed, trying Python fallback", vim.log.levels.WARN)
+          try_python()
+        end)
         return
       end
-      local generated
-      for _, ext in ipairs({ ".http", ".rest" }) do
-        local candidate = input:gsub("%.[^.]*$", "") .. ext
-        if vim.fn.filereadable(candidate) == 1 then generated = candidate; break end
-      end
-      if not generated then
-        try_python()
-        return
-      end
-      local lines = vim.fn.readfile(generated)
-      vim.fn.delete(generated)
-      open_http_buffer(input, lines)
+      vim.schedule(function()
+        if done then return end
+        local generated
+        for _, ext in ipairs({ ".http", ".rest" }) do
+          local candidate = input:gsub("%.[^.]*$", "") .. ext
+          if vim.fn.filereadable(candidate) == 1 then generated = candidate; break end
+        end
+        if not generated then
+          try_python()
+          return
+        end
+        done = true
+        local lines = vim.fn.readfile(generated)
+        vim.fn.delete(generated)
+        open_http_buffer(input, lines)
+      end)
     end)
   elseif vim.fn.executable("python3") == 1 then
     try_python()
