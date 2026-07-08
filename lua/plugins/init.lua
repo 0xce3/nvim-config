@@ -1367,7 +1367,8 @@ return {
       {
         "<Esc>",
         function()
-          require("kulala.cmd.kulala_core_bridge").interrupt_active()
+          pcall(require("kulala.cmd.kulala_core_bridge").interrupt_active)
+          vim.cmd("nohlsearch")
         end,
         desc = "Cancel running request",
         mode = "n",
