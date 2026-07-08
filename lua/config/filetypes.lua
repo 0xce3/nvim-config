@@ -109,7 +109,8 @@ vim.api.nvim_create_autocmd("FileType", {
 
 -- Kulala response panes are Markdown scratch buffers containing nested fenced
 -- payloads. Some Neovim/Treesitter parser combinations throw in decoration
--- callbacks there; plain syntax highlighting is more reliable for responses.
+-- callbacks there; disable treesitter and syntax highlighting to avoid
+-- Gruvbox rendering JSON strings etc. in green.
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
   callback = function(event)
     vim.schedule(function()
@@ -120,7 +121,6 @@ vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
       local filetype = vim.bo[event.buf].filetype
       if buftype == "nofile" and (filetype == "markdown" or filetype == "markdown_inline") then
         pcall(vim.treesitter.stop, event.buf)
-        vim.bo[event.buf].syntax = "markdown"
       end
     end)
   end,

@@ -224,6 +224,29 @@ find_devcontainer_container() {
 }
 
 ensure_devcontainer_running() {
+  # Devcontainers CLI auto-mounts the Wayland socket when WAYLAND_DISPLAY is
+  # set.  Docker refuses to start the container if the source path is missing
+  # or is a regular file — it must be a real Unix socket.  Ensure one exists.
+  if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    local wayland_socket="/run/user/$(id -u)/$WAYLAND_DISPLAY"
+    if [[ -e "$wayland_socket" && ! -S "$wayland_socket" ]]; then
+      rm -f "$wayland_socket"
+    fi
+    if [[ ! -e "$wayland_socket" ]]; then
+      python3 -c "
+import socket, os
+p = '$wayland_socket'
+try:
+    os.unlink(p)
+except FileNotFoundError:
+    pass
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(p)
+s.listen(0)
+" &
+    fi
+  fi
+
   local container=""
   container="$(find_devcontainer_container)"
   if [[ -n "$container" ]]; then
