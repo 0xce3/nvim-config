@@ -107,20 +107,19 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
--- Kulala response panes are Markdown scratch buffers containing nested fenced
--- payloads. Some Neovim/Treesitter parser combinations throw in decoration
--- callbacks there; disable treesitter and syntax highlighting to avoid
--- Gruvbox rendering JSON strings etc. in green.
+-- Kulala response panes are nofile scratch buffers.  kulala.nvim sets
+-- `syntax = filetype` and starts Treesitter, which causes Gruvbox to render
+-- JSON strings, markdown text etc. in green.  Disable both.
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
   callback = function(event)
     vim.schedule(function()
       if not vim.api.nvim_buf_is_valid(event.buf) then
         return
       end
-      local buftype = vim.bo[event.buf].buftype
-      local filetype = vim.bo[event.buf].filetype
-      if buftype == "nofile" and (filetype == "markdown" or filetype == "markdown_inline") then
+      local ft = vim.bo[event.buf].filetype
+      if ft == "kulala_ui" then
         pcall(vim.treesitter.stop, event.buf)
+        vim.bo[event.buf].syntax = "off"
       end
     end)
   end,
