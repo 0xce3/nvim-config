@@ -1294,6 +1294,7 @@ return {
         { "<leader>o", group = "opencode" },
         { "<leader>p", group = "pull request / issues" },
         { "<leader>q", group = "session" },
+        { "<leader>r", group = "REST / HTTP" },
         { "<leader>t", group = "tasks/terminals" },
         { "<leader>w", group = "window" },
       })
@@ -1352,16 +1353,32 @@ return {
   {
     "mistweaverco/kulala.nvim",
     keys = {
-      { "<leader>Rr", desc = "Run request under cursor" },
-      { "<leader>Ra", desc = "Run all requests" },
-      { "<leader>Rs", desc = "Open scratchpad" },
-      { "<leader>Rc", desc = "Copy as cURL" },
+      {
+        "<leader>r",
+        function()
+          require("kulala").run()
+        end,
+        desc = "Run request under cursor",
+      },
+      { "<leader>rr", desc = "Run request under cursor" },
+      { "<leader>ra", desc = "Run all requests" },
+      { "<leader>rs", desc = "Open scratchpad" },
+      { "<leader>rc", desc = "Copy as cURL" },
+      {
+        "<Esc>",
+        function()
+          require("kulala.cmd.kulala_core_bridge").interrupt_active()
+        end,
+        desc = "Cancel running request",
+        mode = "n",
+      },
     },
     ft = { "http", "rest" },
     opts = {
       global_keymaps = true,
-      global_keymaps_prefix = "<leader>R",
+      global_keymaps_prefix = "<leader>r",
       kulala_keymaps_prefix = "",
+      treesitter = { enable = false },
     },
   },
 }

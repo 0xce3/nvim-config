@@ -4,6 +4,7 @@ require("config.filetypes")
 require("config.format_specifiers").setup()
 require("config.preproc").setup()
 require("config.skeleton").setup()
+require("config.http_workspace").setup()
 require("config.lazy")
 
 

@@ -56,6 +56,7 @@ For local testing:
 | Git | `vim-fugitive`, `gitsigns.nvim`, `octo.nvim`, `snacks.nvim` | Git status, hunks, GitHub PRs, lazygit |
 | Debug | `nvim-dap`, `nvim-dap-ui`, `nvim-dap-virtual-text` | DAP debugging |
 | Tasks | `vs-tasks.nvim` | Run `.vscode/tasks.json` and launch configs |
+| HTTP | `kulala.nvim` | Run generated `.http` API requests outside project repos |
 | AI | `opencode.nvim` | Optional opencode integration |
 
 Exact pinned versions live in `lazy-lock.json`.
@@ -94,6 +95,37 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<F10>` / `<F11>` / `<S-F11>` | Step over / into / out |
 | `<leader>du` | Toggle debug UI |
 | `<leader>dr` | Open debug REPL |
+| `<leader>r` | Run request under cursor |
+| `<leader>rg` | Generate external `.http` workspace from OpenAPI |
+| `<leader>ro` | Open external `.http` workspace |
+| `<leader>rd` | Delete external `.http` workspace |
+| `<leader>rp` | Pick OpenAPI file and generate `.http` workspace |
+
+## HTTP Workspaces
+
+`kulala.nvim` runs `.http` API requests from Neovim. `:HttpWorkspaceGenerate`
+searches the current project for `openapi.yaml`, `openapi.yml`, `swagger.yaml`,
+or `swagger.yml`, asks for a workspace name, and generates `<name>.http` outside
+the project repository. `:HttpWorkspaceGenerate smoke` skips the prompt and
+creates `smoke.http` directly.
+
+`:HttpWorkspaceOpen` lists existing HTTP workspaces for the current project and
+opens the selected file.
+
+`:HttpWorkspaceDelete` lists existing HTTP workspaces for the current project and
+deletes the selected file after confirmation.
+
+When the OpenAPI contains a login/authenticate endpoint returning
+`access_token`, the generated login request stores a global Kulala
+`Authorization` header for following requests. Run the login request once before
+calling protected endpoints.
+
+Generated files live under Neovim state, or under `.nvim-http-workspaces` next to
+the devcontainer workspace. They are local scratch files and are not written into
+application repositories.
+
+The generator uses `PyYAML`; `bin/nvim-dev` installs the container package where
+possible.
 
 ## VS Code Tasks And Launches
 

@@ -333,6 +333,10 @@ map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 
 map("n", "<leader>hh", function() require("config.workspace_hub").open() end, { desc = "Open workspace hub" })
+map("n", "<leader>rg", function() require("config.http_workspace").generate() end, { desc = "Generate HTTP workspace" })
+map("n", "<leader>ro", function() require("config.http_workspace").open() end, { desc = "Open HTTP workspace" })
+map("n", "<leader>rd", function() require("config.http_workspace").delete() end, { desc = "Delete HTTP workspace" })
+map("n", "<leader>rp", function() require("config.http_workspace").pick_openapi() end, { desc = "Pick OpenAPI file" })
 
 map("t", "<c-z>", [[<c-\><c-n>u]], { desc = "Undo in editor" })
 map("t", "<esc><esc>", [[<c-\><c-n>]], { desc = "Leave terminal mode" })

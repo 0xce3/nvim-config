@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""Generate a Kulala/JetBrains-style .http file from an OpenAPI YAML file."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+HTTP_METHODS = ("get", "post", "put", "patch", "delete", "head", "options")
+
+
+def ref_name(value: str) -> str:
+    return value.rsplit("/", 1)[-1]
+
+
+def resolve_ref(spec: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/"):
+        return schema
+
+    current: Any = spec
+    for part in ref.lstrip("#/" ).split("/"):
+        current = current.get(part, {}) if isinstance(current, dict) else {}
+    return current if isinstance(current, dict) else schema
+
+
+def sample_value(spec: dict[str, Any], schema: dict[str, Any]) -> Any:
+    schema = resolve_ref(spec, schema)
+    if "example" in schema:
+        return schema["example"]
+    if "default" in schema:
+        return schema["default"]
+
+    enum = schema.get("enum")
+    if isinstance(enum, list) and enum:
+        return enum[0]
+
+    schema_type = schema.get("type")
+    if schema_type == "object" or "properties" in schema:
+        required = set(schema.get("required", []))
+        properties = schema.get("properties", {})
+        result: dict[str, Any] = {}
+        for name, prop_schema in properties.items():
+            value = sample_value(spec, prop_schema if isinstance(prop_schema, dict) else {})
+            result[name] = value if name in required or value not in (None, "") else ""
+        return result
+    if schema_type == "array":
+        items = schema.get("items", {})
+        return [sample_value(spec, items if isinstance(items, dict) else {})]
+    if schema_type == "integer":
+        return 0
+    if schema_type == "number":
+        return 0.0
+    if schema_type == "boolean":
+        return False
+    return ""
+
+
+def request_body_sample(spec: dict[str, Any], operation: dict[str, Any]) -> Any | None:
+    request_body = operation.get("requestBody")
+    if not isinstance(request_body, dict):
+        return None
+    content = request_body.get("content", {})
+    if not isinstance(content, dict):
+        return None
+    media = content.get("application/json") or next(iter(content.values()), None)
+    if not isinstance(media, dict):
+        return None
+    if "example" in media:
+        return media["example"]
+    schema = media.get("schema")
+    if not isinstance(schema, dict):
+        return None
+    return sample_value(spec, schema)
+
+
+def operation_name(method: str, path: str, operation: dict[str, Any]) -> str:
+    name = operation.get("operationId")
+    if isinstance(name, str) and name.strip():
+        return re.sub(r"[^A-Za-z0-9_]+", "_", name.strip())
+    raw = f"{method}_{path.strip('/').replace('/', '_') or 'root'}"
+    return re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
+
+
+def query_suffix(parameters: list[Any]) -> str:
+    query_params = []
+    for param in parameters:
+        if not isinstance(param, dict) or param.get("in") != "query":
+            continue
+        name = param.get("name")
+        if not isinstance(name, str):
+            continue
+        required = param.get("required") is True
+        value = param.get("example")
+        if value is None:
+            schema = param.get("schema", {})
+            if isinstance(schema, dict):
+                value = schema.get("default")
+        value = "" if value is None else str(value).lower() if isinstance(value, bool) else str(value)
+        marker = "" if required else "# "
+        query_params.append(f"{marker}{name}={value}")
+    if not query_params:
+        return ""
+    active = [param for param in query_params if not param.startswith("# ")]
+    inactive = [param[2:] for param in query_params if param.startswith("# ")]
+    parts = active or inactive[:1]
+    return "?" + "&".join(parts)
+
+
+def cookie_headers(parameters: list[Any], login_request_name: str | None) -> list[str]:
+    headers = []
+    for param in parameters:
+        if not isinstance(param, dict) or param.get("in") != "cookie":
+            continue
+        name = param.get("name")
+        if not isinstance(name, str):
+            continue
+        headers.append(f"Cookie: {name}={{{{{name}}}}}")
+    return headers
+
+
+def is_secured(operation: dict[str, Any], root_security: Any) -> bool:
+    security = operation.get("security", root_security)
+    return isinstance(security, list) and len(security) > 0
+
+
+def find_login_request_name(spec: dict[str, Any]) -> str | None:
+    paths = spec.get("paths", {})
+    if not isinstance(paths, dict):
+        return None
+
+    candidates: list[tuple[int, str]] = []
+    for path, path_item in paths.items():
+        if not isinstance(path, str) or not isinstance(path_item, dict):
+            continue
+        for method in HTTP_METHODS:
+            operation = path_item.get(method)
+            if not isinstance(operation, dict):
+                continue
+            operation_id = operation.get("operationId", "")
+            summary = operation.get("summary", "")
+            haystack = f"{path} {operation_id} {summary}".lower()
+            score = 0
+            if "authenticate" in haystack:
+                score += 4
+            if "login" in haystack:
+                score += 3
+            if method == "post":
+                score += 1
+            responses = operation.get("responses", {})
+            response_200 = responses.get("200", {}) if isinstance(responses, dict) else {}
+            response_text = json.dumps(response_200).lower() if isinstance(response_200, dict) else ""
+            if "access_token" in response_text:
+                score += 5
+            if score > 0:
+                candidates.append((score, operation_name(method, path, operation)))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
+
+
+def is_token_response(operation: dict[str, Any]) -> bool:
+    responses = operation.get("responses", {})
+    response_200 = responses.get("200", {}) if isinstance(responses, dict) else {}
+    response_text = json.dumps(response_200).lower() if isinstance(response_200, dict) else ""
+    return "access_token" in response_text
+
+
+def append_token_store_script(lines: list[str]) -> None:
+    lines.append("")
+    lines.append("> {%")
+    lines.append("  const body = typeof response.body === 'string'")
+    lines.append("    ? JSON.parse(response.body)")
+    lines.append("    : response.body.json || response.body;")
+    lines.append("  const setCookie = response.headers.valueOf('Set-Cookie') || response.headers.valueOf('set-cookie') || '';")
+    lines.append("  const refreshToken = String(setCookie).match(/refresh_token=([^;]+)/)?.[1];")
+    lines.append("  if (refreshToken) client.global.set('refresh_token', refreshToken);")
+    lines.append("%}")
+
+
+def base_url(spec: dict[str, Any]) -> str:
+    servers = spec.get("servers")
+    if isinstance(servers, list) and servers:
+        url = servers[0].get("url") if isinstance(servers[0], dict) else None
+        if isinstance(url, str):
+            return (
+                url.replace("{protocol}", "http")
+                .replace("{device_address}", "127.0.0.1")
+                .replace("{version}", "v1")
+            )
+    return "http://127.0.0.1/api/v1"
+
+
+def generate(spec: dict[str, Any], source: Path) -> str:
+    title = spec.get("info", {}).get("title", source.name) if isinstance(spec.get("info"), dict) else source.name
+    login_request_name = find_login_request_name(spec)
+    token_expression = (
+        f"Bearer {{{{{login_request_name}.response.body.$.access_token}}}}"
+        if login_request_name
+        else "Bearer {{token}}"
+    )
+    lines = [
+        "# @kulala-vscode-restclient-compat",
+        f"# Generated from {source.name}",
+        f"# {title}",
+        "# Local only: keep this file outside project repositories.",
+        "# Run the login/authenticate request first; secured requests reuse its access_token automatically.",
+        "",
+        f"@host = {base_url(spec)}",
+    ]
+    if not login_request_name:
+        lines.append("@token =")
+    lines.append("")
+
+    paths = spec.get("paths", {})
+    root_security = spec.get("security")
+    for path, path_item in sorted(paths.items()):
+        if not isinstance(path_item, dict):
+            continue
+        path_parameters = path_item.get("parameters", [])
+        if not isinstance(path_parameters, list):
+            path_parameters = []
+        for method in HTTP_METHODS:
+            operation = path_item.get(method)
+            if not isinstance(operation, dict):
+                continue
+            name = operation_name(method, path, operation)
+            summary = operation.get("summary")
+            parameters = path_parameters + (operation.get("parameters", []) if isinstance(operation.get("parameters"), list) else [])
+            body = request_body_sample(spec, operation)
+
+            lines.append(f"### {name}")
+            lines.append(f"# @name {name}")
+            if isinstance(summary, str) and summary:
+                lines.append(f"# {summary}")
+            responses = operation.get("responses", {})
+            if isinstance(responses, dict) and responses:
+                lines.append("# Responses: " + ", ".join(str(code) for code in responses.keys()))
+            lines.append(f"{method.upper()} {{{{host}}}}{path}{query_suffix(parameters)}")
+            if is_secured(operation, root_security):
+                lines.append(f"Authorization: {token_expression}")
+            lines.extend(cookie_headers(parameters, login_request_name))
+            if body is not None:
+                lines.append("Content-Type: application/json")
+                lines.append("")
+                lines.append(json.dumps(body, indent=2, ensure_ascii=False))
+            if name == login_request_name or is_token_response(operation):
+                append_token_store_script(lines)
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("openapi", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+
+    with args.openapi.open("r", encoding="utf-8") as handle:
+        spec = yaml.safe_load(handle)
+    if not isinstance(spec, dict):
+        print("OpenAPI file did not contain a YAML mapping", file=sys.stderr)
+        return 2
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(generate(spec, args.openapi), encoding="utf-8")
+    print(args.output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
