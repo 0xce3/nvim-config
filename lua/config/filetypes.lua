@@ -126,9 +126,10 @@ vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
   end,
 })
 
--- Hide the kulala output window when leaving an http/rest file,
--- and restore it when re-entering.  The response buffer itself is
--- kept alive so the last result reappears without re-running.
+-- Track the kulala output window: hide it when the user switches to a
+-- non-http buffer (except the output itself), and restore it when re-entering
+-- the http/rest file.  The response buffer stays alive so the last result
+-- reappears without re-running the request.
 local function kulala_hide_output()
   local ok, kulala = pcall(require, "kulala.ui")
   if not ok then return end
@@ -137,7 +138,6 @@ local function kulala_hide_output()
 end
 
 local function kulala_show_output()
-  -- Don't fire during initial UI setup; only once kulala is loaded.
   local ok, kulala = pcall(require, "kulala.ui")
   if not ok then return end
   local buf = kulala.get_kulala_buffer()
@@ -152,14 +152,18 @@ local function kulala_show_output()
   })
 end
 
-vim.api.nvim_create_autocmd("BufLeave", {
-  pattern = { "*.http", "*.rest" },
-  callback = kulala_hide_output,
-})
-
+-- Use BufEnter to drive both hide and show.  The kulala_ui buffer
+-- (filetype == "kulala_ui") is excluded from hiding so clicking on the
+-- response split does not close it.
 vim.api.nvim_create_autocmd("BufEnter", {
-  pattern = { "*.http", "*.rest" },
-  callback = kulala_show_output,
+  callback = function()
+    local ft = vim.bo.filetype
+    if ft == "http" or ft == "rest" then
+      kulala_show_output()
+    elseif ft ~= "kulala_ui" then
+      kulala_hide_output()
+    end
+  end,
 })
 
 -- When the http/rest file itself is closed there is no way back
