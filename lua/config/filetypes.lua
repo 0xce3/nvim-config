@@ -108,23 +108,23 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 -- Kulala response panes use markdown/JSON syntax highlighting backed by
--- Treesitter.  Gruvbox renders several groups (String, markdownH2, …) in
--- green; remap them to non-green colours for the kulala window only.
-vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
+-- Treesitter.  Gruvbox renders String and several markdown heading groups in
+-- green; remap them to non-green highlight groups for the kulala window only.
+local function fix_kulala_highlights(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then return end
+  if vim.bo[buf].filetype ~= "kulala_ui" then return end
+  local fix = "String:Identifier,markdownH2:Title,markdownH3:Title,markdownH4:Title,markdownH5:Title,markdownH6:Title"
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+      vim.wo[win].winhighlight = fix
+    end
+  end
+end
+
+vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
   callback = function(event)
     vim.schedule(function()
-      if not vim.api.nvim_buf_is_valid(event.buf) then
-        return
-      end
-      if vim.bo[event.buf].filetype ~= "kulala_ui" then
-        return
-      end
-      for _, win in ipairs(vim.api.nvim_list_wins()) do
-        if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == event.buf then
-          vim.wo[win].winhighlight =
-            "String:Normal,markdownH2:Title,markdownH3:Title,markdownH4:Title,markdownH5:Title,markdownH6:Title"
-        end
-      end
+      fix_kulala_highlights(event.buf)
     end)
   end,
 })
