@@ -107,19 +107,23 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
--- Kulala response panes are nofile scratch buffers.  kulala.nvim sets
--- `syntax = filetype` and starts Treesitter, which causes Gruvbox to render
--- JSON strings, markdown text etc. in green.  Disable both.
-vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
+-- Kulala response panes use markdown/JSON syntax highlighting backed by
+-- Treesitter.  Gruvbox renders several groups (String, markdownH2, …) in
+-- green; remap them to non-green colours for the kulala window only.
+vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
   callback = function(event)
     vim.schedule(function()
       if not vim.api.nvim_buf_is_valid(event.buf) then
         return
       end
-      local ft = vim.bo[event.buf].filetype
-      if ft == "kulala_ui" then
-        pcall(vim.treesitter.stop, event.buf)
-        vim.bo[event.buf].syntax = "off"
+      if vim.bo[event.buf].filetype ~= "kulala_ui" then
+        return
+      end
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == event.buf then
+          vim.wo[win].winhighlight =
+            "String:Normal,markdownH2:Title,markdownH3:Title,markdownH4:Title,markdownH5:Title,markdownH6:Title"
+        end
       end
     end)
   end,
