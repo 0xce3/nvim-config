@@ -163,12 +163,13 @@ function M.build_dap_config(launch, task_root)
   if request == "attach" and launch.processId == nil then
     request = "launch"
   end
+  local program = launch.program or launch.executable or launch.target
 
   local config = {
     name = launch.name,
     type = "cppdbg",
     request = request,
-    program = M.expand_vscode_vars(launch.program, task_root),
+    program = M.expand_vscode_vars(program, task_root),
     args = expand_vscode_value(launch.args or {}, task_root),
     stopAtEntry = launch.stopAtEntry == true,
     cwd = M.expand_vscode_vars(launch.cwd or task_root, task_root),
@@ -476,6 +477,11 @@ function M.run_launch(name)
 
   local config = M.build_dap_config(launch, task_root)
   local host, port = split_host_port(config.miDebuggerServerAddress)
+
+  if config.request == "launch" and (type(config.program) ~= "string" or config.program == "") then
+    notify("Debug launch needs a program/executable path in .vscode/launch.json: " .. name, vim.log.levels.ERROR)
+    return
+  end
 
   local function run_config()
     dap.run(config)
