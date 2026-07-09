@@ -47,6 +47,17 @@ return {
             scrollbar = "float",
           },
         },
+        buffers = {
+          filename_only = true,
+          previewer = "builtin",
+        },
+        previewers = {
+          builtin = {
+            syntax = true,
+            syntax_limit_b = 5 * 1024 * 1024,
+            treesitter = { enabled = true },
+          },
+        },
         -- Map the fzf pane colours to the active colorscheme (Gruvbox Soft Dark).
         fzf_colors = {
           ["fg"]      = { "fg", "Normal" },
