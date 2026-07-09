@@ -1027,6 +1027,7 @@ return {
         pickers = {
           buffers = {
             initial_mode = "normal",
+            previewer = false,
             sort_lastused = true,
             show_all_buffers = false,
             ignore_current_buffer = false,
