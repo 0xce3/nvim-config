@@ -158,9 +158,25 @@ function M.open_debug_adapter_path()
   return nil
 end
 
+local function has_remote_gdb_command(commands)
+  for _, command in ipairs(commands or {}) do
+    local text = type(command) == "table" and command.text or command
+    if type(text) == "string" and text:match("^%s*target%s+remote%s+") then
+      return true
+    end
+  end
+  return false
+end
+
+local function is_remote_gdb_launch(launch)
+  return type(launch.miDebuggerServerAddress) == "string" and launch.miDebuggerServerAddress ~= ""
+    or has_remote_gdb_command(launch.setupCommands)
+    or has_remote_gdb_command(launch.customLaunchSetupCommands)
+end
+
 function M.build_dap_config(launch, task_root)
   local request = launch.request or "launch"
-  if request == "attach" and launch.miDebuggerServerAddress ~= nil and launch.processId == nil then
+  if request == "attach" and launch.processId == nil and is_remote_gdb_launch(launch) then
     request = "launch"
   end
 
