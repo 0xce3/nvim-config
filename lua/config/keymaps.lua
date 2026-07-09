@@ -263,11 +263,10 @@ map("v", "<C-z>", "<Nop>", { desc = "Disabled (no suspend)" })
 -- Toggle between the two most recently edited files (the alternate buffer):
 -- in file_a, open file_b, then <leader><Tab> flips back and forth.
 map("n", "<leader><Tab>", "<cmd>buffer #<cr>", { desc = "Switch to last file" })
--- Cycle through the open buffers (bufferline order, top tabs): Tab forward,
--- Shift-Tab back. Note: this takes over <C-i> (jumplist forward); <C-o> still
--- jumps back.
-map("n", "<Tab>", "<cmd>BufferLineCycleNext<cr>", { desc = "Next buffer" })
-map("n", "<S-Tab>", "<cmd>BufferLineCyclePrev<cr>", { desc = "Previous buffer" })
+-- Cycle through listed buffers without showing a persistent buffer tabline.
+-- Note: this takes over <C-i> (jumplist forward); <C-o> still jumps back.
+map("n", "<Tab>", "<cmd>bnext<cr>", { desc = "Next buffer" })
+map("n", "<S-Tab>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 map("n", "<esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 map("n", "<leader>x", "<cmd>BufferClose<cr>", { desc = "Close buffer" })
 map("n", "<leader>X", "<cmd>BufferClose!<cr>", { desc = "Force close buffer" })
@@ -323,11 +322,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "<leader>la", vim.lsp.buf.code_action, opts("Code action"))
   end,
 })
-
--- Buffer navigation
-for i = 1, 9 do
-  map("n", "<leader>" .. i, "<cmd>BufferLineGoToBuffer " .. i .. "<cr>", { desc = "Go to buffer " .. i })
-end
 
 map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })

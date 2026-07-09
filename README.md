@@ -47,7 +47,7 @@ For local testing:
 
 | Category | Plugin | Purpose |
 |----------|--------|---------|
-| Theme/UI | `ellisonleao/gruvbox.nvim`, `lualine.nvim`, `bufferline.nvim`, `which-key.nvim` | Colors, statusline, buffers, key hints |
+| Theme/UI | `ellisonleao/gruvbox.nvim`, `lualine.nvim`, `which-key.nvim` | Colors, statusline, key hints |
 | Explorer | `nvim-telescope/telescope-file-browser.nvim` | File browser on `<leader>e` |
 | Find | `fzf-lua`, `telescope.nvim` | Fast project search and shared picker backend |
 | LSP | `nvim-lspconfig`, `mason.nvim`, `mason-tool-installer.nvim` | Language servers and tooling |
@@ -80,8 +80,7 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<leader>e` | Open workspace-scoped Telescope file browser |
 | `<leader>E` | Open unrestricted Telescope file browser |
 | `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
-| `<Tab>` / `<S-Tab>` | Next / previous buffer |
-| `<leader>1` ... `<leader>9` | Jump to buffer |
+| `<Tab>` / `<S-Tab>` | Next / previous listed buffer |
 | `<leader>gg` | Fugitive Git status |
 | `<leader>gl` | Lazygit |
 | `<leader>gn` / `<leader>gp` | Next / previous Git hunk |
