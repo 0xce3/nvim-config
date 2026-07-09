@@ -104,6 +104,24 @@ function M.expand_vscode_vars(value, task_root)
   return value
 end
 
+local function debugger_server_address(launch)
+  local address = launch.miDebuggerServerAddress
+  if (address == nil or address == "") and launch.remote == true and type(launch.target) == "string" then
+    address = launch.target
+  end
+  if type(address) == "string" and address:match("^:%d+$") then
+    local host = "127.0.0.1"
+    if vim.env.DEVCONTAINER == "true" or vim.fn.filereadable("/.dockerenv") == 1 then
+      local route = vim.fn.systemlist({ "sh", "-lc", "ip route | awk '/default/ {print $3; exit}'" })
+      if vim.v.shell_error == 0 and route[1] and route[1] ~= "" then
+        host = route[1]
+      end
+    end
+    address = host .. address
+  end
+  return address
+end
+
 local function expand_vscode_value(value, task_root)
   if type(value) == "string" then
     return M.expand_vscode_vars(value, task_root)
@@ -163,7 +181,8 @@ function M.build_dap_config(launch, task_root)
   if request == "attach" and launch.processId == nil then
     request = "launch"
   end
-  local program = launch.program or launch.executable or launch.target
+  local program = launch.program or launch.executable
+  local debugger_path = launch.miDebuggerPath or launch.gdbpath or "/usr/bin/gdb"
 
   local config = {
     name = launch.name,
@@ -176,8 +195,8 @@ function M.build_dap_config(launch, task_root)
     environment = expand_vscode_value(launch.environment or {}, task_root),
     externalConsole = launch.externalConsole == true,
     MIMode = launch.MIMode or "gdb",
-    miDebuggerPath = M.expand_vscode_vars(launch.miDebuggerPath or "/usr/bin/gdb", task_root),
-    miDebuggerServerAddress = launch.miDebuggerServerAddress,
+    miDebuggerPath = M.expand_vscode_vars(debugger_path, task_root),
+    miDebuggerServerAddress = M.expand_vscode_vars(debugger_server_address(launch), task_root),
     setupCommands = expand_vscode_value(launch.setupCommands or {}, task_root),
     customLaunchSetupCommands = expand_vscode_value(launch.customLaunchSetupCommands, task_root),
     launchCompleteCommand = launch.launchCompleteCommand,
@@ -464,6 +483,22 @@ local function find_elf_files(root)
   return matches
 end
 
+local function find_elf_files_async(root, callback)
+  vim.system({ "sh", "-lc", "find . -type f -path '*/build*/*' -name '*.elf' -print" }, { cwd = root, text = true }, function(result)
+    local matches = {}
+    if result.code == 0 and result.stdout then
+      for line in result.stdout:gmatch("[^\r\n]+") do
+        line = line:gsub("^%./", "")
+        table.insert(matches, vim.fs.joinpath(root, line))
+      end
+    end
+    table.sort(matches)
+    vim.schedule(function()
+      callback(matches)
+    end)
+  end)
+end
+
 local function fill_missing_program(config, task_root, callback)
   if type(config.program) == "string" and config.program ~= "" then
     callback(true)
@@ -618,36 +653,69 @@ function M.pick_launch()
     return
   end
 
-  local elfs = find_elf_files(task_root)
   local runnable = {}
   local program_by_name = {}
-  for _, launch in ipairs(launches) do
-    local ok, program = launch_program_status(launch, task_root, elfs)
-    if ok then
-      table.insert(runnable, launch)
-      program_by_name[launch.name] = program
+  local needs_elf_scan = false
+
+  local function add_elf_backed_launches(elfs)
+    for _, launch in ipairs(launches) do
+      local config = M.build_dap_config(launch, task_root)
+      if config.request == "launch" and (type(config.program) ~= "string" or config.program == "") then
+        local ok, program = launch_program_status(launch, task_root, elfs)
+        if ok then
+          table.insert(runnable, launch)
+          program_by_name[launch.name] = program
+        end
+      end
     end
   end
 
-  if #runnable == 0 then
-    notify("No built debug targets found. Build a target first, or set program/executable in .vscode/launch.json.", vim.log.levels.WARN)
+  local function show_picker()
+    if #runnable == 0 then
+      notify("No built debug targets found. Build a target first, or set program/executable in .vscode/launch.json.", vim.log.levels.WARN)
+      return
+    end
+
+    vim.ui.select(runnable, {
+      prompt = "Debug launch",
+      format_item = function(item)
+        local program = program_by_name[item.name]
+        return program and (item.name .. "  ->  " .. program) or item.name
+      end,
+    }, function(choice)
+      if not choice then
+        notify("Debug launch selection cancelled", vim.log.levels.WARN)
+        return
+      end
+      notify("Selected debug launch: " .. choice.name)
+      M.run_launch(choice.name)
+    end)
+  end
+
+  for _, launch in ipairs(launches) do
+    local config = M.build_dap_config(launch, task_root)
+    if config.request ~= "launch" then
+      table.insert(runnable, launch)
+    elseif type(config.program) == "string" and config.program ~= "" then
+      if vim.fn.filereadable(config.program) == 1 then
+        table.insert(runnable, launch)
+        program_by_name[launch.name] = vim.fn.fnamemodify(config.program, ":~:.")
+      end
+    else
+      needs_elf_scan = true
+    end
+  end
+
+  if needs_elf_scan then
+    notify("Scanning build directories for .elf debug programs...")
+    find_elf_files_async(task_root, function(elfs)
+      add_elf_backed_launches(elfs)
+      show_picker()
+    end)
     return
   end
 
-  vim.ui.select(runnable, {
-    prompt = "Debug launch",
-    format_item = function(item)
-      local program = program_by_name[item.name]
-      return program and (item.name .. "  ->  " .. program) or item.name
-    end,
-  }, function(choice)
-    if not choice then
-      notify("Debug launch selection cancelled", vim.log.levels.WARN)
-      return
-    end
-    notify("Selected debug launch: " .. choice.name)
-    M.run_launch(choice.name)
-  end)
+  show_picker()
 end
 
 function M.cleanup()
