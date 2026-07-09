@@ -491,12 +491,34 @@ local function fill_missing_program(config, task_root, callback)
     end,
   }, function(choice)
     if choice == nil then
+      notify("Debug program selection cancelled", vim.log.levels.WARN)
       callback(false)
       return
     end
     config.program = choice
+    notify("Using debug program: " .. vim.fn.fnamemodify(config.program, ":~:."))
     callback(true)
   end)
+end
+
+local function launch_program_status(launch, task_root, elfs)
+  local config = M.build_dap_config(launch, task_root)
+  if config.request ~= "launch" then
+    return true, nil
+  end
+
+  if type(config.program) == "string" and config.program ~= "" then
+    if vim.fn.filereadable(config.program) == 1 then
+      return true, vim.fn.fnamemodify(config.program, ":~:.")
+    end
+    return false, nil
+  end
+
+  if #elfs > 0 then
+    return true, #elfs == 1 and vim.fn.fnamemodify(elfs[1], ":~:.") or (#elfs .. " built .elf files")
+  end
+
+  return false, nil
 end
 
 function M.run_launch(name)
@@ -528,12 +550,14 @@ function M.run_launch(name)
 
   local function run_config()
     if config.request ~= "launch" then
+      notify("Starting debug session: " .. config.name)
       dap.run(config)
       return
     end
 
     fill_missing_program(config, task_root, function(ok)
       if ok then
+        notify("Starting debug session: " .. config.name)
         dap.run(config)
       end
     end)
@@ -587,21 +611,42 @@ function M.run_launch(name)
 end
 
 function M.pick_launch()
-  local launches = M.load_launches(M.find_task_root())
+  local task_root = M.find_task_root()
+  local launches = M.load_launches(task_root)
   if #launches == 0 then
     notify("No VS Code launch configurations found", vim.log.levels.WARN)
     return
   end
 
-  vim.ui.select(launches, {
+  local elfs = find_elf_files(task_root)
+  local runnable = {}
+  local program_by_name = {}
+  for _, launch in ipairs(launches) do
+    local ok, program = launch_program_status(launch, task_root, elfs)
+    if ok then
+      table.insert(runnable, launch)
+      program_by_name[launch.name] = program
+    end
+  end
+
+  if #runnable == 0 then
+    notify("No built debug targets found. Build a target first, or set program/executable in .vscode/launch.json.", vim.log.levels.WARN)
+    return
+  end
+
+  vim.ui.select(runnable, {
     prompt = "Debug launch",
     format_item = function(item)
-      return item.name
+      local program = program_by_name[item.name]
+      return program and (item.name .. "  ->  " .. program) or item.name
     end,
   }, function(choice)
-    if choice and choice.name then
-      M.run_launch(choice.name)
+    if not choice then
+      notify("Debug launch selection cancelled", vim.log.levels.WARN)
+      return
     end
+    notify("Selected debug launch: " .. choice.name)
+    M.run_launch(choice.name)
   end)
 end
 
