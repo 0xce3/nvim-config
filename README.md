@@ -90,11 +90,17 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<leader>tl` | Run VS Code launch config |
 | `<leader>tj` / `<F12>` | Toggle reusable terminal buffer |
 | `<leader>tq` | Leave reusable terminal buffer |
-| `<F5>` | Continue debug session or run first launch config |
+| `<F5>` | Continue debug session or pick launch config |
 | `<F9>` | Toggle breakpoint |
 | `<F10>` / `<F11>` / `<S-F11>` | Step over / into / out |
+| `<leader>dl` | Pick debug launch config |
+| `<leader>dq` | Stop debug session and clean debug UI buffers |
 | `<leader>du` | Toggle debug UI |
 | `<leader>dr` | Open debug REPL |
+| `<Esc><Esc>` | Leave terminal mode |
+| `<C-h/j/k/l>` | Move between Neovim windows, also from terminal mode |
+| `<leader>tp/tn` | Previous/next tmux window in the task terminal |
+| `<leader>t1..t9` | Numbered tmux window in the task terminal |
 | `<leader>r` | Run request under cursor |
 | `<leader>rg` | Generate external `.http` workspace from OpenAPI |
 | `<leader>ro` | Open external `.http` workspace |
@@ -134,9 +140,56 @@ run in a single reusable terminal buffer shown like any other buffer.
 
 Terminal buffers can be closed with `<leader>x`, `q`, or `:q` from normal mode.
 
-Debug launches are read from `.vscode/launch.json` where possible and executed
-through `nvim-dap`. `:DebugLaunch` runs the first launch config by default, or a
-named config when provided.
+Debug launches are read from the current project's `.vscode/launch.json` and
+executed through `nvim-dap`/`cpptools`. Project-specific target names, paths,
+ports, and toolchain commands belong in the project repository or local files,
+not in this public config.
+
+`:DebugLaunch` runs the first launch config by default, or a named config when
+provided. `<leader>dl` opens a picker for all launch configs. `<F5>` continues an
+active session or opens the launch picker.
+
+Native/local GDB launches work without `miDebuggerServerAddress`:
+
+```jsonc
+{
+  "name": "Native simulator",
+  "type": "cppdbg",
+  "request": "launch",
+  "program": "${workspaceFolder}/build/app",
+  "cwd": "${workspaceFolder}",
+  "MIMode": "gdb",
+  "miDebuggerPath": "/usr/bin/gdb",
+  "stopAtEntry": false
+}
+```
+
+Remote hardware/debug-probe sessions use `miDebuggerServerAddress`. If the
+server is not reachable, `preLaunchTask` is started and Neovim waits for the TCP
+port before attaching. The default wait is 30 seconds and can be overridden per
+launch with `serverReadyTimeout` in milliseconds, or globally with
+`NVIM_DAP_SERVER_TIMEOUT_MS`:
+
+```jsonc
+{
+  "name": "Remote target",
+  "type": "cppdbg",
+  "request": "launch",
+  "program": "${workspaceFolder}/build/firmware.elf",
+  "cwd": "${workspaceFolder}",
+  "MIMode": "gdb",
+  "miDebuggerPath": "arm-none-eabi-gdb",
+  "miDebuggerServerAddress": "127.0.0.1:2331",
+  "serverReadyTimeout": 15000,
+  "preLaunchTask": "Start GDB server",
+  "postDebugTask": "Stop GDB server",
+  "setupCommands": [
+    { "text": "target remote 127.0.0.1:2331" },
+    { "text": "monitor reset halt" },
+    { "text": "load" }
+  ]
+}
+```
 
 ## clangd Build Selection
 

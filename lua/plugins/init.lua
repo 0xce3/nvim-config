@@ -269,6 +269,25 @@ return {
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
       local colors = require("gruvbox").palette
+      local hidden_filetypes = {
+        ["dap-repl"] = true,
+        ["dapui_breakpoints"] = true,
+        ["dapui_console"] = true,
+        ["dapui_scopes"] = true,
+        ["dapui_stacks"] = true,
+        ["dapui_watches"] = true,
+        ["fugitive"] = true,
+        ["help"] = true,
+        ["qf"] = true,
+        ["Trouble"] = true,
+      }
+      local hidden_buftypes = {
+        nofile = true,
+        prompt = true,
+        quickfix = true,
+        terminal = true,
+      }
+
       require("bufferline").setup({
         options = {
           mode = "buffers",
@@ -282,8 +301,18 @@ return {
           truncate_names = false,
           show_close_icon = false,
           show_buffer_close_icons = true,
-          always_show_bufferline = true,
+          always_show_bufferline = false,
           offsets = {},
+          custom_filter = function(bufnr)
+            local name = vim.api.nvim_buf_get_name(bufnr)
+            if name == "" or name:match("Task Terminal$") then
+              return false
+            end
+            if hidden_buftypes[vim.bo[bufnr].buftype] or hidden_filetypes[vim.bo[bufnr].filetype] then
+              return false
+            end
+            return vim.bo[bufnr].buflisted and vim.fn.filereadable(name) == 1
+          end,
         },
         highlights = {
           fill = {

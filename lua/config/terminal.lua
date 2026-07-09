@@ -91,6 +91,19 @@ function M.run(command)
   end
 end
 
+function M.send(keys)
+  if not state.chan then
+    vim.notify("Task terminal is not running", vim.log.levels.WARN, { title = "terminal" })
+    return false
+  end
+  vim.fn.chansend(state.chan, vim.api.nvim_replace_termcodes(keys, true, false, true))
+  return true
+end
+
+function M.tmux(command)
+  return M.send("<C-b>" .. command)
+end
+
 function M.close()
   if buf_ok() and vim.api.nvim_get_current_buf() == state.buf then
     if state.previous_buf and vim.api.nvim_buf_is_valid(state.previous_buf) then

@@ -97,10 +97,26 @@ function M.expand_vscode_vars(value, task_root)
 
   value = value:gsub("%${workspaceFolder}", task_root)
   value = value:gsub("%${workspaceRoot}", task_root)
+  value = value:gsub("%${cwd}", vim.uv.cwd() or task_root)
   value = value:gsub("%${env:([^}]+)}", function(name)
     return vim.env[name] or ""
   end)
   return value
+end
+
+local function expand_vscode_value(value, task_root)
+  if type(value) == "string" then
+    return M.expand_vscode_vars(value, task_root)
+  end
+  if type(value) ~= "table" then
+    return value
+  end
+
+  local expanded = {}
+  for key, item in pairs(value) do
+    expanded[key] = expand_vscode_value(item, task_root)
+  end
+  return expanded
 end
 
 function M.load_launches(task_root)
@@ -143,21 +159,39 @@ function M.open_debug_adapter_path()
 end
 
 function M.build_dap_config(launch, task_root)
-  return {
+  local request = launch.request or "launch"
+  if request == "attach" and launch.miDebuggerServerAddress ~= nil and launch.processId == nil then
+    request = "launch"
+  end
+
+  local config = {
     name = launch.name,
     type = "cppdbg",
-    request = launch.request or "launch",
+    request = request,
     program = M.expand_vscode_vars(launch.program, task_root),
-    args = launch.args or {},
+    args = expand_vscode_value(launch.args or {}, task_root),
     stopAtEntry = launch.stopAtEntry == true,
     cwd = M.expand_vscode_vars(launch.cwd or task_root, task_root),
-    environment = launch.environment or {},
+    environment = expand_vscode_value(launch.environment or {}, task_root),
     externalConsole = launch.externalConsole == true,
     MIMode = launch.MIMode or "gdb",
     miDebuggerPath = M.expand_vscode_vars(launch.miDebuggerPath or "/usr/bin/gdb", task_root),
     miDebuggerServerAddress = launch.miDebuggerServerAddress,
-    setupCommands = launch.setupCommands or {},
+    setupCommands = expand_vscode_value(launch.setupCommands or {}, task_root),
+    customLaunchSetupCommands = expand_vscode_value(launch.customLaunchSetupCommands, task_root),
+    launchCompleteCommand = launch.launchCompleteCommand,
+    sourceFileMap = expand_vscode_value(launch.sourceFileMap, task_root),
+    symbolSearchPath = M.expand_vscode_vars(launch.symbolSearchPath, task_root),
+    additionalSOLibSearchPath = M.expand_vscode_vars(launch.additionalSOLibSearchPath, task_root),
   }
+
+  for _, key in ipairs({ "targetArchitecture", "processId", "coreDumpPath", "serverStarted", "filterStderr", "filterStdout" }) do
+    if launch[key] ~= nil then
+      config[key] = expand_vscode_value(launch[key], task_root)
+    end
+  end
+
+  return config
 end
 
 local function find_task_by_label(tasks, label)
@@ -408,6 +442,14 @@ local function wait_for_tcp(host, port, timeout_ms, callback)
   timer:start(0, 500, tick)
 end
 
+local function server_timeout_ms(launch)
+  local timeout = tonumber(launch.serverReadyTimeout or vim.env.NVIM_DAP_SERVER_TIMEOUT_MS)
+  if timeout ~= nil and timeout > 0 then
+    return timeout
+  end
+  return 30000
+end
+
 function M.run_launch(name)
   local dap = require("dap")
   local task_root = M.find_task_root()
@@ -423,12 +465,6 @@ function M.run_launch(name)
     return
   end
 
-  local host, port = split_host_port(launch.miDebuggerServerAddress)
-  if host == nil or port == nil then
-    notify("Launch config has no miDebuggerServerAddress: " .. name, vim.log.levels.ERROR)
-    return
-  end
-
   dap.adapters.cppdbg = {
     id = "cppdbg",
     type = "executable",
@@ -439,11 +475,45 @@ function M.run_launch(name)
   }
 
   local config = M.build_dap_config(launch, task_root)
+  local host, port = split_host_port(config.miDebuggerServerAddress)
+
+  local function run_config()
+    dap.run(config)
+  end
+
+  local function run_after_prelaunch()
+    if host == nil or port == nil then
+      run_config()
+      return
+    end
+
+    notify("Waiting for gdbserver on " .. config.miDebuggerServerAddress)
+    wait_for_tcp(host, port, server_timeout_ms(launch), function(ready)
+      vim.schedule(function()
+        if not ready then
+          notify("gdbserver did not open " .. config.miDebuggerServerAddress, vim.log.levels.ERROR)
+          return
+        end
+        run_config()
+      end)
+    end)
+  end
+
+  if host == nil or port == nil then
+    if type(launch.preLaunchTask) == "string" then
+      notify("Starting " .. launch.preLaunchTask)
+      if not M.run_task(launch.preLaunchTask) then
+        return
+      end
+    end
+    run_config()
+    return
+  end
 
   check_tcp(host, port, function(open)
     vim.schedule(function()
       if open then
-        dap.run(config)
+        run_config()
         return
       end
 
@@ -453,19 +523,64 @@ function M.run_launch(name)
           return
         end
       end
-
-      notify("Waiting for gdbserver on " .. launch.miDebuggerServerAddress)
-      wait_for_tcp(host, port, 90000, function(ready)
-        vim.schedule(function()
-          if not ready then
-            notify("gdbserver did not open " .. launch.miDebuggerServerAddress, vim.log.levels.ERROR)
-            return
-          end
-          dap.run(config)
-        end)
-      end)
+      run_after_prelaunch()
     end)
   end)
+end
+
+function M.pick_launch()
+  local launches = M.load_launches(M.find_task_root())
+  if #launches == 0 then
+    notify("No VS Code launch configurations found", vim.log.levels.WARN)
+    return
+  end
+
+  vim.ui.select(launches, {
+    prompt = "Debug launch",
+    format_item = function(item)
+      return item.name
+    end,
+  }, function(choice)
+    if choice and choice.name then
+      M.run_launch(choice.name)
+    end
+  end)
+end
+
+function M.cleanup()
+  local dap = require("dap")
+  local ok_dapui, dapui = pcall(require, "dapui")
+
+  if dap.session() ~= nil then
+    pcall(dap.terminate)
+    pcall(dap.disconnect)
+  end
+
+  if ok_dapui then
+    pcall(dapui.close)
+  end
+  pcall(dap.repl.close)
+
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) then
+      local buf = vim.api.nvim_win_get_buf(win)
+      local ft = vim.bo[buf].filetype
+      local name = vim.api.nvim_buf_get_name(buf)
+      if ft:match("^dap") or name:match("dap%-repl") or name:match("DAP ") then
+        pcall(vim.api.nvim_win_close, win, true)
+      end
+    end
+  end
+
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      local ft = vim.bo[buf].filetype
+      local name = vim.api.nvim_buf_get_name(buf)
+      if ft:match("^dap") or name:match("dap%-repl") or name:match("DAP ") then
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+      end
+    end
+  end
 end
 
 function M.stop_post_debug_task(name)
@@ -480,6 +595,15 @@ function M.setup()
   local dap = require("dap")
   local dapui = require("dapui")
   local stopped_sessions = {}
+
+  vim.api.nvim_set_hl(0, "DapBreakpoint", { fg = "#fb4934", bold = true })
+  vim.api.nvim_set_hl(0, "DapBreakpointCondition", { fg = "#fabd2f", bold = true })
+  vim.api.nvim_set_hl(0, "DapLogPoint", { fg = "#83a598", bold = true })
+  vim.api.nvim_set_hl(0, "DapStopped", { fg = "#b8bb26", bold = true })
+  vim.fn.sign_define("DapBreakpoint", { text = "B", texthl = "DapBreakpoint", linehl = "", numhl = "" })
+  vim.fn.sign_define("DapBreakpointCondition", { text = "C", texthl = "DapBreakpointCondition", linehl = "", numhl = "" })
+  vim.fn.sign_define("DapLogPoint", { text = "L", texthl = "DapLogPoint", linehl = "", numhl = "" })
+  vim.fn.sign_define("DapStopped", { text = ">", texthl = "DapStopped", linehl = "", numhl = "" })
 
   dapui.setup({
     layouts = {
@@ -528,28 +652,24 @@ function M.setup()
   dap.listeners.after.event_terminated["post_debug_task"] = stop_post_debug_task_once
   dap.listeners.after.event_exited["post_debug_task"] = stop_post_debug_task_once
 
-  local function continue_or_first_launch()
+  local function continue_or_pick_launch()
     if dap.session() ~= nil then
       dap.continue()
       return
     end
-
-    local launches = M.load_launches(M.find_task_root())
-    if #launches == 0 then
-      notify("No VS Code launch configurations found", vim.log.levels.WARN)
-      return
-    end
-    M.run_launch(launches[1].name)
+    M.pick_launch()
   end
 
   local map = vim.keymap.set
-  map("n", "<F5>", continue_or_first_launch, { desc = "Debug first launch / continue" })
+  map("n", "<F5>", continue_or_pick_launch, { desc = "Debug launch picker / continue" })
   map("n", "<F9>", dap.toggle_breakpoint, { desc = "Toggle breakpoint" })
   map("n", "<F10>", dap.step_over, { desc = "Step over" })
   map("n", "<F11>", dap.step_into, { desc = "Step into" })
   map("n", "<S-F11>", dap.step_out, { desc = "Step out" })
   map("n", "<leader>dc", dap.continue, { desc = "Debug continue" })
   map("n", "<leader>db", dap.toggle_breakpoint, { desc = "Debug breakpoint" })
+  map("n", "<leader>dl", M.pick_launch, { desc = "Debug launch picker" })
+  map("n", "<leader>dq", M.cleanup, { desc = "Debug stop and cleanup" })
   map("n", "<leader>du", dapui.toggle, { desc = "Debug UI" })
   map("n", "<leader>dr", dap.repl.open, { desc = "Debug REPL" })
   vim.api.nvim_create_user_command("DebugLaunch", function(opts)

@@ -344,6 +344,11 @@ map("t", "<c-h>", [[<cmd>wincmd h<cr>]], { desc = "Move left" })
 map("t", "<c-j>", [[<cmd>wincmd j<cr>]], { desc = "Move down" })
 map("t", "<c-k>", [[<cmd>wincmd k<cr>]], { desc = "Move up" })
 map("t", "<c-l>", [[<cmd>wincmd l<cr>]], { desc = "Move right" })
+map({ "n", "t" }, "<leader>tp", function() require("config.terminal").tmux("p") end, { desc = "tmux previous window" })
+map({ "n", "t" }, "<leader>tn", function() require("config.terminal").tmux("n") end, { desc = "tmux next window" })
+for i = 1, 9 do
+  map({ "n", "t" }, "<leader>t" .. i, function() require("config.terminal").tmux(tostring(i)) end, { desc = "tmux window " .. i })
+end
 
 map("n", "<c-h>", "<cmd>wincmd h<cr>", { desc = "Move left" })
 map("n", "<c-j>", "<cmd>wincmd j<cr>", { desc = "Move down" })

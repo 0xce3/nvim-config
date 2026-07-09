@@ -1,5 +1,7 @@
 .DS_Store
 *.log
+.nvim-config.sha256
+.nvim-tools.ok
 
 # Keep plugin downloads, LSP state, swap files, and editor caches out of the repo.
 .cache/
@@ -8,4 +10,3 @@ site/
 state/
 swap/
 shada/
-
