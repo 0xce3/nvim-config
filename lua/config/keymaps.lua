@@ -265,7 +265,7 @@ map("v", "<C-z>", "<Nop>", { desc = "Disabled (no suspend)" })
 map("n", "<leader><Tab>", "<cmd>buffer #<cr>", { desc = "Switch to last file" })
 -- Open buffers through a picker instead of showing a persistent buffer tabline.
 -- This takes over <C-i>; <C-o> still jumps back.
-map("n", "<Tab>", function() require("fzf-lua").buffers() end, { desc = "Find buffers" })
+map("n", "<Tab>", function() require("telescope.builtin").buffers() end, { desc = "Find buffers" })
 map("n", "<S-Tab>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 map("n", "<esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 map("n", "<leader>x", "<cmd>BufferClose<cr>", { desc = "Close buffer" })

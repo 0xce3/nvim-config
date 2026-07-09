@@ -23,7 +23,7 @@ return {
         mode = "x",
         desc = "Grep selection (workspace)",
       },
-      { "<leader>fb", function() require("fzf-lua").buffers() end,              desc = "Find buffers" },
+      { "<leader>fb", function() require("telescope.builtin").buffers() end,    desc = "Find buffers" },
       { "<leader>fh", function() require("fzf-lua").helptags() end,             desc = "Help tags" },
       { "<leader>fr", function() require("fzf-lua").oldfiles() end,             desc = "Recent files" },
       { "<leader>fs", function() require("fzf-lua").lsp_document_symbols() end, desc = "Document symbols" },
@@ -45,15 +45,6 @@ return {
             layout = "horizontal",
             horizontal = "right:55%",
             scrollbar = "float",
-          },
-        },
-        buffers = {
-          fn_transform = function(line)
-            return line:gsub("([^%s]+/)+([^/%s:]+)(:%d+)", "%2%3")
-          end,
-          fzf_opts = {
-            ["--no-multi"] = true,
-            ["--bind"] = "tab:down,btab:up",
           },
         },
         -- Map the fzf pane colours to the active colorscheme (Gruvbox Soft Dark).

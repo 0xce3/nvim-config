@@ -1024,6 +1024,26 @@ return {
           layout_strategy = "horizontal",
           layout_config = { preview_width = 0.55 },
         },
+        pickers = {
+          buffers = {
+            initial_mode = "normal",
+            sort_lastused = true,
+            show_all_buffers = false,
+            ignore_current_buffer = false,
+            path_display = { "tail" },
+            mappings = {
+              n = {
+                ["<Tab>"] = actions.move_selection_next,
+                ["<S-Tab>"] = actions.move_selection_previous,
+                ["q"] = actions.close,
+              },
+              i = {
+                ["<Tab>"] = actions.move_selection_next,
+                ["<S-Tab>"] = actions.move_selection_previous,
+              },
+            },
+          },
+        },
         extensions = {
           file_browser = {
             grouped = true,
