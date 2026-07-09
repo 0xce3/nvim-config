@@ -48,9 +48,12 @@ return {
           },
         },
         buffers = {
-          formatter = "path.filename_first",
+          fn_transform = function(line)
+            return line:gsub("([^%s]+/)+([^/%s:]+)(:%d+)", "%2%3")
+          end,
           fzf_opts = {
             ["--no-multi"] = true,
+            ["--bind"] = "tab:down,btab:up",
           },
         },
         -- Map the fzf pane colours to the active colorscheme (Gruvbox Soft Dark).
