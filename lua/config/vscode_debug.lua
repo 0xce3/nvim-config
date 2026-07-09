@@ -767,6 +767,14 @@ function M.setup()
   local dapui = require("dapui")
   local stopped_sessions = {}
 
+  -- nvim-dap's built-in VS Code parser is strict JSON and can warn on valid
+  -- project JSONC. This config reads launch.json through decode_jsonc instead.
+  if dap.providers and dap.providers.configs then
+    dap.providers.configs["dap.launch.json"] = function()
+      return {}
+    end
+  end
+
   vim.api.nvim_set_hl(0, "DapBreakpoint", { fg = "#fb4934", bold = true })
   vim.api.nvim_set_hl(0, "DapBreakpointCondition", { fg = "#fabd2f", bold = true })
   vim.api.nvim_set_hl(0, "DapLogPoint", { fg = "#83a598", bold = true })
