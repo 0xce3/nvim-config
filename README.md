@@ -80,7 +80,7 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<leader>e` | Open workspace-scoped Telescope file browser |
 | `<leader>E` | Open unrestricted Telescope file browser |
 | `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
-| `<Tab>` / `<S-Tab>` | Next / previous listed buffer; repeated `<Tab>` opens buffer picker |
+| `<Tab>` / `<S-Tab>` | Open buffer picker / previous listed buffer |
 | `<leader>gg` | Fugitive Git status |
 | `<leader>gl` | Lazygit |
 | `<leader>gn` / `<leader>gp` | Next / previous Git hunk |
