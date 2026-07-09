@@ -451,6 +451,54 @@ local function server_timeout_ms(launch)
   return 30000
 end
 
+local function find_elf_files(root)
+  local matches = vim.fs.find(function(name, path)
+    if not name:match("%.elf$") then
+      return false
+    end
+    local rel = vim.fs.joinpath(path, name):sub(#root + 2)
+    return rel:match("^build[^/]*/") ~= nil or rel:match("/build[^/]*/") ~= nil
+  end, { path = root, type = "file", limit = 200 })
+
+  table.sort(matches)
+  return matches
+end
+
+local function fill_missing_program(config, task_root, callback)
+  if type(config.program) == "string" and config.program ~= "" then
+    callback(true)
+    return
+  end
+
+  local elfs = find_elf_files(task_root)
+  if #elfs == 0 then
+    notify("Debug launch needs a program/executable path, and no .elf was found under build directories", vim.log.levels.ERROR)
+    callback(false)
+    return
+  end
+
+  if #elfs == 1 then
+    config.program = elfs[1]
+    notify("Using debug program: " .. vim.fn.fnamemodify(config.program, ":~:."))
+    callback(true)
+    return
+  end
+
+  vim.ui.select(elfs, {
+    prompt = "Debug program (.elf)",
+    format_item = function(path)
+      return vim.fn.fnamemodify(path, ":~:.")
+    end,
+  }, function(choice)
+    if choice == nil then
+      callback(false)
+      return
+    end
+    config.program = choice
+    callback(true)
+  end)
+end
+
 function M.run_launch(name)
   local dap = require("dap")
   local task_root = M.find_task_root()
@@ -478,13 +526,17 @@ function M.run_launch(name)
   local config = M.build_dap_config(launch, task_root)
   local host, port = split_host_port(config.miDebuggerServerAddress)
 
-  if config.request == "launch" and (type(config.program) ~= "string" or config.program == "") then
-    notify("Debug launch needs a program/executable path in .vscode/launch.json: " .. name, vim.log.levels.ERROR)
-    return
-  end
-
   local function run_config()
-    dap.run(config)
+    if config.request ~= "launch" then
+      dap.run(config)
+      return
+    end
+
+    fill_missing_program(config, task_root, function(ok)
+      if ok then
+        dap.run(config)
+      end
+    end)
   end
 
   local function run_after_prelaunch()
