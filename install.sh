@@ -96,9 +96,12 @@ prompt_action() {
     return 0
   fi
 
-  printf '%b' "${c_yellow}?${c_reset} $message ${c_dim}[install/skip/abort]${c_reset}: "
+  printf '%b' "${c_yellow}?${c_reset} $message ${c_dim}[install/skip/abort]${c_reset}: " >&2
   local answer
   read -r answer
+  answer="${answer//$'\r'/}"
+  answer="${answer#"${answer%%[![:space:]]*}"}"
+  answer="${answer%"${answer##*[![:space:]]}"}"
   case "${answer,,}" in
     i|install|y|yes) printf 'install\n' ;;
     s|skip|"") printf 'skip\n' ;;
