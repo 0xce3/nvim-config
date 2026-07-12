@@ -92,7 +92,7 @@ prompt_action() {
     return 0
   fi
   if [[ ! -t 0 ]]; then
-    printf 'skip\n'
+    printf 'install\n'
     return 0
   fi
 

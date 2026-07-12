@@ -44,6 +44,21 @@ detect_output="$(PATH="$apt_path:/usr/bin:/bin" "$install_script" --dry-run)"
 assert_contains "$detect_output" "Package manager"
 assert_contains "$detect_output" "apt"
 
+install_path="$(mktemp -d)"
+trap 'rm -rf "$apt_path" "$install_path"' EXIT
+cat > "$install_path/apt-get" <<'STUB'
+#!/usr/bin/env sh
+exit 0
+STUB
+cat > "$install_path/sudo" <<'STUB'
+#!/usr/bin/env sh
+exec "$@"
+STUB
+chmod +x "$install_path/apt-get" "$install_path/sudo"
+
+noninteractive_output="$(PATH="$install_path:/usr/bin:/bin" "$install_script" --dry-run </dev/null)"
+assert_contains "$noninteractive_output" "apt-get install -y neovim"
+
 pipe_home="$(mktemp -d)"
 pipe_output="$(HOME="$pipe_home" XDG_CONFIG_HOME="$pipe_home/.config" NVIM_CONFIG_REPO="$repo_root" bash -c "$(cat "$install_script")" -- --dry-run)"
 rm -rf "$pipe_home"
