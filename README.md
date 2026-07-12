@@ -29,7 +29,7 @@ nvim
 ## One-command install
 
 ```sh
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh")'
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"
 ```
 
 The installer detects the package manager, installs host packages (nvim, git,

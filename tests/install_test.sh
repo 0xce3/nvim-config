@@ -19,6 +19,10 @@ assert_contains() {
 
 bash -n "$install_script"
 
+readme_install_command="$(grep -F 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"' "$repo_root/README.md" | head -n 1)"
+[[ -n "$readme_install_command" ]] || fail "README install command exists"
+bash -n -c "$readme_install_command"
+
 dry_run_output="$("$install_script" --dry-run)"
 assert_contains "$dry_run_output" "Dry run"
 assert_contains "$dry_run_output" "Neovim config repository"
