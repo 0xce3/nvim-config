@@ -40,6 +40,13 @@ detect_output="$(PATH="$apt_path:/usr/bin:/bin" "$install_script" --dry-run)"
 assert_contains "$detect_output" "Package manager"
 assert_contains "$detect_output" "apt"
 
+pipe_home="$(mktemp -d)"
+pipe_output="$(HOME="$pipe_home" XDG_CONFIG_HOME="$pipe_home/.config" NVIM_CONFIG_REPO="$repo_root" bash -c "$(cat "$install_script")" -- --dry-run)"
+rm -rf "$pipe_home"
+assert_contains "$pipe_output" "config repository"
+assert_contains "$pipe_output" "git clone"
+assert_contains "$pipe_output" "Package manager"
+
 blocked_terms=(
   'qm.''x'
   'endr.''ess'

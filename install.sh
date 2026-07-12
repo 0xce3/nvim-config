@@ -285,9 +285,15 @@ sync_plugins() {
   run "$nvim_bin" --headless '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
 }
 
+script_dir() {
+  local source="${BASH_SOURCE[0]:-${0:-}}"
+  [[ -n "$source" && "$source" == */* && -e "$source" ]] || return 0
+  cd "$(dirname "$source")" 2>/dev/null && pwd -P 2>/dev/null
+}
+
 bootstrap_repo() {
   local original_args=("$@") self_dir
-  self_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P 2>/dev/null || true)"
+  self_dir="$(script_dir || true)"
   if [[ "$self_dir" == "$config_dir" ]]; then
     return 0
   fi
@@ -303,6 +309,10 @@ bootstrap_repo() {
     fi
     run mkdir -p "$(dirname "$config_dir")"
     run git clone "$repo_url" "$config_dir"
+  fi
+  if [[ "$dry_run" -eq 1 ]]; then
+    run "$config_dir/install.sh" "${original_args[@]}"
+    return 0
   fi
   exec "$config_dir/install.sh" "${original_args[@]}"
 }
