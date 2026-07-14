@@ -70,6 +70,45 @@ local function is_under(path, root)
   return path == root or path:find(prefix, 1, true) == 1
 end
 
+local function current_unit_test_root()
+  local path = vim.api.nvim_buf_get_name(0)
+  local root = task_root()
+  if path == "" or not root or not is_under(path, vim.fs.joinpath(root, "tests", "unit")) then
+    return nil
+  end
+  local testcase = vim.fs.find("testcase.yaml", {
+    path = vim.fs.dirname(path),
+    upward = true,
+    limit = 1,
+  })[1]
+  return testcase and vim.fs.dirname(testcase) or nil
+end
+
+local function run_current_unit_test()
+  local unit_root = current_unit_test_root()
+  if not unit_root then
+    vim.notify("Open a file below tests/unit to run its suite", vim.log.levels.WARN, { title = "unit tests" })
+    return
+  end
+
+  local root = task_root()
+  local relative_root = unit_root:sub(#root + 2)
+  local profiles = {
+    { label = "GCC with ASAN", task = "Run specific Unit Test on native_sim (GCC) (ASAN)" },
+    { label = "Clang with ASAN", task = "Run specific Unit Test on native_sim (Clang) (ASAN)" },
+    { label = "GCC with Valgrind", task = "Run specific Unit Test on native_sim (GCC) (Valgrind)" },
+    { label = "Clang with Valgrind", task = "Run specific Unit Test on native_sim (Clang) (Valgrind)" },
+  }
+  vim.ui.select(profiles, {
+    prompt = "Run " .. relative_root,
+    format_item = function(profile) return profile.label end,
+  }, function(profile)
+    if profile then
+      require("config.vscode_debug").run_task(profile.task, { test_path = relative_root })
+    end
+  end)
+end
+
 local function python_adapter()
   local adapter = require("neotest-python")({
     python = python_path,
@@ -105,6 +144,7 @@ return {
       { "<leader>to", function() require("neotest").output.open({ enter = true, auto_close = true }) end, desc = "Test output" },
       { "<leader>tp", function() require("neotest").summary.toggle() end, desc = "Test panel" },
       { "<leader>tx", function() require("neotest").run.stop() end, desc = "Stop test" },
+      { "<leader>tu", run_current_unit_test, desc = "Run current unit suite" },
       {
         "<leader>tS",
         function()

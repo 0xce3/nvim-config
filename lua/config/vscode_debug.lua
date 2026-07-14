@@ -223,6 +223,88 @@ local function find_task_by_label(tasks, label)
   return nil
 end
 
+local function load_tasks_config(root)
+  local path = vim.fs.joinpath(root, ".vscode", "tasks.json")
+  if vim.fn.filereadable(path) ~= 1 then
+    return {}
+  end
+  local ok, parsed = pcall(M.decode_jsonc, table.concat(vim.fn.readfile(path), "\n"))
+  return ok and type(parsed) == "table" and parsed or {}
+end
+
+local function collect_input_ids(task, tasks, seen, ids)
+  if not task or seen[task.label] then return end
+  seen[task.label] = true
+
+  local function collect(value)
+    if type(value) == "string" then
+      for id in value:gmatch("%${input:([^}]+)}") do
+        ids[id] = true
+      end
+    elseif type(value) == "table" then
+      for _, item in pairs(value) do
+        collect(item)
+      end
+    end
+  end
+
+  collect(task.command)
+  collect(task.options)
+  local deps = type(task.dependsOn) == "string" and { task.dependsOn } or task.dependsOn or {}
+  for _, label in ipairs(deps) do
+    collect_input_ids(find_task_by_label(tasks, label), tasks, seen, ids)
+  end
+end
+
+local function replace_input_vars(value, input_values)
+  if type(value) == "string" then
+    return value:gsub("%${input:([^}]+)}", function(id)
+      return input_values[id] or "${input:" .. id .. "}"
+    end)
+  end
+  if type(value) ~= "table" then
+    return value
+  end
+
+  local expanded = {}
+  for key, item in pairs(value) do
+    expanded[key] = replace_input_vars(item, input_values)
+  end
+  return expanded
+end
+
+local function prompt_task_inputs(task, tasks, definitions, supplied, callback)
+  local ids = {}
+  collect_input_ids(task, tasks, {}, ids)
+  local ordered = vim.tbl_keys(ids)
+  table.sort(ordered)
+  local values = vim.deepcopy(supplied or {})
+
+  local function prompt_next(index)
+    local id = ordered[index]
+    if not id then
+      callback(values)
+      return
+    end
+    if values[id] ~= nil then
+      prompt_next(index + 1)
+      return
+    end
+
+    local definition = definitions[id] or {}
+    vim.ui.input({
+      prompt = (definition.description or id) .. ": ",
+      default = definition.default,
+    }, function(value)
+      if value == nil then return end
+      values[id] = value
+      prompt_next(index + 1)
+    end)
+  end
+
+  prompt_next(1)
+end
+
 local function build_task_cmd(task, tasks, job)
   local commands = {}
   local deps = type(task.dependsOn) == "string" and { task.dependsOn } or task.dependsOn or {}
@@ -238,10 +320,10 @@ local function build_task_cmd(task, tasks, job)
   return table.concat(commands, " && ")
 end
 
-function M.run_task(label)
-  local parse = require("vstask.Parse")
+function M.run_task(label, supplied_inputs)
   local job   = require("vstask.Job")
-  local tasks = parse.Tasks()
+  local config = load_tasks_config(M.find_task_root())
+  local tasks = config.tasks or {}
   local task  = find_task_by_label(tasks, label)
 
   if task == nil then
@@ -249,25 +331,34 @@ function M.run_task(label)
     return false
   end
 
-  local cmd = build_task_cmd(task, tasks, job)
-  if cmd == "" then
-    notify("Empty command for task: " .. label, vim.log.levels.ERROR)
-    return false
+  local definitions = {}
+  for _, input in ipairs(config.inputs or {}) do
+    definitions[input.id] = input
   end
 
-  -- Run every VS Code task through the reusable in-Nvim terminal buffer.
-  if task.dependsOn ~= nil then
-    job.run_dependent_tasks(task, tasks)
-  else
-    job.start_job({
-      label     = task.label,
-      command   = cmd,
-      silent    = false,
-      watch     = false,
-      terminal  = true,
-      direction = "horizontal",
-    })
-  end
+  prompt_task_inputs(task, tasks, definitions, supplied_inputs, function(input_values)
+    local expanded_tasks = replace_input_vars(tasks, input_values)
+    local expanded_task = find_task_by_label(expanded_tasks, label)
+    local cmd = build_task_cmd(expanded_task, expanded_tasks, job)
+    if cmd == "" then
+      notify("Empty command for task: " .. label, vim.log.levels.ERROR)
+      return
+    end
+
+    -- Run every VS Code task through the reusable in-Nvim terminal buffer.
+    if expanded_task.dependsOn ~= nil then
+      job.run_dependent_tasks(expanded_task, expanded_tasks)
+    else
+      job.start_job({
+        label     = expanded_task.label,
+        command   = cmd,
+        silent    = false,
+        watch     = false,
+        terminal  = true,
+        direction = "horizontal",
+      })
+    end
+  end)
   return true
 end
 
