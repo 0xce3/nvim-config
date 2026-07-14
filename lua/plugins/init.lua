@@ -1203,6 +1203,8 @@ return {
     ft = { "c", "cpp", "python", "rust", "lua", "go", "json", "yaml", "h", "hpp" },
     cmd = { "LspInfo", "LspStop", "LspStart", "LspRestart" },
     config = function()
+      local clangd_unit_test = require("config.clangd_unit_test")
+
       local function lsp_client_filter(name)
         if name and name ~= "" then
           return { name = name }
@@ -1221,7 +1223,8 @@ return {
           for _, client in ipairs(clients) do
             table.insert(lines, string.format("%s [%d]", client.name, client.id))
             if client.config and client.config.cmd then
-              table.insert(lines, "  cmd: " .. table.concat(client.config.cmd, " "))
+              local cmd = client.config.cmd
+              table.insert(lines, "  cmd: " .. (type(cmd) == "table" and table.concat(cmd, " ") or "dynamic"))
             end
             if client.config and client.config.root_dir then
               table.insert(lines, "  root: " .. client.config.root_dir)
@@ -1254,6 +1257,11 @@ return {
           table.insert(cmd, "--compile-commands-dir=" .. compile_commands_dir)
         end
         return cmd
+      end
+
+      local function firmware_root_dir(bufnr, on_dir)
+        if clangd_unit_test.is_unit_test(bufnr) then return end
+        on_dir(vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd())
       end
 
       vim.api.nvim_create_user_command("LspInfo", lsp_info, {
@@ -1311,9 +1319,16 @@ return {
 
       vim.lsp.config("clangd", {
         cmd = clangd_cmd(),
+        root_dir = firmware_root_dir,
       })
 
-      local enabled_servers = { "clangd" }
+      vim.lsp.config("clangd_unit_test", {
+        cmd = clangd_unit_test.cmd,
+        filetypes = { "c", "cpp", "h", "hpp" },
+        root_dir = clangd_unit_test.root_dir,
+      })
+
+      local enabled_servers = { "clangd", "clangd_unit_test" }
       if vim.fn.executable("pyright-langserver") == 1 then
         vim.lsp.config("pyright", {
           cmd = { "pyright-langserver", "--stdio" },
