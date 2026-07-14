@@ -90,12 +90,12 @@ opt.foldlevel = 99
 opt.foldlevelstart = 99
 opt.foldenable = true
 
--- Show a fold gutter with open/closed chevrons so it's obvious which lines are
--- foldable and whether they're open or closed.
-opt.foldcolumn = "1"
+-- Keep the fold gutter out of the way for ordinary buffers. Open folds have no
+-- marker; only a closed fold is marked with a chevron.
+opt.foldcolumn = "auto:1"
 opt.fillchars:append({
   fold = " ",
-  foldopen = "▾",  -- open fold
+  foldopen = " ",  -- open folds stay unmarked
   foldclose = "▸", -- closed fold
   foldsep = " ",
 })
