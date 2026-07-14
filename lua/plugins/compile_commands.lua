@@ -1,6 +1,7 @@
 -- Quickly switch the active clangd compile database between build directories.
 --
--- Telescope lists every compile_commands.json under the project root. Picking
+-- Telescope lists every compile_commands.json under the project root, including
+-- Twister unit-test builds under .west_workspace/ and tests/unit/build. Picking
 -- one points clangd at that build directory via `--compile-commands-dir` and
 -- restarts clangd. The choice is remembered in Neovim's state dir (see
 -- config.clangd_build) so it survives restarts without creating project files.
@@ -12,15 +13,14 @@ local store = require("config.clangd_build")
 -- Substrings; any compile_commands.json whose path contains one is hidden.
 local EXCLUDE = vim.g.compile_commands_exclude or {}
 
-local function filter_ccjson(root, raw)
+local function filter_ccjson(root, raw, source)
   local root_file = root .. "/compile_commands.json"
-  local app_dir = "main" .. "_" .. "app"
-  local app_prefix = root .. "/" .. app_dir .. "/"
   local results = {}
+  local matching_source = {}
   for _, f in ipairs(raw) do
     -- Keep only real compile_commands.json paths (guards against any stray
     -- non-path lines), drop any stray root file and excluded builds.
-    if f:match("compile_commands%.json$") and f ~= root_file and f:sub(1, #app_prefix) == app_prefix then
+    if f:match("compile_commands%.json$") and f ~= root_file then
       local skip = false
       for _, pat in ipairs(EXCLUDE) do
         if f:find(pat, 1, true) then
@@ -30,8 +30,15 @@ local function filter_ccjson(root, raw)
       end
       if not skip then
         table.insert(results, f)
+        local ok, lines = pcall(vim.fn.readfile, f)
+        if ok and source ~= "" and table.concat(lines, "\n"):find(source, 1, true) then
+          table.insert(matching_source, f)
+        end
       end
     end
+  end
+  if not vim.tbl_isempty(matching_source) then
+    results = matching_source
   end
   table.sort(results)
   return results
@@ -39,12 +46,8 @@ end
 
 local function find_ccjson(root, callback)
   local raw = {}
-  local app_dir = "main" .. "_" .. "app"
-  local search_root = root .. "/" .. app_dir
-  if vim.fn.isdirectory(search_root) ~= 1 then
-    callback({})
-    return
-  end
+  local source = vim.api.nvim_buf_get_name(0)
+  local search_root = root
   if vim.fn.executable("find") == 1 then
     -- Run find directly (no shell) so the user's login-shell startup noise
     -- ("bash: no job control...") never leaks into the results.
@@ -53,7 +56,7 @@ local function find_ccjson(root, callback)
         raw = vim.split(res.stdout, "\n", { trimempty = true })
       end
       vim.schedule(function()
-        callback(filter_ccjson(root, raw))
+        callback(filter_ccjson(root, raw, source))
       end)
     end)
     return
@@ -62,7 +65,7 @@ local function find_ccjson(root, callback)
   if vim.tbl_isempty(raw) then
     raw = vim.fs.find("compile_commands.json", { path = search_root, type = "file", limit = 1000 })
   end
-  callback(filter_ccjson(root, raw))
+  callback(filter_ccjson(root, raw, source))
 end
 
 local function restart_clangd(build_dir)
@@ -97,7 +100,7 @@ local function switch_compile_commands()
   vim.notify("Searching compile_commands.json...", vim.log.levels.INFO, { title = "clangd" })
   find_ccjson(root, function(results)
     if vim.tbl_isempty(results) then
-      vim.notify("No build compile_commands.json found under " .. root .. "/" .. app_dir, vim.log.levels.WARN)
+      vim.notify("No build compile_commands.json found under " .. root, vim.log.levels.WARN)
       return
     end
 
