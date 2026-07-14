@@ -169,9 +169,9 @@ return {
         hl("IncSearch", { fg = "#282828", bg = "#fabd2f", reverse = false })
         hl("CurSearch", { fg = "#282828", bg = "#fabd2f", reverse = false })
         hl("Visual", { bg = "#504945", reverse = false })
-        hl("LineNr", { fg = c.fg })
-        hl("LineNrAbove", { fg = c.fg })
-        hl("LineNrBelow", { fg = c.fg })
+        hl("LineNr", { fg = "#bdae93" })
+        hl("LineNrAbove", { fg = "#bdae93" })
+        hl("LineNrBelow", { fg = "#bdae93" })
 
         -- Closed folds: readable cream text on a subtle background (NOT greyed
         -- out, so a folded function doesn't look disabled). Fold gutter chevrons
