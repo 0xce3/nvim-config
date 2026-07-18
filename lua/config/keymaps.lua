@@ -164,6 +164,15 @@ local function format_buffer(bufnr)
   end
 
   if not has_formatter then
+    local ok, conform = pcall(require, "conform")
+    if ok then
+      conform.format({
+        bufnr = bufnr,
+        async = false,
+        lsp_format = "fallback",
+        timeout_ms = 2000,
+      })
+    end
     return
   end
 
@@ -325,6 +334,24 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
+
+vim.api.nvim_create_user_command("Term", function(opts)
+  require("config.file_utils").open_terminal(opts.args ~= "" and opts.args or nil)
+end, { nargs = "?", complete = "dir", desc = "Open terminal in file or given directory" })
+
+vim.api.nvim_create_user_command("CopyPath", function()
+  require("config.file_utils").copy_current_file_path()
+end, { desc = "Copy current file path" })
+
+-- Preserve the familiar `:terminal .` spelling while limiting the command-line
+-- rewrite to that exact command, so all other built-in :terminal invocations
+-- retain their normal Neovim behavior.
+map("c", "<CR>", function()
+  if vim.fn.getcmdtype() == ":" and vim.fn.getcmdline() == "terminal ." then
+    return vim.api.nvim_replace_termcodes("<C-u>Term .<CR>", true, false, true)
+  end
+  return vim.api.nvim_replace_termcodes("<CR>", true, false, true)
+end, { expr = true, desc = "Open terminal in current file directory" })
 
 map("n", "<leader>hh", function() require("config.workspace_hub").open() end, { desc = "Open workspace hub" })
 map("n", "<leader>rg", function() require("config.http_workspace").generate() end, { desc = "Generate HTTP workspace" })

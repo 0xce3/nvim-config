@@ -534,8 +534,15 @@ return {
         return build_launch(command, expanded_args)
       end
 
-      vstask_job.clean_command = function(command, options)
+      vstask_job.clean_command = function(command, options, args)
         local cleaned = expand_vscode_vars(command)
+        if type(args) == "table" and #args > 0 then
+          local quoted_args = {}
+          for _, arg in ipairs(args) do
+            table.insert(quoted_args, vim.fn.shellescape(expand_vscode_vars(tostring(arg))))
+          end
+          cleaned = cleaned .. " " .. table.concat(quoted_args, " ")
+        end
         if type(options) == "table" and type(options.env) == "table" then
           local exports = {}
           for key, value in pairs(options.env) do
@@ -553,9 +560,9 @@ return {
 
         if type(options) == "table" and type(options.cwd) == "string" then
           local cwd = expand_vscode_vars(options.cwd)
-          return prefix .. "cd " .. vim.fn.shellescape(cwd) .. " && { " .. cleaned .. "; }"
+          return "( " .. prefix .. "cd " .. vim.fn.shellescape(cwd) .. " && { " .. cleaned .. "; } )"
         end
-        return prefix .. "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; }"
+        return "( " .. prefix .. "cd " .. vim.fn.shellescape(task_root) .. " && { " .. cleaned .. "; } )"
       end
 
       -- Tasks run in the single reusable terminal buffer (see lua/config/terminal.lua).
@@ -1251,7 +1258,7 @@ return {
       end
 
       local function clangd_cmd()
-        local cmd = { "clangd" }
+        local cmd = { "clangd", "--clang-tidy" }
         local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
         if compile_commands_dir then
           table.insert(cmd, "--compile-commands-dir=" .. compile_commands_dir)
@@ -1319,6 +1326,7 @@ return {
 
       vim.lsp.config("clangd", {
         cmd = clangd_cmd(),
+        capabilities = require("config.inactive_regions").capabilities(),
         root_dir = firmware_root_dir,
       })
 

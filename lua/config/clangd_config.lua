@@ -23,6 +23,13 @@ CompileFlags:
     - -fno-reorder-functions
     - -fno-defer-pop
     - -fno-printf-return-value
+
+# clangd 20 ignores --clang-tidy-checks. Enable the desired check here so it
+# applies without adding a .clang-tidy file to each project.
+Diagnostics:
+  ClangTidy:
+    Add:
+      - cert-err33-c
 ]]
 
 local function config_path()

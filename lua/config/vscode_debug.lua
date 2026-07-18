@@ -98,6 +98,7 @@ function M.expand_vscode_vars(value, task_root)
   value = value:gsub("%${workspaceFolder}", task_root)
   value = value:gsub("%${workspaceRoot}", task_root)
   value = value:gsub("%${cwd}", vim.uv.cwd() or task_root)
+  value = value:gsub("%${userHome}", vim.env.HOME or vim.fn.expand("~"))
   value = value:gsub("%${env:([^}]+)}", function(name)
     return vim.env[name] or ""
   end)
@@ -273,6 +274,21 @@ local function replace_input_vars(value, input_values)
   return expanded
 end
 
+local function expand_task_vars(value, root)
+  if type(value) == "string" then
+    return M.expand_vscode_vars(value, root)
+  end
+  if type(value) ~= "table" then
+    return value
+  end
+
+  local expanded = {}
+  for key, item in pairs(value) do
+    expanded[key] = expand_task_vars(item, root)
+  end
+  return expanded
+end
+
 local function prompt_task_inputs(task, tasks, definitions, supplied, callback)
   local ids = {}
   collect_input_ids(task, tasks, {}, ids)
@@ -311,11 +327,11 @@ local function build_task_cmd(task, tasks, job)
   for _, dep_label in ipairs(deps) do
     local dep = find_task_by_label(tasks, dep_label)
     if dep then
-      table.insert(commands, job.clean_command(dep.command, dep.options))
+      table.insert(commands, job.clean_command(dep.command, dep.options, dep.args))
     end
   end
   if task.command then
-    table.insert(commands, job.clean_command(task.command, task.options))
+    table.insert(commands, job.clean_command(task.command, task.options, task.args))
   end
   return table.concat(commands, " && ")
 end
@@ -337,7 +353,7 @@ function M.run_task(label, supplied_inputs)
   end
 
   prompt_task_inputs(task, tasks, definitions, supplied_inputs, function(input_values)
-    local expanded_tasks = replace_input_vars(tasks, input_values)
+    local expanded_tasks = expand_task_vars(replace_input_vars(tasks, input_values), M.find_task_root())
     local expanded_task = find_task_by_label(expanded_tasks, label)
     local cmd = build_task_cmd(expanded_task, expanded_tasks, job)
     if cmd == "" then

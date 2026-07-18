@@ -5,15 +5,28 @@ local function workspace_root()
   return vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
 end
 
+local function copy_selected_path(selected, opts)
+  local entry = require("fzf-lua.path").entry_to_file(selected[1], opts)
+  require("config.file_utils").copy_path(entry.path)
+end
+
+local function copy_path_action()
+  return {
+    actions = {
+      ["ctrl-y"] = { fn = copy_selected_path, exec_silent = true },
+    },
+  }
+end
+
 return {
   {
     "ibhagwan/fzf-lua",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     cmd = "FzfLua",
     keys = {
-      { "<C-p>",      function() require("fzf-lua").files() end,                desc = "Find files" },
-      { "<leader>ff", function() require("fzf-lua").files() end,                desc = "Find files" },
-      { "<leader>fg", function() require("fzf-lua").live_grep() end,            desc = "Live grep" },
+      { "<C-p>",      function() require("fzf-lua").files(copy_path_action()) end,     desc = "Find files" },
+      { "<leader>ff", function() require("fzf-lua").files(copy_path_action()) end,     desc = "Find files" },
+      { "<leader>fg", function() require("fzf-lua").live_grep(copy_path_action()) end, desc = "Live grep" },
       {
         "<leader>fw",
         function()

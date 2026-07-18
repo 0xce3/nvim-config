@@ -11,6 +11,14 @@ vim.filetype.add({
     conf = "kconf",
     http = "http",
     rest = "http",
+    bb = "bitbake",
+    bbappend = "bitbake",
+    bbclass = "bitbake",
+  },
+  pattern = {
+    [".*/conf/.*%.conf"] = "bitbake",
+    [".*/recipes%-.*/.*%.inc"] = "bitbake",
+    [".*/classes/.*%.inc"] = "bitbake",
   },
 })
 

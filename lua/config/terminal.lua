@@ -44,6 +44,10 @@ local function open()
   if buf_ok() then
     vim.api.nvim_set_current_buf(state.buf)
   else
+    -- Telescope's prompt buffer is modified while a task is selected, and
+    -- :terminal cannot replace a modified buffer. Switch this window to a
+    -- fresh buffer first, preserving the original buffer via 'hidden'.
+    vim.cmd("enew!")
     vim.cmd("terminal")
     capture()
   end
