@@ -18,6 +18,7 @@ return {
       opts.window.mappings = opts.window.mappings or {}
       opts.window.mappings["<Tab>"] = "next_source"
       opts.window.mappings["<S-Tab>"] = "prev_source"
+      opts.window.mappings["<leader>tr"] = function() end
       opts.filesystem = vim.tbl_deep_extend("force", opts.filesystem or {}, {
         bind_to_cwd = true,
         follow_current_file = { enabled = true },

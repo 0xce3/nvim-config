@@ -4,7 +4,54 @@
 --       as this provides autocomplete and documentation while editing
 
 ---@type LazySpec
+local function project_header()
+  local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+  local project = vim.fs.basename(root or vim.uv.cwd())
+  local files = vim.fn.systemlist({ "git", "-C", root, "ls-files" })
+  local languages = {}
+  local seen = {}
+  local extensions = {
+    [".c"] = "C",
+    [".h"] = "C/C++",
+    [".cpp"] = "C++",
+    [".hpp"] = "C++",
+    [".lua"] = "Lua",
+    [".py"] = "Python",
+    [".rs"] = "Rust",
+    [".js"] = "JavaScript",
+    [".ts"] = "TypeScript",
+    [".yaml"] = "YAML",
+    [".yml"] = "YAML",
+  }
+
+  for _, file in ipairs(files) do
+    local extension = file:match("(%.[^./]+)$")
+    local language = extensions[extension]
+    if language and not seen[language] then
+      seen[language] = true
+      languages[#languages + 1] = language
+    end
+  end
+  table.sort(languages)
+
+  local branch = vim.fn.systemlist({ "git", "-C", root, "branch", "--show-current" })[1] or ""
+  local status = vim.fn.systemlist({ "git", "-C", root, "status", "--short" })
+  local state = #status == 0 and "clean" or (#status .. " changed")
+  local language_text = #languages > 0 and table.concat(languages, ", ") or "unknown"
+
+  return table.concat({
+    "  0xc3 NVIM",
+    "",
+    "  Project  " .. project,
+    "  Root     " .. root,
+    "  Branch   " .. (branch ~= "" and branch or "detached HEAD"),
+    "  Status   " .. state,
+    "  Languages " .. language_text,
+  }, "\n")
+end
+
 return {
+  {
   "AstroNvim/astroui",
   init = function()
     vim.api.nvim_create_autocmd({ "BufModifiedSet", "DiagnosticChanged" }, {
@@ -25,11 +72,14 @@ return {
         TabLineSel = { bg = "#32302f", fg = "#ebdbb2", bold = true },
       },
     },
-    status = {
-      colors = {
-        git_branch_fg = "#d3869b",
-      },
-      components = {
+      status = {
+        colors = {
+          git_branch_fg = "#d3869b",
+        },
+        winbar = {
+          enabled = {},
+        },
+        components = {
         tabline_file_info = {
           hl = function(self)
             local error_count = #vim.diagnostic.get(self.bufnr, {
@@ -55,6 +105,17 @@ return {
       LSPLoading8 = "⠧",
       LSPLoading9 = "⠇",
       LSPLoading10 = "⠏",
+    },
+  },
+  },
+  {
+    "folke/snacks.nvim",
+    opts = {
+      dashboard = {
+        preset = {
+          header = project_header(),
+        },
+      },
     },
   },
 }
