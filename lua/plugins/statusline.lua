@@ -24,6 +24,40 @@ return {
           },
         },
       }
+      table.insert(opts.statusline, 9, status.component.builder {
+        condition = function()
+          local terminal = require("config.terminal")
+          return terminal.task_status() ~= nil or terminal.is_task_running()
+        end,
+        {
+          provider = function()
+            return require("astroui").get_icon("Package", 1, true)
+          end,
+          hl = { fg = "#ebdbb2" },
+        },
+        {
+          provider = function()
+            return "Task: " .. (require("config.terminal").task_label() or "Task") .. " "
+          end,
+          hl = { fg = "#ebdbb2" },
+        },
+        {
+          provider = function()
+            local terminal = require("config.terminal")
+            local task_status = terminal.task_status()
+            if task_status == "success" then return "successful" end
+            if task_status == "failed" then return "failed" end
+            return "running " .. terminal.task_spinner()
+          end,
+          hl = function()
+            local task_status = require("config.terminal").task_status()
+            if task_status == "success" then return { fg = "#b8bb26", bold = true } end
+            if task_status == "failed" then return { fg = "#fb4934", bold = true } end
+            return { fg = "#fabd2f", bold = true }
+          end,
+        },
+        surround = { separator = "right" },
+      })
     end,
   },
 }

@@ -9,7 +9,38 @@ local state = {
   buf = nil,
   chan = nil,
   previous_buf = nil,
+  task_running = false,
+  task_status = nil,
+  task_label = nil,
+  spinner = 1,
+  marker = nil,
 }
+
+local function redraw_spinner()
+  if not state.task_running then return end
+  vim.cmd("redrawstatus")
+  vim.defer_fn(redraw_spinner, 120)
+end
+
+local function mark_task_complete()
+  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(state.buf, 0, -1, false)) do
+    local exit_code = state.marker and line:match(vim.pesc(state.marker) .. ":(%d+)")
+    if exit_code then
+      exit_code = tonumber(exit_code)
+      state.task_running = false
+      state.marker = nil
+      state.task_status = exit_code == 0 and "success" or "failed"
+      vim.cmd("redrawstatus")
+      if exit_code == 0 then
+        vim.notify("Task completed successfully", vim.log.levels.INFO, { title = "Task Terminal" })
+      else
+        vim.notify("Task failed with exit code " .. exit_code, vim.log.levels.ERROR, { title = "Task Terminal" })
+      end
+      return
+    end
+  end
+end
 
 local function buf_ok()
   return state.buf ~= nil and vim.api.nvim_buf_is_valid(state.buf)
@@ -17,6 +48,25 @@ end
 
 function M.is_terminal_buffer(bufnr)
   return buf_ok() and bufnr == state.buf
+end
+
+function M.is_task_running()
+  return state.task_running
+end
+
+function M.task_status()
+  return state.task_status
+end
+
+function M.task_label()
+  return state.task_label
+end
+
+function M.task_spinner()
+  local ok, astroui = pcall(require, "astroui")
+  if not ok then return "..." end
+  local frames = astroui.get_spinner("LSPLoading", 1) or { "..." }
+  return frames[math.floor(vim.uv.hrtime() / 120000000) % #frames + 1]
 end
 
 local function capture()
@@ -30,12 +80,18 @@ local function capture()
     pcall(vim.api.nvim_buf_delete, existing, { force = true })
   end
   vim.api.nvim_buf_set_name(state.buf, "Task Terminal")
+  vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+    buffer = state.buf,
+    silent = true,
+    desc = "Leave task terminal mode",
+  })
+  vim.api.nvim_buf_attach(state.buf, false, { on_lines = mark_task_complete })
 
   vim.api.nvim_create_autocmd("TermClose", {
     buffer = state.buf,
     once = true,
     callback = function()
-      state.buf, state.chan = nil, nil
+      state.buf, state.chan, state.task_running = nil, nil, false
     end,
   })
 end
@@ -45,9 +101,10 @@ local function open()
     vim.api.nvim_set_current_buf(state.buf)
   else
     -- Telescope's prompt buffer is modified while a task is selected, and
-    -- :terminal cannot replace a modified buffer. Switch this window to a
-    -- fresh buffer first, preserving the original buffer via 'hidden'.
-    vim.cmd("enew!")
+    -- :terminal cannot replace a modified buffer. Use a scratch buffer first
+    -- so special buffers such as Neo-tree remain untouched.
+    local scratch = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(scratch)
     vim.cmd("terminal")
     capture()
   end
@@ -70,7 +127,7 @@ function M.toggle()
   open()
 end
 
-function M.run(command)
+function M.run(command, label)
   if not command or command == "" then
     return
   end
@@ -93,7 +150,17 @@ function M.run(command)
 
   local function send()
     if state.chan then
-      vim.fn.chansend(state.chan, command .. "\n")
+      state.task_running = true
+      state.task_status = nil
+      state.task_label = label or "Task"
+      state.spinner = 1
+      state.marker = "__NVIM_TASK_DONE_" .. tostring(vim.loop.hrtime()) .. "__"
+      vim.cmd("redrawstatus")
+      redraw_spinner()
+      vim.fn.chansend(
+        state.chan,
+        "{ " .. command .. "; }; task_exit=$?; printf '\\n" .. state.marker .. ":%s\\n' \"$task_exit\"\n"
+      )
     end
   end
 

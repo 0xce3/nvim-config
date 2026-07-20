@@ -362,6 +362,7 @@ function M.run_task(label, supplied_inputs)
     end
 
     -- Run every VS Code task through the reusable in-Nvim terminal buffer.
+    notify("Task started: " .. expanded_task.label, vim.log.levels.INFO)
     if expanded_task.dependsOn ~= nil then
       job.run_dependent_tasks(expanded_task, expanded_tasks)
     else

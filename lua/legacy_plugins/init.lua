@@ -572,7 +572,7 @@ return {
         if opts == nil or opts.terminal == false then
           return
         end
-        term.run(opts.command)
+        term.run(opts.command, opts.label)
       end
 
       local function find_task_by_label(tasks, label)
