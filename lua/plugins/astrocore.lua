@@ -56,7 +56,11 @@ return {
             vim.bo[args.buf].syntax = ""
             vim.cmd("syntax off")
             vim.cmd("unlet! b:current_syntax")
-            vim.cmd("syntax on")
+            vim.schedule(function()
+              if not vim.api.nvim_buf_is_valid(args.buf) then return end
+              pcall(vim.treesitter.stop, args.buf)
+              vim.api.nvim_buf_call(args.buf, function() vim.cmd("syntax on") end)
+            end)
           end,
           desc = "Detect CSV delimiter before applying syntax highlighting",
         },
