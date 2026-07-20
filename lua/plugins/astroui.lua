@@ -20,6 +20,9 @@ return {
       init = {
         StatusLine = { bg = "#282828", fg = "#ebdbb2" },
         StatusLineNC = { bg = "#282828", fg = "#a89984" },
+        TabLine = { bg = "#32302f", fg = "#a89984" },
+        TabLineFill = { bg = "#32302f", fg = "#a89984" },
+        TabLineSel = { bg = "#32302f", fg = "#ebdbb2", bold = true },
       },
     },
     status = {

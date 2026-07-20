@@ -28,6 +28,8 @@ return {
         },
       })
       opts.source_selector = vim.tbl_deep_extend("force", opts.source_selector or {}, {
+        winbar = false,
+        statusline = true,
         separator = "|",
         separator_active = "|",
         highlight_background = "NeoTreeTabInactive",
@@ -37,10 +39,10 @@ return {
     end,
     init = function()
       local function apply_source_tab_colors()
-        vim.api.nvim_set_hl(0, "NeoTreeTabInactive", { fg = "#a89984", bg = "#3c3836" })
-        vim.api.nvim_set_hl(0, "NeoTreeTabActive", { fg = "#ebdbb2", bg = "#504945", bold = true })
-        vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorInactive", { fg = "#7c6f64", bg = "#3c3836" })
-        vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorActive", { fg = "#a89984", bg = "#504945" })
+        vim.api.nvim_set_hl(0, "NeoTreeTabInactive", { fg = "#a89984", bg = "#32302f" })
+        vim.api.nvim_set_hl(0, "NeoTreeTabActive", { fg = "#ebdbb2", bg = "#32302f", bold = true })
+        vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorInactive", { fg = "#7c6f64", bg = "#32302f" })
+        vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorActive", { fg = "#a89984", bg = "#32302f" })
          vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#ebdbb2", bold = true })
          vim.api.nvim_set_hl(0, "NeoTreeDirectoryIcon", { fg = "#ebdbb2", bold = true })
          vim.api.nvim_set_hl(0, "NeoTreeFileName", { fg = "#bdae93" })
