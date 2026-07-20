@@ -15,6 +15,10 @@ if ok then
   }
 end
 
+-- Keep normal Vim yanks/deletes local. Use the explicit "+ register mappings
+-- below for the system clipboard so OSC52 cannot shadow the unnamed register.
+vim.opt.clipboard = ""
+
 vim.keymap.set("v", "<C-c>", '"+y', { desc = "Copy selection to system clipboard" })
 vim.keymap.set("n", "<C-v>", '"+p', { desc = "Paste from system clipboard" })
 vim.keymap.set("i", "<C-v>", '<C-r>+', { desc = "Paste from system clipboard" })
