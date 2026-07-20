@@ -191,7 +191,7 @@ function M.build_dap_config(launch, task_root)
     request = request,
     program = M.expand_vscode_vars(program, task_root),
     args = expand_vscode_value(launch.args or {}, task_root),
-    stopAtEntry = launch.stopAtEntry == true,
+    stopAtEntry = true,
     cwd = M.expand_vscode_vars(launch.cwd or task_root, task_root),
     environment = expand_vscode_value(launch.environment or {}, task_root),
     externalConsole = launch.externalConsole == true,
@@ -200,11 +200,16 @@ function M.build_dap_config(launch, task_root)
     miDebuggerServerAddress = M.expand_vscode_vars(debugger_server_address(launch), task_root),
     setupCommands = expand_vscode_value(launch.setupCommands or {}, task_root),
     customLaunchSetupCommands = expand_vscode_value(launch.customLaunchSetupCommands, task_root),
-    launchCompleteCommand = launch.launchCompleteCommand,
+    launchCompleteCommand = launch.launchCompleteCommand
+      or (launch.miDebuggerServerAddress and "None" or nil),
     sourceFileMap = expand_vscode_value(launch.sourceFileMap, task_root),
     symbolSearchPath = M.expand_vscode_vars(launch.symbolSearchPath, task_root),
     additionalSOLibSearchPath = M.expand_vscode_vars(launch.additionalSOLibSearchPath, task_root),
   }
+
+  if config.miDebuggerPath:match("arm%-zephyr%-eabi") then
+    config.targetArchitecture = launch.targetArchitecture or "arm"
+  end
 
   for _, key in ipairs({ "targetArchitecture", "processId", "coreDumpPath", "serverStarted", "filterStderr", "filterStdout" }) do
     if launch[key] ~= nil then
@@ -336,7 +341,7 @@ local function build_task_cmd(task, tasks, job)
   return table.concat(commands, " && ")
 end
 
-function M.run_task(label, supplied_inputs)
+function M.run_task(label, supplied_inputs, debug_terminal)
   local job   = require("vstask.Job")
   local config = load_tasks_config(M.find_task_root())
   local tasks = config.tasks or {}
@@ -363,7 +368,9 @@ function M.run_task(label, supplied_inputs)
 
     -- Run every VS Code task through the reusable in-Nvim terminal buffer.
     notify("Task started: " .. expanded_task.label, vim.log.levels.INFO)
-    if expanded_task.dependsOn ~= nil then
+    if debug_terminal then
+      require("config.terminal").run_debug(cmd)
+    elseif expanded_task.dependsOn ~= nil then
       job.run_dependent_tasks(expanded_task, expanded_tasks)
     else
       job.start_job({
@@ -683,6 +690,7 @@ function M.run_launch(name)
     id = "cppdbg",
     type = "executable",
     command = adapter_path,
+    args = { "--engineLogging=" .. vim.fs.joinpath(vim.fn.stdpath("cache"), "cpptools-engine.log") },
     options = {
       detached = false,
     },
@@ -727,7 +735,7 @@ function M.run_launch(name)
   if host == nil or port == nil then
     if type(launch.preLaunchTask) == "string" then
       notify("Starting " .. launch.preLaunchTask)
-      if not M.run_task(launch.preLaunchTask) then
+       if not M.run_task(launch.preLaunchTask, nil, true) then
         return
       end
     end
@@ -744,7 +752,7 @@ function M.run_launch(name)
 
       if type(launch.preLaunchTask) == "string" then
         notify("Starting " .. launch.preLaunchTask)
-        if not M.run_task(launch.preLaunchTask) then
+         if not M.run_task(launch.preLaunchTask, nil, true) then
           return
         end
       end
@@ -829,6 +837,8 @@ end
 function M.cleanup()
   local dap = require("dap")
   local ok_dapui, dapui = pcall(require, "dapui")
+  pcall(require("config.terminal").stop_task)
+  pcall(require("config.terminal").stop_debug)
 
   if dap.session() ~= nil then
     pcall(dap.terminate)
@@ -917,12 +927,25 @@ function M.setup()
 
   -- Open only the side panel on start; the reusable terminal owns task output.
   dap.listeners.after.event_initialized["dapui_config"] = function()
-    dapui.open({ layout = 1, reset = true })
+    dapui.open({ reset = true })
+    local session = dap.session()
+    if session and session.config and session.config.miDebuggerServerAddress then
+      vim.defer_fn(function()
+        if dap.session() == session then pcall(dap.pause) end
+      end, 500)
+    end
+  end
+  dap.listeners.after.event_stopped["dapui_refresh"] = function()
+    dapui.open()
   end
   dap.listeners.before.event_terminated["dapui_config"] = function()
+    pcall(require("config.terminal").stop_task)
+    pcall(require("config.terminal").stop_debug)
     dapui.close()
   end
   dap.listeners.before.event_exited["dapui_config"] = function()
+    pcall(require("config.terminal").stop_task)
+    pcall(require("config.terminal").stop_debug)
     dapui.close()
   end
   local function stop_post_debug_task_once(session)

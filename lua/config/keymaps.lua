@@ -334,6 +334,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
+map("n", "<leader>td", function() require("config.terminal").toggle_debug() end, { desc = "Toggle debug terminal" })
 
 vim.api.nvim_create_user_command("Term", function(opts)
   require("config.file_utils").open_terminal(opts.args ~= "" and opts.args or nil)

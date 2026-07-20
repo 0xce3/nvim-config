@@ -7,5 +7,6 @@ return {
   "AstroNvim/astrocommunity",
   { import = "astrocommunity.pack.lua" },
   { import = "astrocommunity.recipes.picker-lsp-mappings" },
+  { import = "astrocommunity.programming-language-support.kulala-nvim" },
   -- import/override with your plugins folder
 }

@@ -16,6 +16,8 @@ local state = {
   marker = nil,
 }
 
+local debug_state = { buf = nil, chan = nil, previous_buf = nil }
+
 local function redraw_spinner()
   if not state.task_running then return end
   vim.cmd("redrawstatus")
@@ -171,6 +173,83 @@ function M.run(command, label)
   end
 end
 
+function M.run_debug(command)
+  if not command or command == "" then return end
+  if debug_state.buf and vim.api.nvim_buf_is_valid(debug_state.buf) then
+    vim.api.nvim_set_current_buf(debug_state.buf)
+    vim.fn.chansend(debug_state.chan, command .. "\n")
+    vim.cmd("startinsert")
+    return
+  end
+
+  debug_state.previous_buf = vim.api.nvim_get_current_buf()
+  local scratch = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(scratch)
+  vim.cmd("terminal")
+  debug_state.buf = vim.api.nvim_get_current_buf()
+  debug_state.chan = vim.b[debug_state.buf].terminal_job_id
+  vim.bo[debug_state.buf].buflisted = true
+  vim.bo[debug_state.buf].bufhidden = "hide"
+  vim.api.nvim_buf_set_name(debug_state.buf, "Debug Terminal")
+  vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+    buffer = debug_state.buf,
+    silent = true,
+    desc = "Leave debug terminal mode",
+  })
+  vim.keymap.set("t", "<C-c>", function() M.stop_debug_session() end, {
+    buffer = debug_state.buf,
+    silent = true,
+    desc = "Stop debug session",
+  })
+  vim.api.nvim_create_autocmd("TermClose", {
+    buffer = debug_state.buf,
+    once = true,
+    callback = function()
+      debug_state.buf, debug_state.chan = nil, nil
+      vim.schedule(function()
+        local dap = require("dap")
+        if dap.session() then pcall(dap.terminate) end
+      end)
+    end,
+  })
+  vim.defer_fn(function()
+    if debug_state.chan then vim.fn.chansend(debug_state.chan, command .. "\n") end
+  end, 150)
+  vim.defer_fn(function()
+    if debug_state.buf and vim.api.nvim_buf_is_valid(debug_state.buf) then
+      vim.api.nvim_set_current_buf(debug_state.buf)
+      vim.cmd("startinsert")
+    end
+  end, 500)
+end
+
+function M.toggle_debug()
+  if not debug_state.buf or not vim.api.nvim_buf_is_valid(debug_state.buf) then
+    vim.notify("Debug terminal is not running", vim.log.levels.WARN, { title = "debug" })
+    return
+  end
+  local current = vim.api.nvim_get_current_buf()
+  if current == debug_state.buf then
+    if debug_state.previous_buf and vim.api.nvim_buf_is_valid(debug_state.previous_buf) then
+      vim.api.nvim_set_current_buf(debug_state.previous_buf)
+    end
+  else
+    debug_state.previous_buf = current
+    vim.api.nvim_set_current_buf(debug_state.buf)
+    vim.cmd("startinsert")
+  end
+end
+
+function M.stop_debug()
+  if debug_state.chan then vim.fn.chansend(debug_state.chan, "\003") end
+end
+
+function M.stop_debug_session()
+  M.stop_debug()
+  local dap = require("dap")
+  if dap.session() then pcall(dap.terminate) end
+end
+
 function M.send(keys)
   if not state.chan then
     vim.notify("Task terminal is not running", vim.log.levels.WARN, { title = "terminal" })
@@ -178,6 +257,15 @@ function M.send(keys)
   end
   vim.fn.chansend(state.chan, vim.api.nvim_replace_termcodes(keys, true, false, true))
   return true
+end
+
+function M.stop_task()
+  if not state.chan or not state.task_running then return end
+  vim.fn.chansend(state.chan, "\003")
+  state.task_running = false
+  state.task_status = "failed"
+  state.marker = nil
+  vim.cmd("redrawstatus")
 end
 
 function M.tmux(command)

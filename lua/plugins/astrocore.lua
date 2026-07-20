@@ -80,6 +80,10 @@ return {
           function() require("config.terminal").toggle() end,
           desc = "Toggle task terminal",
         },
+        ["<leader>td"] = {
+          function() require("config.terminal").toggle_debug() end,
+          desc = "Toggle debug terminal",
+        },
         ["go"] = { "<C-o>", desc = "Jump back" },
         ["<Leader>gl"] = {
           function()
