@@ -26,20 +26,44 @@ return {
     filetypes = {
       -- see `:h vim.filetype.add` for usage
       extension = {
-          conf = "kconf",
-          http = "http",
-          rest = "http",
-          bb = "bitbake",
-          bbappend = "bitbake",
-          bbclass = "bitbake",
-      },
-      filename = {
-          [".*/conf/.*%.conf"] = "bitbake",
+        conf = "kconf",
+        yaml = "yaml",
+        yml = "yaml",
+        http = "http",
+        rest = "http",
+        bb = "bitbake",
+        bbappend = "bitbake",
+        bbclass = "bitbake",
       },
       pattern = {
-          [".*/recipes%-.*/.*%.inc"] = "bitbake",
-          [".*/classes/.*%.inc"] = "bitbake",
+        [".*/conf/.*%.conf"] = "bitbake",
+        [".*/recipes%-.*/.*%.inc"] = "bitbake",
+        [".*/classes/.*%.inc"] = "bitbake",
       },
+    },
+    autocmds = {
+      csv_delimiter = {
+        {
+          event = "FileType",
+          pattern = "csv",
+          callback = function(args)
+            local line = vim.api.nvim_buf_get_lines(args.buf, 0, 1, false)[1] or ""
+            local semicolons = select(2, line:gsub(";", ""))
+            local commas = select(2, line:gsub(",", ""))
+            local delimiter = semicolons > commas and ";" or ","
+
+            vim.b[args.buf].csv_delimiter = delimiter
+            vim.bo[args.buf].syntax = ""
+            vim.cmd("syntax off")
+            vim.cmd("unlet! b:current_syntax")
+            vim.cmd("syntax on")
+          end,
+          desc = "Detect CSV delimiter before applying syntax highlighting",
+        },
+      },
+    },
+    treesitter = {
+      ensure_installed = { "yaml" },
     },
     -- vim options can be configured here
     options = {
@@ -83,6 +107,10 @@ return {
         ["<leader>td"] = {
           function() require("config.terminal").toggle_debug() end,
           desc = "Toggle debug terminal",
+        },
+        ["<leader>c"] = {
+          function() require("astrocore.buffer").close(0, false) end,
+          desc = "Close buffer",
         },
         ["go"] = { "<C-o>", desc = "Jump back" },
         ["<Leader>gl"] = {

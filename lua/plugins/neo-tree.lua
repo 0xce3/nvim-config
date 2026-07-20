@@ -1,6 +1,18 @@
 return {
   {
     "nvim-neo-tree/neo-tree.nvim",
+    specs = {
+      {
+        "nvim-mini/mini.icons",
+        optional = true,
+        opts = {
+          file = {
+            ["README.md"] = { glyph = "󰈙", hl = "MiniIconsGrey" },
+            ["requirements.txt"] = { glyph = "󰈙", hl = "MiniIconsGrey" },
+          },
+        },
+      },
+    },
     opts = function(_, opts)
       opts.window = opts.window or {}
       opts.window.mappings = opts.window.mappings or {}
@@ -8,7 +20,7 @@ return {
       opts.window.mappings["<S-Tab>"] = "prev_source"
       opts.filesystem = vim.tbl_deep_extend("force", opts.filesystem or {}, {
         bind_to_cwd = true,
-        follow_current_file = { enabled = false },
+        follow_current_file = { enabled = true },
         filtered_items = {
           visible = true,
           hide_dotfiles = false,
@@ -29,8 +41,10 @@ return {
         vim.api.nvim_set_hl(0, "NeoTreeTabActive", { fg = "#ebdbb2", bg = "#504945", bold = true })
         vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorInactive", { fg = "#7c6f64", bg = "#3c3836" })
         vim.api.nvim_set_hl(0, "NeoTreeTabSeparatorActive", { fg = "#a89984", bg = "#504945" })
-        vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#ebdbb2", bold = true })
-        vim.api.nvim_set_hl(0, "NeoTreeDirectoryIcon", { fg = "#ebdbb2", bold = true })
+         vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#ebdbb2", bold = true })
+         vim.api.nvim_set_hl(0, "NeoTreeDirectoryIcon", { fg = "#ebdbb2", bold = true })
+         vim.api.nvim_set_hl(0, "NeoTreeFileName", { fg = "#bdae93" })
+         vim.api.nvim_set_hl(0, "NeoTreeFileNameOpened", { fg = "#d5c4a1" })
         vim.api.nvim_set_hl(0, "NeoTreeGitAdded", { fg = "#b8bb26" })
         vim.api.nvim_set_hl(0, "NeoTreeGitUntracked", { fg = "#b8bb26" })
         vim.api.nvim_set_hl(0, "NeoTreeGitModified", { fg = "#fabd2f" })

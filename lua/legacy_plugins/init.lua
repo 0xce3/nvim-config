@@ -633,9 +633,6 @@ return {
       map("n", "<leader>tr", function()
         require("config.vscode_debug").pick_task()
       end, { desc = "Run VS Code task" })
-      map("n", "<leader>cc", function()
-        require("config.vscode_debug").run_task("Compliance check with fix (Delta)")
-      end, { desc = "Compliance fix delta" })
       map("n", "<leader>tt", function()
         require("vstask").jobs()
       end, { desc = "Show task jobs" })
@@ -762,6 +759,8 @@ return {
       })
 
       vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#83a598" })
+      vim.api.nvim_set_hl(0, "NeoTreeFileName", { fg = "#bdae93" })
+      vim.api.nvim_set_hl(0, "NeoTreeFileNameOpened", { fg = "#d5c4a1" })
       vim.api.nvim_set_hl(0, "NeoTreeGitAdded", { fg = "#b8bb26" })
       vim.api.nvim_set_hl(0, "NeoTreeGitModified", { fg = "#fabd2f" })
       vim.api.nvim_set_hl(0, "NeoTreeGitUntracked", { fg = "#b8bb26" })
@@ -1122,7 +1121,7 @@ return {
         },
         highlight = {
           enable = true,
-          disable = { "markdown", "markdown_inline" },
+           disable = { "csv", "markdown", "markdown_inline" },
         },
         indent = {
           enable = true,

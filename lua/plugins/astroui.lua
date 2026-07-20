@@ -6,6 +6,12 @@
 ---@type LazySpec
 return {
   "AstroNvim/astroui",
+  init = function()
+    vim.api.nvim_create_autocmd({ "BufModifiedSet", "DiagnosticChanged" }, {
+      callback = function() vim.schedule(function() vim.cmd.redrawtabline() end) end,
+      desc = "Refresh tabline buffer state",
+    })
+  end,
   ---@type AstroUIOpts
   opts = {
     -- change colorscheme
@@ -19,6 +25,18 @@ return {
     status = {
       colors = {
         git_branch_fg = "#d3869b",
+      },
+      components = {
+        tabline_file_info = {
+          hl = function(self)
+            local error_count = #vim.diagnostic.get(self.bufnr, {
+              severity = vim.diagnostic.severity.ERROR,
+            })
+            if error_count > 0 then return { fg = "#fb4934", bold = true } end
+            if vim.bo[self.bufnr].modified then return { fg = "#fe8019", bold = true } end
+            return require("astroui.status.hl").get_attributes(self.tab_type)
+          end,
+        },
       },
     },
     -- Icons can be configured throughout the interface

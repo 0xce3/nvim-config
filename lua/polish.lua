@@ -16,6 +16,8 @@ if ok then
 end
 
 vim.keymap.set("v", "<C-c>", '"+y', { desc = "Copy selection to system clipboard" })
+vim.keymap.set("n", "<C-v>", '"+p', { desc = "Paste from system clipboard" })
+vim.keymap.set("i", "<C-v>", '<C-r>+', { desc = "Paste from system clipboard" })
 vim.keymap.set("v", "<C-x>", '"+d', { desc = "Cut selection to system clipboard" })
 
 -- Set this after all AstroNvim plugin specs so no Git mapping can shadow it.
