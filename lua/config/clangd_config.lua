@@ -17,6 +17,7 @@ local CONTENT = MARKER .. [[
 CompileFlags:
   Remove:
     - -mfp16-format*
+    - -fno-freestanding
     - -mtp=*
     - -specs=*
     - --param*

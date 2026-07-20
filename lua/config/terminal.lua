@@ -80,7 +80,16 @@ function M.run(command)
   if not (buf_ok() and current == state.buf) then
     state.previous_buf = current
   end
-  open()
+
+  if fresh then
+    -- Create the reusable terminal in the current window, then immediately
+    -- restore the user's buffer. Tasks remain visible through F12/<leader>tj.
+    open()
+    if vim.api.nvim_buf_is_valid(current) then
+      vim.api.nvim_set_current_buf(current)
+      vim.cmd("stopinsert")
+    end
+  end
 
   local function send()
     if state.chan then
