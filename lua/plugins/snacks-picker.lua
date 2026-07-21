@@ -3,6 +3,11 @@ return {
     "folke/snacks.nvim",
     opts = function(_, opts)
       opts.picker = opts.picker or {}
+      opts.picker.sources = opts.picker.sources or {}
+      opts.picker.sources.files = opts.picker.sources.files or {}
+      opts.picker.sources.files.hidden = true
+      opts.picker.sources.grep = opts.picker.sources.grep or {}
+      opts.picker.sources.grep.hidden = true
       opts.picker.win = opts.picker.win or {}
       opts.picker.win.input = opts.picker.win.input or {}
       opts.picker.win.input.keys = opts.picker.win.input.keys or {}

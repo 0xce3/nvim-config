@@ -27,7 +27,7 @@ return {
       table.insert(opts.statusline, 9, status.component.builder {
         condition = function()
           local terminal = require("config.terminal")
-          return terminal.task_status() ~= nil or terminal.is_task_running()
+          return terminal.task_status() ~= nil or terminal.is_task_running() or terminal.is_debug_waiting()
         end,
         {
           provider = function()
@@ -37,13 +37,15 @@ return {
         },
         {
           provider = function()
-            return "Task: " .. (require("config.terminal").task_label() or "Task") .. " "
+            local terminal = require("config.terminal")
+            return (terminal.is_debug_waiting() and "DAP: " .. terminal.debug_wait_label() or "Task: " .. (terminal.task_label() or "Task")) .. " "
           end,
           hl = { fg = "#ebdbb2" },
         },
         {
           provider = function()
             local terminal = require("config.terminal")
+            if terminal.is_debug_waiting() then return "waiting " .. terminal.task_spinner() end
             local task_status = terminal.task_status()
             if task_status == "success" then return "successful" end
             if task_status == "failed" then return "failed" end

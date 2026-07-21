@@ -184,6 +184,11 @@ function M.build_dap_config(launch, task_root)
   end
   local program = launch.program or launch.executable
   local debugger_path = launch.miDebuggerPath or launch.gdbpath or "/usr/bin/gdb"
+  debugger_path = M.expand_vscode_vars(debugger_path, task_root)
+  if debugger_path == "" or vim.fn.executable(debugger_path) ~= 1 then
+    local toolchain_gdb = vim.fn.exepath("arm-zephyr-eabi-gdb")
+    debugger_path = toolchain_gdb ~= "" and toolchain_gdb or debugger_path
+  end
 
   local config = {
     name = launch.name,
@@ -191,12 +196,12 @@ function M.build_dap_config(launch, task_root)
     request = request,
     program = M.expand_vscode_vars(program, task_root),
     args = expand_vscode_value(launch.args or {}, task_root),
-    stopAtEntry = true,
+    stopAtEntry = launch.stopAtEntry == true,
     cwd = M.expand_vscode_vars(launch.cwd or task_root, task_root),
     environment = expand_vscode_value(launch.environment or {}, task_root),
     externalConsole = launch.externalConsole == true,
     MIMode = launch.MIMode or "gdb",
-    miDebuggerPath = M.expand_vscode_vars(debugger_path, task_root),
+    miDebuggerPath = debugger_path,
     miDebuggerServerAddress = M.expand_vscode_vars(debugger_server_address(launch), task_root),
     setupCommands = expand_vscode_value(launch.setupCommands or {}, task_root),
     customLaunchSetupCommands = expand_vscode_value(launch.customLaunchSetupCommands, task_root),
@@ -211,7 +216,7 @@ function M.build_dap_config(launch, task_root)
     config.targetArchitecture = launch.targetArchitecture or "arm"
   end
 
-  for _, key in ipairs({ "targetArchitecture", "processId", "coreDumpPath", "serverStarted", "filterStderr", "filterStdout" }) do
+  for _, key in ipairs({ "targetArchitecture", "processId", "coreDumpPath", "serverStarted", "filterStderr", "filterStdout", "stopAtConnect" }) do
     if launch[key] ~= nil then
       config[key] = expand_vscode_value(launch[key], task_root)
     end
@@ -702,14 +707,16 @@ function M.run_launch(name)
   local function run_config()
     if config.request ~= "launch" then
       notify("Starting debug session: " .. config.name)
-      dap.run(config)
+      local ok, err = pcall(dap.run, config)
+      if not ok then notify("DAP start failed: " .. tostring(err), vim.log.levels.ERROR) end
       return
     end
 
     fill_missing_program(config, task_root, function(ok)
       if ok then
         notify("Starting debug session: " .. config.name)
-        dap.run(config)
+        local started, err = pcall(dap.run, config)
+        if not started then notify("DAP start failed: " .. tostring(err), vim.log.levels.ERROR) end
       end
     end)
   end
@@ -720,11 +727,14 @@ function M.run_launch(name)
       return
     end
 
-    notify("Waiting for gdbserver on " .. config.miDebuggerServerAddress)
+    local terminal = require("config.terminal")
+    terminal.start_debug_wait("gdbserver " .. config.miDebuggerServerAddress)
+    notify("Waiting for gdbserver on " .. config.miDebuggerServerAddress, vim.log.levels.INFO)
     wait_for_tcp(host, port, server_timeout_ms(launch), function(ready)
       vim.schedule(function()
+        terminal.stop_debug_wait()
         if not ready then
-          notify("gdbserver did not open " .. config.miDebuggerServerAddress, vim.log.levels.ERROR)
+          notify("gdbserver did not open " .. config.miDebuggerServerAddress .. " before timeout", vim.log.levels.ERROR)
           return
         end
         run_config()
@@ -804,7 +814,8 @@ function M.pick_launch()
         return
       end
       notify("Selected debug launch: " .. choice.name)
-      M.run_launch(choice.name)
+      local ok, err = pcall(M.run_launch, choice.name)
+      if not ok then notify("Debug launch failed: " .. tostring(err), vim.log.levels.ERROR) end
     end)
   end
 
@@ -813,10 +824,10 @@ function M.pick_launch()
     if config.request ~= "launch" then
       table.insert(runnable, launch)
     elseif type(config.program) == "string" and config.program ~= "" then
-      if vim.fn.filereadable(config.program) == 1 then
-        table.insert(runnable, launch)
-        program_by_name[launch.name] = vim.fn.fnamemodify(config.program, ":~:.")
-      end
+      -- Remote/container launches may reference a program that is not visible
+      -- on the host running Neovim. An explicit path is still runnable.
+      table.insert(runnable, launch)
+      program_by_name[launch.name] = vim.fn.fnamemodify(config.program, ":~:.")
     else
       needs_elf_scan = true
     end
@@ -896,11 +907,12 @@ function M.setup()
   vim.api.nvim_set_hl(0, "DapBreakpoint", { fg = "#fb4934", bold = true })
   vim.api.nvim_set_hl(0, "DapBreakpointCondition", { fg = "#fabd2f", bold = true })
   vim.api.nvim_set_hl(0, "DapLogPoint", { fg = "#83a598", bold = true })
-  vim.api.nvim_set_hl(0, "DapStopped", { fg = "#b8bb26", bold = true })
+  vim.api.nvim_set_hl(0, "DapStopped", { fg = "#282828", bg = "#fabd2f", bold = true })
+  vim.api.nvim_set_hl(0, "DapStoppedLine", { bg = "#665c54", fg = "#fbf1c7", bold = true })
   vim.fn.sign_define("DapBreakpoint", { text = "B", texthl = "DapBreakpoint", linehl = "", numhl = "" })
   vim.fn.sign_define("DapBreakpointCondition", { text = "C", texthl = "DapBreakpointCondition", linehl = "", numhl = "" })
   vim.fn.sign_define("DapLogPoint", { text = "L", texthl = "DapLogPoint", linehl = "", numhl = "" })
-  vim.fn.sign_define("DapStopped", { text = ">", texthl = "DapStopped", linehl = "", numhl = "" })
+  vim.fn.sign_define("DapStopped", { text = ">>", texthl = "DapStopped", linehl = "DapStoppedLine", numhl = "DapStopped" })
 
   dapui.setup({
     layouts = {
@@ -929,7 +941,7 @@ function M.setup()
   dap.listeners.after.event_initialized["dapui_config"] = function()
     dapui.open({ reset = true })
     local session = dap.session()
-    if session and session.config and session.config.miDebuggerServerAddress then
+    if session and session.config and session.config.miDebuggerServerAddress and session.config.stopAtConnect == true then
       vim.defer_fn(function()
         if dap.session() == session then pcall(dap.pause) end
       end, 500)

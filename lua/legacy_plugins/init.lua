@@ -1258,7 +1258,11 @@ return {
       end
 
       local function clangd_cmd()
-        local cmd = { "clangd", "--clang-tidy" }
+        local cmd = {
+          "clangd",
+          "--clang-tidy",
+          "--query-driver=**/arm-zephyr-eabi-gcc,**/arm-zephyr-eabi-g++",
+        }
         local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
         if compile_commands_dir then
           table.insert(cmd, "--compile-commands-dir=" .. compile_commands_dir)

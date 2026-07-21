@@ -16,7 +16,7 @@ local state = {
   marker = nil,
 }
 
-local debug_state = { buf = nil, chan = nil, previous_buf = nil }
+local debug_state = { buf = nil, chan = nil, previous_buf = nil, waiting = false, wait_label = nil }
 
 local function redraw_spinner()
   if not state.task_running then return end
@@ -223,6 +223,26 @@ function M.run_debug(command)
   end, 500)
 end
 
+function M.start_debug_wait(label)
+  debug_state.waiting = true
+  debug_state.wait_label = label or "Debug server"
+  vim.cmd("redrawstatus")
+end
+
+function M.stop_debug_wait()
+  debug_state.waiting = false
+  debug_state.wait_label = nil
+  vim.cmd("redrawstatus")
+end
+
+function M.is_debug_waiting()
+  return debug_state.waiting
+end
+
+function M.debug_wait_label()
+  return debug_state.wait_label
+end
+
 function M.toggle_debug()
   if not debug_state.buf or not vim.api.nvim_buf_is_valid(debug_state.buf) then
     vim.notify("Debug terminal is not running", vim.log.levels.WARN, { title = "debug" })
@@ -241,6 +261,7 @@ function M.toggle_debug()
 end
 
 function M.stop_debug()
+  M.stop_debug_wait()
   if debug_state.chan then vim.fn.chansend(debug_state.chan, "\003") end
 end
 

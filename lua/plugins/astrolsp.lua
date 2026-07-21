@@ -37,25 +37,11 @@ return {
     },
     -- enable servers that you already have installed without mason
     servers = {
-        "clangd", "pyright", "ruff",
+        "pyright", "ruff",
     },
     -- customize language server configuration passed to `vim.lsp.config`
     -- client specific configuration can also go in `lsp/` in your configuration root (see `:h lsp-config`)
     config = {
-        clangd = {
-          cmd = (function()
-            local cmd = { "clangd", "--clang-tidy" }
-            local build_dir = vim.env.NVIM_CLANGD_COMPILE_COMMANDS_DIR
-            if not build_dir or build_dir == "" then
-              local ok, store = pcall(require, "config.clangd_build")
-              if ok then build_dir = store.active(vim.fn.getcwd()) end
-            end
-            if build_dir and build_dir ~= "" then
-              table.insert(cmd, "--compile-commands-dir=" .. build_dir)
-            end
-            return cmd
-          end)(),
-        },
     },
     -- customize how language servers are attached
     handlers = {
