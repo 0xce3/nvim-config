@@ -4,6 +4,14 @@
 --       as this provides autocomplete and documentation while editing
 
 ---@type LazySpec
+local function close_buffer(bufnr, force)
+  if vim.bo[bufnr].filetype == "csv" then
+    local ok, csvview = pcall(require, "csvview")
+    if ok then pcall(csvview.disable, bufnr) end
+  end
+  require("astrocore.buffer").close(bufnr, force)
+end
+
 return {
   "AstroNvim/astrocore",
   ---@type AstroCoreOpts
@@ -114,8 +122,12 @@ return {
           desc = "Toggle debug terminal",
         },
         ["<leader>c"] = {
-          function() require("astrocore.buffer").close(0, false) end,
+          function() close_buffer(0, false) end,
           desc = "Close buffer",
+        },
+        ["<leader>C"] = {
+          function() close_buffer(0, true) end,
+          desc = "Force close buffer",
         },
         ["go"] = { "<C-o>", desc = "Jump back" },
         ["<Leader>gl"] = {
@@ -163,7 +175,7 @@ return {
         ["<Leader>bd"] = {
           function()
             require("astroui.status.heirline").buffer_picker(
-              function(bufnr) require("astrocore.buffer").close(bufnr) end
+              function(bufnr) close_buffer(bufnr, false) end
             )
           end,
           desc = "Close buffer from tabline",
