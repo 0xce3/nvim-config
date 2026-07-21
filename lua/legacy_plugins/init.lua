@@ -631,7 +631,8 @@ return {
 
       local map = vim.keymap.set
       map("n", "<leader>tr", function()
-        require("config.vscode_debug").pick_task()
+        local ok, err = pcall(function() require("config.vscode_debug").pick_task() end)
+        if not ok then vim.notify("Could not open VS Code tasks: " .. tostring(err), vim.log.levels.ERROR) end
       end, { desc = "Run VS Code task" })
       map("n", "<leader>tt", function()
         require("vstask").jobs()
