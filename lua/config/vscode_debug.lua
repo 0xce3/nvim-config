@@ -189,6 +189,12 @@ function M.build_dap_config(launch, task_root)
     local toolchain_gdb = vim.fn.exepath("arm-zephyr-eabi-gdb")
     debugger_path = toolchain_gdb ~= "" and toolchain_gdb or debugger_path
   end
+  local setup_commands = expand_vscode_value(launch.setupCommands or {}, task_root)
+  for index = 1, #(launch.debugger_args or {}), 2 do
+    if launch.debugger_args[index] == "-ex" and type(launch.debugger_args[index + 1]) == "string" then
+      table.insert(setup_commands, { text = M.expand_vscode_vars(launch.debugger_args[index + 1], task_root), ignoreFailures = true })
+    end
+  end
 
   local config = {
     name = launch.name,
@@ -203,7 +209,7 @@ function M.build_dap_config(launch, task_root)
     MIMode = launch.MIMode or "gdb",
     miDebuggerPath = debugger_path,
     miDebuggerServerAddress = M.expand_vscode_vars(debugger_server_address(launch), task_root),
-    setupCommands = expand_vscode_value(launch.setupCommands or {}, task_root),
+    setupCommands = setup_commands,
     customLaunchSetupCommands = expand_vscode_value(launch.customLaunchSetupCommands, task_root),
     launchCompleteCommand = launch.launchCompleteCommand
       or (launch.miDebuggerServerAddress and "None" or nil),
