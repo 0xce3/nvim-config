@@ -1,5 +1,16 @@
 -- WSL/Windows Terminal clipboard integration via OSC52. This avoids requiring
 -- a clipboard executable inside WSL and works through remote-ui sessions too.
+vim.api.nvim_create_autocmd("TermOpen", {
+  callback = function(event)
+    vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+      buffer = event.buf,
+      silent = true,
+      desc = "Leave terminal mode",
+    })
+  end,
+  desc = "Make Escape leave terminal mode in every terminal",
+})
+
 local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
 if ok then
   vim.g.clipboard = {
