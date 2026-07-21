@@ -20,12 +20,8 @@ return {
         strategy = { [""] = rainbow.strategy.global },
         query = { [""] = "rainbow-delimiters" },
         highlight = {
-          "RainbowDelimiterRed",
-          "RainbowDelimiterYellow",
-          "RainbowDelimiterBlue",
-          "RainbowDelimiterOrange",
-          "RainbowDelimiterGreen",
-          "RainbowDelimiterViolet",
+          "RainbowDelimiterRed", "RainbowDelimiterYellow", "RainbowDelimiterBlue",
+          "RainbowDelimiterOrange", "RainbowDelimiterGreen", "RainbowDelimiterViolet",
           "RainbowDelimiterCyan",
         },
       }
