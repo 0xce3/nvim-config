@@ -77,7 +77,7 @@ return {
         StatusLineNC = { bg = "#282828", fg = "#a89984" },
         TabLine = { bg = "#32302f", fg = "#a89984" },
         TabLineFill = { bg = "#32302f", fg = "#a89984" },
-        TabLineSel = { bg = "#32302f", fg = "#ebdbb2", bold = true },
+        TabLineSel = { bg = "#3c3836", fg = "#ebdbb2", bold = true },
         FoldColumn = { bg = "NONE" },
         SignColumn = { bg = "NONE" },
         CursorLineSign = { bg = "NONE" },
@@ -93,12 +93,19 @@ return {
         components = {
         tabline_file_info = {
           hl = function(self)
+            local active = self.tab_type == "buffer_active"
+            local attributes = require("astroui.status.hl").get_attributes(self.tab_type)
+            if active then
+              attributes.bg = "#3c3836"
+              attributes.underline = true
+              attributes.sp = "#fabd2f"
+            end
             local error_count = #vim.diagnostic.get(self.bufnr, {
               severity = vim.diagnostic.severity.ERROR,
             })
-            if error_count > 0 then return { fg = "#fb4934", bold = true } end
-            if vim.bo[self.bufnr].modified then return { fg = "#fe8019", bold = true } end
-            return require("astroui.status.hl").get_attributes(self.tab_type)
+            if error_count > 0 then attributes.fg = "#fb4934"; attributes.bold = true end
+            if vim.bo[self.bufnr].modified then attributes.fg = "#fe8019"; attributes.bold = true end
+            return attributes
           end,
         },
       },

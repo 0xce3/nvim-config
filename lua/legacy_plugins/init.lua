@@ -774,10 +774,6 @@ return {
     end,
   },
 
-  {
-    "tpope/vim-fugitive",
-  },
-
   -- UI toolkit used by opencode.nvim (managed terminal), lazygit, media previews,
   -- and the Workspace Hub dashboard. Every other module is explicitly disabled.
   {

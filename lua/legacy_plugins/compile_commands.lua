@@ -94,7 +94,7 @@ local function switch_compile_commands()
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
 
-  local root = vim.fn.getcwd()
+   local root = vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
   local saved = store.get(root)
 
   vim.notify("Searching compile_commands.json...", vim.log.levels.INFO, { title = "clangd" })
@@ -148,6 +148,24 @@ end
 
 return {
   "nvim-telescope/telescope.nvim",
+  init = function()
+    local root = vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
+    local build_dir = store.active(root)
+    local cmd = { "clangd" }
+    if build_dir then table.insert(cmd, "--compile-commands-dir=" .. build_dir) end
+    vim.lsp.config("clangd", { cmd = cmd })
+    vim.api.nvim_create_autocmd("BufEnter", {
+      pattern = { "*.c", "*.h", "*.cc", "*.cpp", "*.hpp" },
+      callback = function(event)
+        if #vim.lsp.get_clients({ bufnr = event.buf, name = "clangd" }) > 0 then return end
+        local buffer_root = vim.fs.root(event.buf, { ".git" }) or root
+        local selected = store.active(buffer_root)
+        local buffer_cmd = { "clangd" }
+        if selected then table.insert(buffer_cmd, "--compile-commands-dir=" .. selected) end
+        vim.lsp.start({ name = "clangd", cmd = buffer_cmd, root_dir = buffer_root }, { bufnr = event.buf })
+      end,
+    })
+  end,
   keys = {
     {
       "<leader>fc",

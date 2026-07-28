@@ -28,9 +28,20 @@ return {
           hide_gitignored = false,
         },
       })
+      opts.git_status = vim.tbl_deep_extend("force", opts.git_status or {}, {
+        window = {
+          mappings = {
+            ["<cr>"] = function(state)
+              local node = state.tree:get_node()
+              if not node or node.type ~= "file" then return end
+              vim.cmd("DiffviewOpen -- " .. vim.fn.fnameescape(node.path or node:get_id()))
+            end,
+          },
+        },
+      })
       opts.source_selector = vim.tbl_deep_extend("force", opts.source_selector or {}, {
-        winbar = false,
-        statusline = true,
+        winbar = true,
+        statusline = false,
         separator = "|",
         separator_active = "|",
         highlight_background = "NeoTreeTabInactive",

@@ -1,16 +1,5 @@
 -- WSL/Windows Terminal clipboard integration via OSC52. This avoids requiring
 -- a clipboard executable inside WSL and works through remote-ui sessions too.
-vim.api.nvim_create_autocmd("TermOpen", {
-  callback = function(event)
-    vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
-      buffer = event.buf,
-      silent = true,
-      desc = "Leave terminal mode",
-    })
-  end,
-  desc = "Make Escape leave terminal mode in every terminal",
-})
-
 local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
 if ok then
   vim.g.clipboard = {
@@ -25,6 +14,24 @@ if ok then
     },
   }
 end
+
+vim.api.nvim_create_autocmd("TermOpen", {
+  callback = function(event)
+    if vim.bo[event.buf].filetype == "snacks_terminal" then return end
+    vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+      buffer = event.buf,
+      silent = true,
+      desc = "Leave terminal mode",
+    })
+  end,
+  desc = "Leave normal terminal mode with Escape",
+})
+
+-- German layouts make Ctrl-\ awkward because the key requires AltGr. These
+-- terminal-mode fallbacks enter Neovim normal mode without sending the key to
+-- the running terminal program.
+vim.keymap.set("t", "<C-Space>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
+vim.keymap.set("t", "<C-q>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
 
 -- Keep normal Vim yanks/deletes local. Use the explicit "+ register mappings
 -- below for the system clipboard so OSC52 cannot shadow the unnamed register.

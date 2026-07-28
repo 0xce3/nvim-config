@@ -75,7 +75,8 @@ return {
       },
     },
     treesitter = {
-      ensure_installed = { "yaml" },
+      auto_install = false,
+      ensure_installed = {},
     },
     -- vim options can be configured here
     options = {
@@ -144,7 +145,7 @@ return {
         ["<Leader>fg"] = {
           function()
             local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
-            require("snacks").picker.grep({ cwd = root })
+            require("snacks").picker.grep({ cwd = root, hidden = true, ignored = true })
           end,
           desc = "Grep project",
         },

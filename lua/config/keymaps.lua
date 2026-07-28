@@ -315,6 +315,16 @@ map("n", "<leader>dl", vim.diagnostic.setloclist, { desc = "Diagnostics list" })
 map("n", "<leader>gn", function() require("gitsigns").next_hunk() end, { desc = "Next git hunk" })
 map("n", "<leader>gp", function() require("gitsigns").prev_hunk() end, { desc = "Prev git hunk" })
 
+map("n", "gd", function()
+  vim.lsp.buf.definition()
+end, { desc = "Go to definition" })
+map("n", "gD", function()
+  vim.lsp.buf.declaration()
+end, { desc = "Go to declaration" })
+map("n", "gi", function()
+  vim.cmd([[normal! \<C-o>]])
+end, { desc = "Jump back" })
+
 vim.api.nvim_create_autocmd("LspAttach", {
   callback = function(event)
     local opts = function(desc)
