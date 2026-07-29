@@ -150,6 +150,13 @@ local function format_buffer(bufnr)
     return
   end
 
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    if line:match("^<<<<<<<") or line:match("^=======") or line:match("^>>>>>>>") then
+      vim.notify("Formatting skipped: merge conflict markers are present", vim.log.levels.WARN, { title = "format" })
+      return
+    end
+  end
+
   local filetype = vim.bo[bufnr].filetype
   if c_like_filetypes[filetype] then
     return
@@ -314,6 +321,14 @@ map("n", "<leader>dl", vim.diagnostic.setloclist, { desc = "Diagnostics list" })
 -- Git hunk navigation (replaces [c/]c for German keyboard)
 map("n", "<leader>gn", function() require("gitsigns").next_hunk() end, { desc = "Next git hunk" })
 map("n", "<leader>gp", function() require("gitsigns").prev_hunk() end, { desc = "Prev git hunk" })
+
+map("n", "za", function() vim.cmd("normal! za") end, { desc = "Toggle fold" })
+map("n", "zc", function() vim.cmd("normal! zc") end, { desc = "Close fold" })
+map("n", "zo", function() vim.cmd("normal! zo") end, { desc = "Open fold" })
+map("v", "zf", function()
+  vim.opt_local.foldmethod = "manual"
+  vim.cmd("'<,'>fold")
+end, { desc = "Create fold from selection" })
 
 map("n", "gd", function()
   vim.lsp.buf.definition()

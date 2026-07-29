@@ -10,31 +10,39 @@ return {
     config = function(_, opts)
       local csvview = require("csvview")
       csvview.setup(opts)
+      local function has_conflict_markers(bufnr)
+        for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+          if line:match("^<<<<<<<") or line:match("^=======") or line:match("^>>>>>>>") then return true end
+        end
+        return false
+      end
+      local function refresh_csvview(bufnr)
+        if has_conflict_markers(bufnr) then
+          pcall(csvview.disable, bufnr)
+          return
+        end
+        local delimiter = vim.b[bufnr].csv_delimiter or ","
+        csvview.enable(bufnr, {
+          parser = { delimiter = delimiter },
+          view = { display_mode = "border", header_lnum = 1, sticky_header = { enabled = true } },
+        })
+      end
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "csv",
         callback = function(args)
           local delimiter = vim.b[args.buf].csv_delimiter or ","
-          csvview.enable(args.buf, {
-            parser = { delimiter = delimiter },
-            view = {
-              display_mode = "border",
-              header_lnum = 1,
-              sticky_header = { enabled = true },
-            },
-          })
+          vim.b[args.buf].csv_delimiter = delimiter
+          refresh_csvview(args.buf)
         end,
         desc = "Enable CSV table view",
       })
+      vim.api.nvim_create_autocmd("BufWritePost", {
+        pattern = "*.csv",
+        callback = function(args) refresh_csvview(args.buf) end,
+        desc = "Refresh CSV view after merge conflict resolution",
+      })
       if vim.bo.filetype == "csv" then
-        local delimiter = vim.b.csv_delimiter or ","
-        csvview.enable(0, {
-          parser = { delimiter = delimiter },
-          view = {
-            display_mode = "border",
-            header_lnum = 1,
-            sticky_header = { enabled = true },
-          },
-        })
+        refresh_csvview(0)
       end
     end,
   },
