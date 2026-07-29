@@ -87,6 +87,13 @@ local function capture()
     silent = true,
     desc = "Leave task terminal mode",
   })
+  vim.keymap.set("t", "<leader>tr", function()
+    vim.schedule(function() require("config.vscode_debug").pick_task() end)
+  end, {
+    buffer = state.buf,
+    silent = true,
+    desc = "Run VS Code task",
+  })
   vim.api.nvim_buf_attach(state.buf, false, { on_lines = mark_task_complete })
 
   vim.api.nvim_create_autocmd("TermClose", {
