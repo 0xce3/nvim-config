@@ -136,6 +136,10 @@ function M.run(command, label)
 
   local fresh = not buf_ok()
   local current = vim.api.nvim_get_current_buf()
+  if buf_ok() and current == state.buf and state.previous_buf and vim.api.nvim_buf_is_valid(state.previous_buf) then
+    vim.api.nvim_set_current_buf(state.previous_buf)
+    current = state.previous_buf
+  end
   if not (buf_ok() and current == state.buf) then
     state.previous_buf = current
   end

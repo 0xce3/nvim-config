@@ -155,7 +155,10 @@ return {
         },
         -- second key is the lefthand side of the map
         ["<C-p>"] = {
-          function() require("snacks").picker.files() end,
+          function()
+            local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+            require("snacks").picker.files({ cwd = root, hidden = true, ignored = true })
+          end,
           desc = "Find files",
         },
         ["<Tab>"] = {
