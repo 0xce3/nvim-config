@@ -81,9 +81,8 @@ vim.api.nvim_create_autocmd("BufEnter", {
   end,
 })
 
--- Keep folding cheap in large firmware trees; Treesitter foldexpr is evaluated
--- frequently while moving through C/C++ buffers.
-opt.foldmethod = "indent"
+-- Manual folds keep `zf` available for switch cases and other custom regions.
+opt.foldmethod = "manual"
 opt.foldexpr = ""
 opt.foldnestmax = 6
 opt.foldlevel = 99
