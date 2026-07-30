@@ -51,6 +51,17 @@ vim.keymap.set("n", "<leader>gg", function()
   require("gitgraph").draw({}, { all = true, max_count = 5000 })
 end, { desc = "Git graph" })
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "gitgraph",
+  callback = function(args)
+    vim.keymap.set("n", "<Esc>", "<cmd>bd!<cr>", {
+      buffer = args.buf,
+      silent = true,
+      desc = "Close GitGraph",
+    })
+  end,
+})
+
 
 -- VS Code tasks and the devcontainer workflow expect the user's login shell
 -- environment, where tools such as west and project virtualenvs are exposed.
