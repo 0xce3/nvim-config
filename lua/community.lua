@@ -8,5 +8,6 @@ return {
   { import = "astrocommunity.pack.lua" },
   { import = "astrocommunity.recipes.picker-lsp-mappings" },
   { import = "astrocommunity.programming-language-support.kulala-nvim" },
+  { import = "astrocommunity.git.gitgraph-nvim" },
   -- import/override with your plugins folder
 }
