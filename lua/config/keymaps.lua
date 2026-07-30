@@ -242,6 +242,9 @@ end, { desc = "Write nvim devcontainer debug info" })
 
 vim.api.nvim_create_autocmd("BufWritePre", {
   callback = function(event)
+    if vim.fn.mode() ~= "n" then
+      return
+    end
     if vim.env.DEVCONTAINER == "true" then
       return
     end
