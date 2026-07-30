@@ -36,6 +36,7 @@ vim.keymap.set("t", "<C-q>", [[<C-\><C-n>]], { silent = true, desc = "Leave term
 -- Keep normal Vim yanks/deletes local. Use the explicit "+ register mappings
 -- below for the system clipboard so OSC52 cannot shadow the unnamed register.
 vim.opt.clipboard = ""
+vim.keymap.set("n", "q", "<Nop>", { desc = "Disable macro recording" })
 
 vim.keymap.set("v", "<C-c>", '"+y', { desc = "Copy selection to system clipboard" })
 vim.keymap.set("n", "<C-v>", '"+p', { desc = "Paste from system clipboard" })
