@@ -30,16 +30,14 @@ return {
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "csv",
         callback = function(args)
-          local delimiter = vim.b[args.buf].csv_delimiter or ","
-          vim.b[args.buf].csv_delimiter = delimiter
-          refresh_csvview(args.buf)
+          pcall(csvview.disable, args.buf)
         end,
-        desc = "Enable CSV table view",
+        desc = "Keep CSV files editable as plain text",
       })
       vim.api.nvim_create_autocmd("BufWritePost", {
         pattern = "*.csv",
-        callback = function(args) refresh_csvview(args.buf) end,
-        desc = "Refresh CSV view after merge conflict resolution",
+        callback = function(args) pcall(csvview.disable, args.buf) end,
+        desc = "Keep CSV view disabled",
       })
       vim.api.nvim_create_autocmd("InsertEnter", {
         pattern = "*.csv",
@@ -48,12 +46,10 @@ return {
       })
       vim.api.nvim_create_autocmd("InsertLeave", {
         pattern = "*.csv",
-        callback = function(args) refresh_csvview(args.buf) end,
-        desc = "Restore CSV view after editing",
+        callback = function(args) pcall(csvview.disable, args.buf) end,
+        desc = "Keep CSV view disabled after editing",
       })
-      if vim.bo.filetype == "csv" then
-        refresh_csvview(0)
-      end
+      if vim.bo.filetype == "csv" then pcall(csvview.disable, 0) end
     end,
   },
 }
