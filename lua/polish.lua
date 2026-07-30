@@ -48,23 +48,7 @@ vim.keymap.set("n", "<leader>gl", function()
 end, { desc = "Open lazygit" })
 
 vim.keymap.set("n", "<leader>gg", function()
-  local win = Snacks.win({
-    position = "float",
-    enter = true,
-    width = 0.9,
-    height = 0.9,
-    border = "rounded",
-    title = " Git Graph ",
-    title_pos = "center",
-    bo = { buftype = "nofile", bufhidden = "wipe", swapfile = false },
-    wo = { number = false, relativenumber = false, signcolumn = "no", cursorline = true },
-    keys = { q = "close", ["<Esc>"] = "close" },
-  })
-  win:show()
-  local lines = vim.fn.systemlist({ "git", "log", "--graph", "--all", "--decorate", "--oneline", "--color=never" })
-  vim.bo[vim.api.nvim_get_current_buf()].filetype = "git"
-  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
-  vim.bo[vim.api.nvim_get_current_buf()].modifiable = false
+  require("gitgraph").draw({}, { all = true, max_count = 5000 })
 end, { desc = "Git graph" })
 
 vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {

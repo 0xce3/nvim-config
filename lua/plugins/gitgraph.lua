@@ -25,15 +25,6 @@ local function open_commit_diff(commit)
   vim.bo[vim.api.nvim_get_current_buf()].modifiable = false
 end
 
-local function open_git_graph()
-  local win = open_popup()
-  win:show()
-  local lines = vim.fn.systemlist({ "git", "log", "--graph", "--all", "--decorate", "--oneline", "--color=never" })
-  vim.bo[vim.api.nvim_get_current_buf()].filetype = "git"
-  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
-  vim.bo[vim.api.nvim_get_current_buf()].modifiable = false
-end
-
 return {
   {
     "isakbm/gitgraph.nvim",
@@ -45,11 +36,7 @@ return {
     keys = {
       {
         "<leader>gg",
-        function()
-          local win = open_popup()
-          win:show()
-          open_git_graph()
-        end,
+        function() require("gitgraph").draw({}, { all = true, max_count = 5000 }) end,
         desc = "Git graph",
       },
     },
