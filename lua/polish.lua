@@ -47,6 +47,10 @@ vim.keymap.set("n", "<leader>gl", function()
   require("snacks").lazygit.open()
 end, { desc = "Open lazygit" })
 
+vim.keymap.set("n", "<leader>gg", function()
+  require("gitgraph").draw({}, { all = true, max_count = 5000 })
+end, { desc = "Git graph" })
+
 
 -- VS Code tasks and the devcontainer workflow expect the user's login shell
 -- environment, where tools such as west and project virtualenvs are exposed.
