@@ -5,6 +5,74 @@
 
 local M = {}
 
+local function diagnostic_from_line(line)
+  line = line:gsub("\27%[[0-9;?]*[ -/]*[@-~]", "")
+  line = vim.trim(line)
+  local path, row, col, message = line:match("(.+):(%d+):(%d+):%s*(.*)")
+  if not path or not message then return nil end
+  local severity = message:match("^(error|warning|note):")
+  if not severity then return nil end
+  path = vim.trim(path)
+  return {
+    filename = path,
+    lnum = tonumber(row),
+    col = tonumber(col),
+    text = line,
+    type = severity == "error" and "E" or severity == "warning" and "W" or "I",
+  }
+end
+
+local function resolve_diagnostic_filename(filename)
+  if vim.fn.filereadable(filename) == 1 then return filename end
+  local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+  local project = vim.fs.basename(root)
+  local relative = filename:match("/" .. vim.pesc(project) .. "/(.+)$")
+  if relative then
+    local candidate = vim.fs.joinpath(root, relative)
+    if vim.fn.filereadable(candidate) == 1 then return candidate end
+  end
+  return filename
+end
+
+local function jump_to_diagnostic()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(0)[1]
+  local item
+  for offset = 0, 20 do
+    for _, line_number in ipairs({ cursor - offset, cursor + offset }) do
+      if line_number >= 1 and line_number <= vim.api.nvim_buf_line_count(bufnr) then
+        item = diagnostic_from_line(vim.api.nvim_buf_get_lines(bufnr, line_number - 1, line_number, false)[1] or "")
+        if item then break end
+      end
+    end
+    if item then break end
+  end
+  if not item then
+    vim.notify("No compiler diagnostic on this line", vim.log.levels.INFO, { title = "Task Terminal" })
+    return
+  end
+  item.filename = resolve_diagnostic_filename(item.filename)
+  vim.cmd("edit " .. vim.fn.fnameescape(item.filename))
+  vim.api.nvim_win_set_cursor(0, { item.lnum, math.max(item.col - 1, 0) })
+end
+
+local function populate_diagnostics(bufnr)
+  local items = {}
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    local item = diagnostic_from_line(line)
+    if item then
+      item.filename = resolve_diagnostic_filename(item.filename)
+      table.insert(items, item)
+    end
+  end
+  vim.fn.setqflist({}, " ", { title = "Task diagnostics", items = items })
+  if #items == 0 then
+    vim.notify("No compiler diagnostics found", vim.log.levels.INFO, { title = "Task Terminal" })
+    return
+  end
+  vim.cmd("copen")
+end
+
 local state = {
   buf = nil,
   chan = nil,
@@ -94,6 +162,10 @@ local function capture()
     silent = true,
     desc = "Run VS Code task",
   })
+  vim.keymap.set("n", "<CR>", jump_to_diagnostic, { buffer = state.buf, silent = true, desc = "Jump to compiler diagnostic" })
+  vim.keymap.set("n", "<leader>te", function() populate_diagnostics(state.buf) end, { buffer = state.buf, silent = true, desc = "Open task diagnostics" })
+  vim.keymap.set("n", "]q", function() vim.cmd("cnext") end, { buffer = state.buf, silent = true, desc = "Next task diagnostic" })
+  vim.keymap.set("n", "[q", function() vim.cmd("cprev") end, { buffer = state.buf, silent = true, desc = "Previous task diagnostic" })
   vim.api.nvim_buf_attach(state.buf, false, { on_lines = mark_task_complete })
 
   vim.api.nvim_create_autocmd("TermClose", {

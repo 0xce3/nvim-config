@@ -98,7 +98,7 @@ return {
           shiftwidth = 2,
           tabstop = 2,
           smartindent = true,
-          foldmethod = "indent",
+           foldmethod = "manual",
           foldlevel = 99,
           foldlevelstart = 99,
       },
