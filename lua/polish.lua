@@ -48,6 +48,14 @@ vim.keymap.set("n", "<leader>gl", function()
 end, { desc = "Open lazygit" })
 
 vim.keymap.set("n", "<leader>gg", function()
+  local win = Snacks.win({
+    position = "float",
+    width = 0.9,
+    height = 0.9,
+    border = "rounded",
+    keys = { q = "close", ["<Esc>"] = "close" },
+  })
+  win:show()
   require("gitgraph").draw({}, { all = true, max_count = 5000 })
 end, { desc = "Git graph" })
 

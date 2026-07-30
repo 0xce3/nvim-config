@@ -1,10 +1,41 @@
+local function open_popup(opts)
+  return Snacks.win(vim.tbl_deep_extend("force", {
+    position = "float",
+    width = 0.9,
+    height = 0.9,
+    border = "rounded",
+    keys = {
+      q = "close",
+      ["<Esc>"] = "close",
+    },
+  }, opts or {}))
+end
+
+local function open_commit_diff(commit)
+  local win = open_popup()
+  win:show()
+  local lines = vim.fn.systemlist({ "git", "show", "--color=never", "--format=fuller", commit.hash .. "^!" })
+  vim.bo[vim.api.nvim_get_current_buf()].filetype = "diff"
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  vim.bo[vim.api.nvim_get_current_buf()].modifiable = false
+end
+
 return {
   {
     "isakbm/gitgraph.nvim",
+    opts = function(_, opts)
+      opts.hooks = vim.tbl_extend("force", opts.hooks or {}, {
+        on_select_commit = open_commit_diff,
+      })
+    end,
     keys = {
       {
         "<leader>gg",
-        function() require("gitgraph").draw({}, { all = true, max_count = 5000 }) end,
+        function()
+          local win = open_popup()
+          win:show()
+          require("gitgraph").draw({}, { all = true, max_count = 5000 })
+        end,
         desc = "Git graph",
       },
     },
