@@ -50,6 +50,7 @@ end, { desc = "Open lazygit" })
 vim.keymap.set("n", "<leader>gg", function()
   local win = Snacks.win({
     position = "float",
+    enter = true,
     width = 0.9,
     height = 0.9,
     border = "rounded",

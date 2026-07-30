@@ -1,6 +1,7 @@
 local function open_popup(opts)
   return Snacks.win(vim.tbl_deep_extend("force", {
     position = "float",
+    enter = true,
     width = 0.9,
     height = 0.9,
     border = "rounded",
