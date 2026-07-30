@@ -54,7 +54,16 @@ end, { desc = "Git graph" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "gitgraph",
   callback = function(args)
-    vim.keymap.set("n", "<Esc>", "<cmd>bd!<cr>", {
+    vim.keymap.set("n", "<Esc>", function()
+      local graph_buf = vim.api.nvim_get_current_buf()
+      local alternate = vim.fn.bufnr("#")
+      if alternate > 0 and alternate ~= graph_buf and vim.api.nvim_buf_is_valid(alternate) then
+        vim.cmd("buffer " .. alternate)
+      else
+        vim.cmd("enew")
+      end
+      vim.api.nvim_buf_delete(graph_buf, { force = true })
+    end, {
       buffer = args.buf,
       silent = true,
       desc = "Close GitGraph",
