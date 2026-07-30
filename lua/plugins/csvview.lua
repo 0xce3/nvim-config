@@ -31,7 +31,7 @@ return {
         pattern = "csv",
         callback = function(args)
           pcall(csvview.disable, args.buf)
-          vim.keymap.set("n", "<leader>cv", function()
+          vim.keymap.set("n", "<leader>gc", function()
             csvview.toggle(args.buf, {
               parser = { delimiter = vim.b[args.buf].csv_delimiter or "," },
               view = { display_mode = "border", header_lnum = 1, sticky_header = { enabled = true } },
