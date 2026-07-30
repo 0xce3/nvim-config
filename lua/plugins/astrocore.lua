@@ -5,10 +5,6 @@
 
 ---@type LazySpec
 local function close_buffer(bufnr, force)
-  if vim.bo[bufnr].filetype == "csv" then
-    local ok, csvview = pcall(require, "csvview")
-    if ok then pcall(csvview.disable, bufnr) end
-  end
   require("astrocore.buffer").close(bufnr, force)
 end
 
@@ -47,31 +43,6 @@ return {
         [".*/conf/.*%.conf"] = "bitbake",
         [".*/recipes%-.*/.*%.inc"] = "bitbake",
         [".*/classes/.*%.inc"] = "bitbake",
-      },
-    },
-    autocmds = {
-      csv_delimiter = {
-        {
-          event = "FileType",
-          pattern = "csv",
-          callback = function(args)
-            local line = vim.api.nvim_buf_get_lines(args.buf, 0, 1, false)[1] or ""
-            local semicolons = select(2, line:gsub(";", ""))
-            local commas = select(2, line:gsub(",", ""))
-            local delimiter = semicolons > commas and ";" or ","
-
-            vim.b[args.buf].csv_delimiter = delimiter
-            vim.bo[args.buf].syntax = ""
-            vim.cmd("syntax off")
-            vim.cmd("unlet! b:current_syntax")
-            vim.schedule(function()
-              if not vim.api.nvim_buf_is_valid(args.buf) then return end
-              pcall(vim.treesitter.stop, args.buf)
-              vim.api.nvim_buf_call(args.buf, function() vim.cmd("syntax on") end)
-            end)
-          end,
-          desc = "Detect CSV delimiter before applying syntax highlighting",
-        },
       },
     },
     treesitter = {
