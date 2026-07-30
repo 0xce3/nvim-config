@@ -51,9 +51,10 @@ vim.keymap.set("n", "<leader>gg", function()
   require("gitgraph").draw({}, { all = true, max_count = 5000 })
 end, { desc = "Git graph" })
 
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "gitgraph",
+vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
+  pattern = "*",
   callback = function(args)
+    if vim.bo[args.buf].filetype ~= "gitgraph" then return end
     vim.keymap.set("n", "<Esc>", function()
       local graph_buf = vim.api.nvim_get_current_buf()
       local alternate = vim.fn.bufnr("#")
@@ -66,6 +67,7 @@ vim.api.nvim_create_autocmd("FileType", {
     end, {
       buffer = args.buf,
       silent = true,
+      nowait = true,
       desc = "Close GitGraph",
     })
   end,
