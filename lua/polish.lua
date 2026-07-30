@@ -57,7 +57,10 @@ vim.keymap.set("n", "<leader>gg", function()
     keys = { q = "close", ["<Esc>"] = "close" },
   })
   win:show()
-  require("gitgraph").draw({}, { all = true, max_count = 5000 })
+  local lines = vim.fn.systemlist({ "git", "log", "--graph", "--all", "--decorate", "--oneline", "--color=never" })
+  vim.bo[vim.api.nvim_get_current_buf()].filetype = "git"
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  vim.bo[vim.api.nvim_get_current_buf()].modifiable = false
 end, { desc = "Git graph" })
 
 vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
