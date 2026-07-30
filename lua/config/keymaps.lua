@@ -309,7 +309,6 @@ map("n", "<leader>E", function()
     cwd = vim.uv.cwd(),
   })
 end, { desc = "Open unrestricted file explorer" })
-map("n", "<leader>gg", "<cmd>Git<cr>", { desc = "Open Git status" })
 map("n", "K", vim.diagnostic.open_float, { desc = "Show diagnostic" })
 map("n", "[d", function() vim.diagnostic.jump({ count = -1 }) end, { desc = "Previous diagnostic" })
 map("n", "]d", function() vim.diagnostic.jump({ count = 1 }) end, { desc = "Next diagnostic" })
