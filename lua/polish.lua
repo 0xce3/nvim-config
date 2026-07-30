@@ -54,6 +54,10 @@ vim.keymap.set("n", "<leader>gg", function()
     width = 0.9,
     height = 0.9,
     border = "rounded",
+    title = " Git Graph ",
+    title_pos = "center",
+    bo = { buftype = "nofile", bufhidden = "wipe", swapfile = false },
+    wo = { number = false, relativenumber = false, signcolumn = "no", cursorline = true },
     keys = { q = "close", ["<Esc>"] = "close" },
   })
   win:show()

@@ -5,6 +5,10 @@ local function open_popup(opts)
     width = 0.9,
     height = 0.9,
     border = "rounded",
+    title = " Git Graph ",
+    title_pos = "center",
+    bo = { buftype = "nofile", bufhidden = "wipe", swapfile = false },
+    wo = { number = false, relativenumber = false, signcolumn = "no", cursorline = true },
     keys = {
       q = "close",
       ["<Esc>"] = "close",
@@ -13,7 +17,7 @@ local function open_popup(opts)
 end
 
 local function open_commit_diff(commit)
-  local win = open_popup()
+  local win = open_popup({ title = " Commit Diff " })
   win:show()
   local lines = vim.fn.systemlist({ "git", "show", "--color=never", "--format=fuller", commit.hash .. "^!" })
   vim.bo[vim.api.nvim_get_current_buf()].filetype = "diff"
