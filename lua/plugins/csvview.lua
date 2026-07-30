@@ -41,6 +41,16 @@ return {
         callback = function(args) refresh_csvview(args.buf) end,
         desc = "Refresh CSV view after merge conflict resolution",
       })
+      vim.api.nvim_create_autocmd("InsertEnter", {
+        pattern = "*.csv",
+        callback = function(args) pcall(csvview.disable, args.buf) end,
+        desc = "Disable CSV view while editing",
+      })
+      vim.api.nvim_create_autocmd("InsertLeave", {
+        pattern = "*.csv",
+        callback = function(args) refresh_csvview(args.buf) end,
+        desc = "Restore CSV view after editing",
+      })
       if vim.bo.filetype == "csv" then
         refresh_csvview(0)
       end
