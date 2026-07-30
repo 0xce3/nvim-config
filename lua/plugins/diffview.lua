@@ -70,7 +70,7 @@ return {
         callback = function()
           for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
             local bufnr = vim.api.nvim_win_get_buf(win)
-            vim.keymap.set("n", "<CR>", "<cmd>tabclose<cr>", {
+            vim.keymap.set("n", "<Esc>", "<cmd>tabclose<cr>", {
               buffer = bufnr,
               silent = true,
               desc = "Close Diffview tab",
