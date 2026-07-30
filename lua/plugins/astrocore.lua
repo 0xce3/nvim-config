@@ -143,10 +143,7 @@ return {
           desc = "Open lazygit",
         },
         ["<Leader>fg"] = {
-          function()
-            local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
-            require("snacks").picker.grep({ cwd = root, hidden = true, ignored = true })
-          end,
+          function() require("snacks").picker.grep() end,
           desc = "Grep project",
         },
         ["<Leader>fw"] = {
