@@ -965,8 +965,25 @@ return {
 
       vim.g.opencode_opts = {
         server = {
-          url = vim.env.OPENCODE_SERVER_URL or (vim.env.DEVCONTAINER and "http://127.0.0.1:4096" or nil),
-          start = false,
+          url = function(callback)
+            local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+            local hash = 0
+            for index = 1, #root do
+              hash = (hash * 31 + root:byte(index)) % 1000
+            end
+            callback("http://127.0.0.1:" .. (4100 + hash))
+          end,
+          start = function()
+            local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+            local hash = 0
+            for index = 1, #root do
+              hash = (hash * 31 + root:byte(index)) % 1000
+            end
+            require("snacks.terminal").open("opencode --port " .. (4100 + hash), {
+              cwd = root,
+              win = { position = "right", enter = false },
+            })
+          end,
         },
         contexts = {
           ["@this"] = function(context)
