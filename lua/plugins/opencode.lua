@@ -55,7 +55,7 @@ return {
         server = {
           url = function(callback) callback("http://127.0.0.1:" .. port) end,
           start = function()
-            require("snacks.terminal").open("opencode --port " .. port, {
+            require("snacks.terminal").open("opencode serve --port " .. port .. " --hostname 127.0.0.1", {
               cwd = root,
               win = { position = "right", enter = false },
             })

@@ -979,7 +979,7 @@ return {
             for index = 1, #root do
               hash = (hash * 31 + root:byte(index)) % 10000
             end
-            require("snacks.terminal").open("opencode --port " .. (4100 + hash), {
+            require("snacks.terminal").open("opencode serve --port " .. (4100 + hash) .. " --hostname 127.0.0.1", {
               cwd = root,
               win = { position = "right", enter = false },
             })
