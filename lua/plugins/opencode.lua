@@ -27,7 +27,7 @@ return {
       local function project_port(root)
         local hash = 0
         for index = 1, #root do
-          hash = (hash * 31 + root:byte(index)) % 1000
+          hash = (hash * 31 + root:byte(index)) % 10000
         end
         return 4100 + hash
       end
