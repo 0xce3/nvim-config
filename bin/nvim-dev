@@ -123,8 +123,39 @@ devcontainer_json_value() {
   local key="$1"
   python3 - "$(devcontainer_json)" "$key" <<'PY'
 import json, sys
+
+def strip_jsonc(text):
+    out = []
+    i = 0
+    in_string = False
+    while i < len(text):
+        if in_string:
+            out.append(text[i])
+            if text[i] == "\\" and i + 1 < len(text):
+                i += 1
+                out.append(text[i])
+            elif text[i] == '"':
+                in_string = False
+        elif text[i] == '"':
+            in_string = True
+            out.append(text[i])
+        elif text[i:i + 2] == "//":
+            i = text.find("\n", i)
+            if i == -1:
+                break
+            out.append("\n")
+        elif text[i:i + 2] == "/*":
+            i = text.find("*/", i + 2)
+            if i == -1:
+                raise ValueError("unterminated JSONC comment")
+            i += 1
+        else:
+            out.append(text[i])
+        i += 1
+    return "".join(out)
+
 with open(sys.argv[1], "r", encoding="utf-8") as f:
-    value = json.load(f).get(sys.argv[2], "")
+    value = json.loads(strip_jsonc(f.read())).get(sys.argv[2], "")
 if isinstance(value, str):
     print(value)
 PY
@@ -224,26 +255,25 @@ find_devcontainer_container() {
 }
 
 ensure_devcontainer_running() {
-  # Devcontainers CLI auto-mounts the Wayland socket when WAYLAND_DISPLAY is
-  # set.  Docker refuses to start the container if the source path is missing
-  # or is a regular file — it must be a real Unix socket.  Ensure one exists.
+  # WSLg can expose the real socket outside XDG_RUNTIME_DIR. Existing
+  # devcontainers retain the original bind source, so restore that path.
   if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
-    local wayland_socket="/run/user/$(id -u)/$WAYLAND_DISPLAY"
+    local runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    local wayland_socket="${runtime_dir%/}/$WAYLAND_DISPLAY"
+    local wslg_socket="/mnt/wslg/runtime-dir/$WAYLAND_DISPLAY"
     if [[ -e "$wayland_socket" && ! -S "$wayland_socket" ]]; then
       rm -f "$wayland_socket"
     fi
-    if [[ ! -e "$wayland_socket" ]]; then
-      python3 -c "
-import socket, os
-p = '$wayland_socket'
-try:
-    os.unlink(p)
-except FileNotFoundError:
-    pass
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-s.bind(p)
-s.listen(0)
-" &
+    if [[ ! -S "$wayland_socket" && -S "$wslg_socket" ]]; then
+      if [[ ! -d "$runtime_dir" ]]; then
+        if ! mkdir -p "$runtime_dir" 2>/dev/null; then
+          [[ -t 0 ]] || die "cannot create Wayland runtime directory: $runtime_dir"
+          step "restore Wayland runtime directory" "$runtime_dir (sudo)"
+          sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" "$runtime_dir" \
+            || die "cannot create Wayland runtime directory: $runtime_dir"
+        fi
+      fi
+      ln -sfn "$wslg_socket" "$wayland_socket"
     fi
   fi
 
@@ -252,7 +282,9 @@ s.listen(0)
   if [[ -n "$container" ]]; then
     if ! docker ps --format '{{.Names}}' | grep -Fxq "$container"; then
       step "starting existing devcontainer" "$container"
-      docker start "$container" 2>&1 | tee "$startup_log_host" >&2
+      if ! docker start "$container" 2>&1 | tee "$startup_log_host" >&2; then
+        die "failed to start devcontainer $container"
+      fi
       run_post_start_command "$container"
     fi
     printf '%s\n' "$container"
