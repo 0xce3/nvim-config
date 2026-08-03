@@ -34,6 +34,8 @@ return {
 
       local root = project_root()
       local port = project_port(root)
+      local opencode = vim.fn.exepath("opencode")
+      if opencode == "" then opencode = "/home/ubuntu/.opencode/bin/opencode" end
       local function mapped_path(buf)
         local path = vim.api.nvim_buf_get_name(buf)
         local container_root = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
@@ -55,7 +57,7 @@ return {
         server = {
           url = function(callback) callback("http://127.0.0.1:" .. port) end,
           start = function()
-            require("snacks.terminal").open("opencode serve --port " .. port .. " --hostname 127.0.0.1", {
+            require("snacks.terminal").open(vim.fn.shellescape(opencode) .. " serve --port " .. port .. " --hostname 127.0.0.1", {
               cwd = root,
               win = { position = "right", enter = false },
             })

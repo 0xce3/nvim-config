@@ -975,11 +975,13 @@ return {
           end,
           start = function()
             local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+            local opencode = vim.fn.exepath("opencode")
+            if opencode == "" then opencode = "/home/ubuntu/.opencode/bin/opencode" end
             local hash = 0
             for index = 1, #root do
               hash = (hash * 31 + root:byte(index)) % 10000
             end
-            require("snacks.terminal").open("opencode serve --port " .. (4100 + hash) .. " --hostname 127.0.0.1", {
+            require("snacks.terminal").open(vim.fn.shellescape(opencode) .. " serve --port " .. (4100 + hash) .. " --hostname 127.0.0.1", {
               cwd = root,
               win = { position = "right", enter = false },
             })
