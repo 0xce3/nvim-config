@@ -21,6 +21,20 @@ fi
 
 log() { printf '%b\n' "$*" >&2; }
 
+update_config() {
+  local config_dir="$HOME/.config/nvim"
+  [[ -d "$config_dir/.git" ]] || return 0
+
+  if [[ -n "$(git -C "$config_dir" status --porcelain 2>/dev/null)" ]]; then
+    log "${c_yellow}⚠${c_reset} nvim config has local changes; skipping git pull"
+    return 0
+  fi
+
+  if ! git -C "$config_dir" pull --ff-only --quiet 2>/dev/null; then
+    log "${c_yellow}⚠${c_reset} could not update nvim config from origin"
+  fi
+}
+
 real_nvim() {
   if [[ -n "${NVIM_REAL_BIN:-}" && -x "${NVIM_REAL_BIN:-}" ]]; then
     printf '%s\n' "$NVIM_REAL_BIN"
@@ -101,6 +115,7 @@ choose_mode() {
 }
 
 nvim_bin="$(real_nvim)" || { log "nvim wrapper: real nvim binary not found"; exit 127; }
+update_config
 root="$(project_root || true)"
 
 if [[ -n "$root" && -z "${OPENCODE_PORT:-}" ]]; then
