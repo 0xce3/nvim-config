@@ -293,6 +293,23 @@ install_opencode() {
   fi
 }
 
+configure_docker_access() {
+  command -v docker >/dev/null 2>&1 || return 0
+  getent group docker >/dev/null 2>&1 || return 0
+  id -nG "$USER" | tr ' ' '\n' | grep -qx docker && return 0
+
+  if [[ "$skip_packages" -eq 1 ]]; then
+    warn "docker group membership skipped" "run: sudo usermod -aG docker $USER"
+    return 0
+  fi
+  [[ "$(prompt_action "Add $USER to the docker group for rootless Docker access?")" == install ]] || {
+    warn "docker group membership skipped" "run: sudo usermod -aG docker $USER"
+    return 0
+  }
+  as_root usermod -aG docker "$USER"
+  ok "docker group membership added" "restart WSL before using docker without sudo"
+}
+
 install_language_tools() {
   step "language tools" "pyright ruff"
   if command -v npm >/dev/null 2>&1; then
@@ -410,6 +427,7 @@ main() {
   ensure_command "$manager" gcc "" "compile local Treesitter parsers"
   ensure_command "$manager" make "" "compile local Treesitter parsers"
   ensure_command "$manager" docker "" "devcontainer workflow"
+  configure_docker_access
   ensure_command "$manager" gh "" "GitHub integration"
 
   install_lazygit_github
