@@ -101,6 +101,10 @@ return {
           function() close_buffer(0, true) end,
           desc = "Force close buffer",
         },
+        ["<Leader>Sl"] = {
+          function() require("resession").load("Last Session", { silence_errors = true }) end,
+          desc = "Load last session",
+        },
         ["go"] = { "<C-o>", desc = "Jump back" },
         ["<Leader>gl"] = {
           function()
