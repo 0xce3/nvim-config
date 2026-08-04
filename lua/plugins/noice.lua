@@ -14,6 +14,14 @@ return {
       popupmenu = {
         enabled = true,
       },
+      lsp = {
+        hover = {
+          enabled = false,
+        },
+        signature = {
+          enabled = false,
+        },
+      },
     },
   },
 }
