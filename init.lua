@@ -14,7 +14,7 @@ if not (vim.env.LAZY or (vim.uv or vim.loop).fs_stat(lazypath)) then
 end
 
 vim.opt.rtp:prepend(lazypath)
-vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site")
+vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/site")
 
 -- validate that lazy is available
 if not pcall(require, "lazy") then

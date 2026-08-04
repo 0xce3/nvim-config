@@ -97,7 +97,7 @@ return {
           function() close_buffer(0, false) end,
           desc = "Close buffer",
         },
-        ["<leader>C"] = {
+        ["<Leader>C"] = {
           function() close_buffer(0, true) end,
           desc = "Force close buffer",
         },
