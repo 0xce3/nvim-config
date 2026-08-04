@@ -268,7 +268,7 @@ install_wrappers() {
 install_language_tools() {
   step "language tools" "pyright ruff"
   if command -v npm >/dev/null 2>&1; then
-    run npm install -g pyright || warn "pyright install failed" "run npm install -g pyright manually"
+    as_root npm install -g pyright || warn "pyright install failed" "run sudo npm install -g pyright manually"
   else
     warn "npm missing" "pyright skipped"
   fi
