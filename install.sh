@@ -266,6 +266,33 @@ install_wrappers() {
   fi
 }
 
+install_opencode() {
+  step "install OpenCode" "AI coding assistant"
+  local binary="$HOME/.opencode/bin/opencode"
+  if [[ -x "$binary" ]]; then
+    ok "opencode" "installed"
+    return 0
+  fi
+  if [[ "$skip_packages" -eq 1 ]]; then
+    warn "opencode missing" "skipped"
+    return 0
+  fi
+  [[ "$(prompt_action "Install OpenCode from the official installer?")" == install ]] || {
+    warn "skipped" "opencode"
+    return 0
+  }
+  if [[ "$dry_run" -eq 1 ]]; then
+    run curl -fsSL https://opencode.ai/install
+  else
+    curl -fsSL https://opencode.ai/install | bash
+  fi
+  if [[ -x "$binary" ]]; then
+    ok "opencode" "installed"
+  else
+    warn "opencode install failed" "run curl -fsSL https://opencode.ai/install | bash manually"
+  fi
+}
+
 install_language_tools() {
   step "language tools" "pyright ruff"
   if command -v npm >/dev/null 2>&1; then
@@ -386,6 +413,7 @@ main() {
   ensure_command "$manager" gh "" "GitHub integration"
 
   install_lazygit_github
+  install_opencode
   install_wrappers
   install_language_tools
   install_media_tools
