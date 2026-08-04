@@ -8,11 +8,10 @@ return {
     },
     opts = {
       cmdline = {
-        enabled = true,
-        view = "cmdline",
+        enabled = false,
       },
       popupmenu = {
-        enabled = true,
+        enabled = false,
       },
       lsp = {
         hover = {
