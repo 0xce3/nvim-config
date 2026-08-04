@@ -22,17 +22,29 @@ fi
 log() { printf '%b\n' "$*" >&2; }
 
 update_config() {
-  local config_dir="$HOME/.config/nvim"
+  local config_dir="$HOME/.config/nvim" status stashed=false
   [[ -d "$config_dir/.git" ]] || return 0
 
-  if [[ -n "$(git -C "$config_dir" status --porcelain 2>/dev/null)" ]]; then
+  status="$(git -C "$config_dir" status --porcelain 2>/dev/null)"
+  if [[ "$status" == " M lazy-lock.json" ]]; then
+    if git -C "$config_dir" stash push --quiet --message "nvim auto-pull lazy-lock" -- lazy-lock.json; then
+      stashed=true
+    else
+      log "${c_yellow}⚠${c_reset} could not stash lazy-lock.json; skipping git pull"
+      return 0
+    fi
+  elif [[ -n "$status" ]]; then
     log "${c_yellow}⚠${c_reset} nvim config has local changes; skipping git pull"
     return 0
   fi
 
   if ! git -C "$config_dir" pull --ff-only --quiet 2>/dev/null; then
+    if [[ "$stashed" == true ]]; then git -C "$config_dir" stash pop --quiet >/dev/null 2>&1 || true; fi
     log "${c_yellow}⚠${c_reset} could not update nvim config from origin"
+    return 0
   fi
+
+  if [[ "$stashed" == true ]]; then git -C "$config_dir" stash pop --quiet >/dev/null 2>&1 || log "${c_yellow}⚠${c_reset} could not restore local lazy-lock.json"; fi
 }
 
 real_nvim() {
