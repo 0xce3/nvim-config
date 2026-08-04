@@ -8,6 +8,13 @@ if [[ ! -x "$real_opencode" ]]; then
   exit 127
 fi
 
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)"
+if [[ -z "${OPENCODE_PORT:-}" ]]; then
+  root_hash="$(printf '%s' "$root" | cksum | awk '{print $1}')"
+  export OPENCODE_PORT=$((4100 + root_hash % 10000))
+fi
+export OPENCODE_SERVER_URL="${OPENCODE_SERVER_URL:-http://127.0.0.1:${OPENCODE_PORT}}"
+
 has_port=0
 has_hostname=0
 for arg in "$@"; do
