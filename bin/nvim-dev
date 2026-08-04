@@ -602,6 +602,10 @@ install_host_wrappers
 nvim_bin="$(real_nvim)" || die "real nvim binary not found"
 banner
 
+# Devcontainer bind mounts must exist before Docker creates the container.
+mkdir -p "$HOME/.ssh" "$HOME/.config/gh"
+chmod 700 "$HOME/.ssh"
+
 root="$(project_root)"
 if ! has_devcontainer; then
   info "no devcontainer found" "opening local nvim"
