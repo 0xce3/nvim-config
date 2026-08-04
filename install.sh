@@ -141,6 +141,7 @@ pkg_name() {
     apt:node) printf 'nodejs' ;;
     apt:npm) printf 'npm' ;;
     apt:gh) printf 'gh' ;;
+    apt:docker) printf 'docker.io' ;;
     apt:gcc|apt:make) printf 'build-essential' ;;
     apt:convert) printf 'imagemagick' ;;
     apt:gs) printf 'ghostscript' ;;
@@ -270,7 +271,7 @@ install_language_tools() {
     warn "npm missing" "pyright skipped"
   fi
   if command -v python3 >/dev/null 2>&1; then
-    run python3 -m pip install --user ruff || run python3 -m pip install --user --break-system-packages ruff || warn "ruff install failed" "run python3 -m pip install --user ruff manually"
+    run python3 -m pip install --user --break-system-packages ruff || run python3 -m pip install --user ruff || warn "ruff install failed" "run python3 -m pip install --user ruff manually"
   else
     warn "python3 missing" "ruff skipped"
   fi
