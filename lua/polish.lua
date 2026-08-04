@@ -33,6 +33,8 @@ vim.api.nvim_create_autocmd("TermOpen", {
 vim.keymap.set("t", "<C-Space>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
 vim.keymap.set("t", "<C-q>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
 
+vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site")
+
 -- Keep normal Vim yanks/deletes local. Use the explicit "+ register mappings
 -- below for the system clipboard so OSC52 cannot shadow the unnamed register.
 vim.opt.clipboard = ""
