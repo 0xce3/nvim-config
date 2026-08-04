@@ -294,7 +294,7 @@ ensure_devcontainer_running() {
   step "creating devcontainer" "$root"
   local dc_cmd
   dc_cmd="$(devcontainer_cmd)"
-  eval "$dc_cmd" up --workspace-folder "$(quote "$root")" 2>&1 | tr '\r' '\n' | tee "$startup_log_host" >&2
+  script -qefc "$dc_cmd up --workspace-folder $(quote "$root")" /dev/null 2>&1 | tee "$startup_log_host" >&2
 
   container="$(find_devcontainer_container)"
   [[ -n "$container" ]] || die "devcontainer started, but no matching running container was found"
@@ -626,13 +626,13 @@ case "$action" in
     ;;
   up|reopen)
     dc_cmd="$(devcontainer_cmd)"
-    eval "$dc_cmd" up --workspace-folder "$(quote "$root")" 2>&1 | tr '\r' '\n' | tee "$startup_log_host"
+    script -qefc "$dc_cmd up --workspace-folder $(quote "$root")" /dev/null 2>&1 | tee "$startup_log_host"
     container="${container:-$(find_devcontainer_container)}"
     [[ -n "$container" ]] || container="$(choose_container)"
     ;;
   rebuild)
     dc_cmd="$(devcontainer_cmd)"
-    eval "$dc_cmd" up --workspace-folder "$(quote "$root")" --remove-existing-container 2>&1 | tr '\r' '\n' | tee "$startup_log_host"
+    script -qefc "$dc_cmd up --workspace-folder $(quote "$root") --remove-existing-container" /dev/null 2>&1 | tee "$startup_log_host"
     container="${container:-$(find_devcontainer_container)}"
     [[ -n "$container" ]] || container="$(choose_container)"
     ;;
