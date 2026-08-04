@@ -29,4 +29,5 @@ require("lazy").setup({
       },
     },
   },
+  rocks = { enabled = false },
 } --[[@as LazyConfig]])
