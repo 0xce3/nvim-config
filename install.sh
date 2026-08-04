@@ -188,11 +188,13 @@ command_version() {
 
 command_available() {
   local cmd="$1"
+  local resolved
   if [[ "$cmd" == "fd" ]]; then
     command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1
     return $?
   fi
-  command -v "$cmd" >/dev/null 2>&1
+  resolved="$(command -v "$cmd" 2>/dev/null || true)"
+  [[ -n "$resolved" && "$resolved" != /mnt/c/* ]]
 }
 
 ensure_command() {
