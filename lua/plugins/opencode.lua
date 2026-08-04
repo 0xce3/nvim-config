@@ -20,22 +20,6 @@ return {
       { "goo", function() return require("opencode").operator("@this ") .. "_" end, mode = { "n", "x" }, expr = true, desc = "Add line to opencode" },
     },
     init = function()
-      local function project_root()
-        return vim.fs.root(0, { ".git" }) or vim.uv.cwd()
-      end
-
-      local function project_port(root)
-        local hash = 0
-        for index = 1, #root do
-          hash = (hash * 31 + root:byte(index)) % 10000
-        end
-        return 4100 + hash
-      end
-
-      local root = project_root()
-      local port = project_port(root)
-      local opencode = vim.fn.exepath("opencode")
-      if opencode == "" then opencode = "/home/ubuntu/.opencode/bin/opencode" end
       local function mapped_path(buf)
         local path = vim.api.nvim_buf_get_name(buf)
         local container_root = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
@@ -55,13 +39,8 @@ return {
 
       vim.g.opencode_opts = {
         server = {
-          url = function(callback) callback("http://127.0.0.1:" .. port) end,
-          start = function()
-            require("snacks.terminal").open(vim.fn.shellescape(opencode) .. " serve --port " .. port .. " --hostname 127.0.0.1", {
-              cwd = root,
-              win = { position = "right", enter = false },
-            })
-          end,
+          url = vim.env.OPENCODE_SERVER_URL or (vim.env.DEVCONTAINER and "http://127.0.0.1:4096" or nil),
+          start = false,
         },
         contexts = {
           ["@this"] = function(context)
