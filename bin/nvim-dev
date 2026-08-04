@@ -534,6 +534,44 @@ fi
   ok "tools ready" "$((SECONDS - start))s"
 }
 
+ensure_container_github() {
+  local container="$1" remote_user answer
+  remote_user="$(devcontainer_json_value remoteUser || true)"
+  [[ -n "$remote_user" ]] || remote_user="$(docker inspect -f '{{.Config.User}}' "$container" 2>/dev/null || true)"
+  [[ -n "$remote_user" ]] || remote_user=root
+
+  if ! docker exec -u "$remote_user" "$container" sh -lc 'command -v gh >/dev/null 2>&1' >/dev/null 2>&1; then
+    [[ -t 0 ]] || { warn "GitHub CLI missing in container" "install gh in the devcontainer"; return 0; }
+    printf '%b' "${c_blue}?${c_reset} Install GitHub CLI in the devcontainer? [y/N] " >&2
+    read -r answer
+    case "${answer,,}" in
+      y|yes)
+        docker exec -u root "$container" sh -lc 'apt-get update && apt-get install -y gh' \
+          || { warn "GitHub CLI install failed" "install gh in the devcontainer manually"; return 0; }
+        ;;
+      *)
+        warn "GitHub CLI skipped" "install gh in the devcontainer manually"
+        return 0
+        ;;
+    esac
+  fi
+
+  if docker exec -u "$remote_user" "$container" sh -lc 'gh auth status >/dev/null 2>&1'; then
+    ok "GitHub CLI authenticated" "container user $remote_user"
+    return 0
+  fi
+
+  [[ -t 0 && -t 1 ]] || { warn "GitHub CLI not authenticated" "run gh auth login in the devcontainer"; return 0; }
+  printf '%b' "${c_blue}?${c_reset} Run gh auth login in the devcontainer now? [y/N] " >&2
+  read -r answer
+  case "${answer,,}" in
+    y|yes)
+      docker exec -it -u "$remote_user" "$container" gh auth login
+      ;;
+    *) warn "GitHub authentication skipped" "run gh auth login in the devcontainer manually" ;;
+  esac
+}
+
 wait_for_server() {
   local addr="$1"
   local i spin elapsed
@@ -610,6 +648,7 @@ addr="$host:$port"
 
 sync_nvim_config_to_container "$container"
 ensure_container_tools "$container"
+ensure_container_github "$container"
 copy_startup_log_to_container "$container"
 
 info "container" "$container"
