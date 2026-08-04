@@ -58,15 +58,35 @@ if [[ "${1:-}" == "." ]]; then
       else
         printf 'opencode wrapper: WSL auth file not found: %s\n' "$auth_file" >&2
       fi
+      existing_container=""
+      if command -v docker >/dev/null 2>&1 && [[ -f "$auth_file" ]]; then
+        while IFS= read -r candidate; do
+          [[ -n "$candidate" ]] || continue
+          existing_container="$candidate"
+          break
+        done < <(docker ps -aq --filter "label=devcontainer.local_folder=$root" 2>/dev/null || true)
+        if [[ -n "$existing_container" ]]; then
+          has_auth_mount="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/tmp/opencode-auth.json"}}yes{{end}}{{end}}' "$existing_container" 2>/dev/null || true)"
+          if [[ "$has_auth_mount" != "yes" ]]; then
+            printf '%b' "? Existing devcontainer needs recreation to mount WSL OpenCode auth read-only. Recreate it? [y/N] " >&2
+            read -r recreate
+            case "${recreate,,}" in
+              y|yes) recreate_arg=(--remove-existing-container) ;;
+              *) printf 'opencode wrapper: refusing remote start without the read-only auth mount\n' >&2; exit 1 ;;
+            esac
+          fi
+        fi
+      fi
+      recreate_arg=(${recreate_arg[@]:-})
       if command -v devcontainer >/dev/null 2>&1; then
-        devcontainer up --workspace-folder "$root" "${mount_arg[@]}"
+        devcontainer up --workspace-folder "$root" "${recreate_arg[@]}" "${mount_arg[@]}"
         if [[ -f "$auth_file" ]]; then
           devcontainer exec --workspace-folder "$root" sh -lc \
             'mkdir -p "$HOME/.local/share/opencode" && ln -sfn /tmp/opencode-auth.json "$HOME/.local/share/opencode/auth.json"'
         fi
         exec devcontainer exec --workspace-folder "$root" opencode "${@:2}"
       elif command -v npx >/dev/null 2>&1; then
-        npx -y @devcontainers/cli up --workspace-folder "$root" "${mount_arg[@]}"
+        npx -y @devcontainers/cli up --workspace-folder "$root" "${recreate_arg[@]}" "${mount_arg[@]}"
         if [[ -f "$auth_file" ]]; then
           npx -y @devcontainers/cli exec --workspace-folder "$root" sh -lc \
             'mkdir -p "$HOME/.local/share/opencode" && ln -sfn /tmp/opencode-auth.json "$HOME/.local/share/opencode/auth.json"'
