@@ -51,11 +51,26 @@ if [[ "${1:-}" == "." ]]; then
   if has_devcontainer "$root"; then
     mode="$(choose_mode)"
     if [[ "$mode" == "remote" ]]; then
+      auth_file="$HOME/.local/share/opencode/auth.json"
+      mount_arg=()
+      if [[ -f "$auth_file" ]]; then
+        mount_arg=(--mount "type=bind,source=$auth_file,target=/tmp/opencode-auth.json,readonly")
+      else
+        printf 'opencode wrapper: WSL auth file not found: %s\n' "$auth_file" >&2
+      fi
       if command -v devcontainer >/dev/null 2>&1; then
-        devcontainer up --workspace-folder "$root"
+        devcontainer up --workspace-folder "$root" "${mount_arg[@]}"
+        if [[ -f "$auth_file" ]]; then
+          devcontainer exec --workspace-folder "$root" sh -lc \
+            'mkdir -p "$HOME/.local/share/opencode" && ln -sfn /tmp/opencode-auth.json "$HOME/.local/share/opencode/auth.json"'
+        fi
         exec devcontainer exec --workspace-folder "$root" opencode "${@:2}"
       elif command -v npx >/dev/null 2>&1; then
-        npx -y @devcontainers/cli up --workspace-folder "$root"
+        npx -y @devcontainers/cli up --workspace-folder "$root" "${mount_arg[@]}"
+        if [[ -f "$auth_file" ]]; then
+          npx -y @devcontainers/cli exec --workspace-folder "$root" sh -lc \
+            'mkdir -p "$HOME/.local/share/opencode" && ln -sfn /tmp/opencode-auth.json "$HOME/.local/share/opencode/auth.json"'
+        fi
         exec npx -y @devcontainers/cli exec --workspace-folder "$root" opencode "${@:2}"
       else
         printf 'opencode wrapper: devcontainer CLI not found\n' >&2
