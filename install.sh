@@ -136,6 +136,7 @@ pkg_name() {
     apt:nvim) printf 'neovim' ;;
     apt:rg) printf 'ripgrep' ;;
     apt:fd) printf 'fd-find' ;;
+    apt:unzip) printf 'unzip' ;;
     apt:python3) printf 'python3' ;;
     apt:pip3) printf 'python3-pip' ;;
     apt:node) printf 'nodejs' ;;
@@ -370,6 +371,7 @@ main() {
   ensure_command "$manager" git "" "clone and update plugins"
   ensure_command "$manager" curl "" "download installers and releases"
   ensure_command "$manager" tar "" "extract release archives"
+  ensure_command "$manager" unzip "" "extract Mason packages"
   ensure_command "$manager" nvim "0.12.0" "editor runtime"
   ensure_command "$manager" rg "" "fast text search"
   ensure_command "$manager" fd "" "fast file search"
