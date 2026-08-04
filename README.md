@@ -18,7 +18,8 @@ nvim
 ## Requirements
 
 **Host (WSL / Linux / macOS):** Neovim 0.11+, `git`, `curl`, `ripgrep`, `fd`,
-  `python3`, `node`/`npm`, Docker, and a Nerd Font for icons.
+  `python3`, `node`/`npm`, a C compiler, `make`, Docker, and a Nerd Font for
+  icons. Treesitter parsers are compiled locally for the host system.
 
 **Devcontainer:** Toolchain (clangd, cmake, gcc, ninja, …) – defined in your
   project's `.devcontainer/devcontainer.json` / Dockerfile.
@@ -49,7 +50,7 @@ For local testing:
 |----------|--------|---------|
 | Theme/UI | `ellisonleao/gruvbox.nvim`, `lualine.nvim`, `which-key.nvim` | Colors, statusline, key hints |
 | Explorer | `nvim-telescope/telescope-file-browser.nvim` | File browser on `<leader>e` |
-| Find | `fzf-lua`, `telescope.nvim` | Fast project search and shared picker backend |
+| Find | `snacks.nvim`, `telescope.nvim` | Fast project search and shared picker backend |
 | LSP | `nvim-lspconfig`, `mason.nvim`, `mason-tool-installer.nvim` | Language servers and tooling |
 | Completion | `nvim-cmp`, `LuaSnip` | Completion and snippets |
 | Syntax | `nvim-treesitter/nvim-treesitter`, `rainbow-delimiters.nvim` | Parsing, highlighting, delimiters |

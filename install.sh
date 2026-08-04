@@ -141,6 +141,7 @@ pkg_name() {
     apt:node) printf 'nodejs' ;;
     apt:npm) printf 'npm' ;;
     apt:gh) printf 'gh' ;;
+    apt:gcc|apt:make) printf 'build-essential' ;;
     apt:convert) printf 'imagemagick' ;;
     apt:gs) printf 'ghostscript' ;;
     dnf:rg) printf 'ripgrep' ;;
@@ -149,19 +150,27 @@ pkg_name() {
     dnf:pip3) printf 'python3-pip' ;;
     dnf:convert) printf 'ImageMagick' ;;
     dnf:gs) printf 'ghostscript' ;;
+    dnf:gcc) printf 'gcc' ;;
+    dnf:make) printf 'make' ;;
     pacman:python3) printf 'python' ;;
     pacman:pip3) printf 'python-pip' ;;
     pacman:gh) printf 'github-cli' ;;
     pacman:convert) printf 'imagemagick' ;;
     pacman:gs) printf 'ghostscript' ;;
+    pacman:gcc) printf 'gcc' ;;
+    pacman:make) printf 'make' ;;
     apk:pip3) printf 'py3-pip' ;;
     apk:gh) printf 'github-cli' ;;
     apk:convert) printf 'imagemagick' ;;
     apk:gs) printf 'ghostscript' ;;
+    apk:gcc) printf 'build-base' ;;
+    apk:make) printf 'build-base' ;;
     brew:python3) printf 'python' ;;
     brew:pip3) printf 'python' ;;
     brew:convert) printf 'imagemagick' ;;
     brew:gs) printf 'ghostscript' ;;
+    brew:gcc) printf 'gcc' ;;
+    brew:make) printf 'make' ;;
     *) printf '%s' "$cmd" ;;
   esac
 }
@@ -288,6 +297,16 @@ sync_plugins() {
   run "$nvim_bin" --headless '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
 }
 
+build_treesitter_parsers() {
+  step "Treesitter parsers" "build locally for this system"
+  local nvim_bin
+  nvim_bin="$(command -v nvim 2>/dev/null || true)"
+  [[ -n "$nvim_bin" ]] || nvim_bin="/usr/local/bin/nvim"
+  run "$nvim_bin" --headless \
+    '+TSInstall! lua' '+TSInstall! yaml' '+TSInstall! vim' '+TSInstall! http' '+qa' \
+    || warn "Treesitter parser build failed" "run :TSInstallSync! <language> after fixing the compiler"
+}
+
 script_dir() {
   local source="${BASH_SOURCE[0]:-${0:-}}"
   [[ -n "$source" && "$source" == */* && -e "$source" ]] || return 0
@@ -356,6 +375,8 @@ main() {
   ensure_command "$manager" pip3 "" "python package installs"
   ensure_command "$manager" node "18.0.0" "pyright and plugin tooling"
   ensure_command "$manager" npm "" "node package installs"
+  ensure_command "$manager" gcc "" "compile local Treesitter parsers"
+  ensure_command "$manager" make "" "compile local Treesitter parsers"
   ensure_command "$manager" docker "" "devcontainer workflow"
   ensure_command "$manager" gh "" "GitHub integration"
 
@@ -364,6 +385,7 @@ main() {
   install_language_tools
   install_media_tools
   sync_plugins
+  build_treesitter_parsers
 
   ok "setup complete" "open a project and run: nvim ."
 }

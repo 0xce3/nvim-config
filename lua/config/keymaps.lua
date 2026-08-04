@@ -150,6 +150,13 @@ local function format_buffer(bufnr)
     return
   end
 
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    if line:match("^<<<<<<<") or line:match("^=======") or line:match("^>>>>>>>") then
+      vim.notify("Formatting skipped: merge conflict markers are present", vim.log.levels.WARN, { title = "format" })
+      return
+    end
+  end
+
   local filetype = vim.bo[bufnr].filetype
   if c_like_filetypes[filetype] then
     return
@@ -235,6 +242,9 @@ end, { desc = "Write nvim devcontainer debug info" })
 
 vim.api.nvim_create_autocmd("BufWritePre", {
   callback = function(event)
+    if vim.fn.mode() ~= "n" then
+      return
+    end
     if vim.env.DEVCONTAINER == "true" then
       return
     end
@@ -302,7 +312,6 @@ map("n", "<leader>E", function()
     cwd = vim.uv.cwd(),
   })
 end, { desc = "Open unrestricted file explorer" })
-map("n", "<leader>gg", "<cmd>Git<cr>", { desc = "Open Git status" })
 map("n", "K", vim.diagnostic.open_float, { desc = "Show diagnostic" })
 map("n", "[d", function() vim.diagnostic.jump({ count = -1 }) end, { desc = "Previous diagnostic" })
 map("n", "]d", function() vim.diagnostic.jump({ count = 1 }) end, { desc = "Next diagnostic" })
@@ -314,6 +323,24 @@ map("n", "<leader>dl", vim.diagnostic.setloclist, { desc = "Diagnostics list" })
 -- Git hunk navigation (replaces [c/]c for German keyboard)
 map("n", "<leader>gn", function() require("gitsigns").next_hunk() end, { desc = "Next git hunk" })
 map("n", "<leader>gp", function() require("gitsigns").prev_hunk() end, { desc = "Prev git hunk" })
+
+map("n", "za", function() vim.cmd("normal! za") end, { desc = "Toggle fold" })
+map("n", "zc", function() vim.cmd("normal! zc") end, { desc = "Close fold" })
+map("n", "zo", function() vim.cmd("normal! zo") end, { desc = "Open fold" })
+map("v", "zf", function()
+  vim.opt_local.foldmethod = "manual"
+  vim.cmd("'<,'>fold")
+end, { desc = "Create fold from selection" })
+
+map("n", "gd", function()
+  vim.lsp.buf.definition()
+end, { desc = "Go to definition" })
+map("n", "gD", function()
+  vim.lsp.buf.declaration()
+end, { desc = "Go to declaration" })
+map("n", "gi", function()
+  vim.cmd([[normal! \<C-o>]])
+end, { desc = "Jump back" })
 
 vim.api.nvim_create_autocmd("LspAttach", {
   callback = function(event)
@@ -334,6 +361,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 map("n", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
 map("t", "<F12>", function() require("config.terminal").toggle() end, { desc = "Toggle terminal" })
+map("n", "<leader>td", function() require("config.terminal").toggle_debug() end, { desc = "Toggle debug terminal" })
 
 vim.api.nvim_create_user_command("Term", function(opts)
   require("config.file_utils").open_terminal(opts.args ~= "" and opts.args or nil)

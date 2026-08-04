@@ -572,7 +572,7 @@ return {
         if opts == nil or opts.terminal == false then
           return
         end
-        term.run(opts.command)
+        term.run(opts.command, opts.label)
       end
 
       local function find_task_by_label(tasks, label)
@@ -631,11 +631,9 @@ return {
 
       local map = vim.keymap.set
       map("n", "<leader>tr", function()
-        require("config.vscode_debug").pick_task()
+        local ok, err = pcall(function() require("config.vscode_debug").pick_task() end)
+        if not ok then vim.notify("Could not open VS Code tasks: " .. tostring(err), vim.log.levels.ERROR) end
       end, { desc = "Run VS Code task" })
-      map("n", "<leader>cc", function()
-        require("config.vscode_debug").run_task("Compliance check with fix (Delta)")
-      end, { desc = "Compliance fix delta" })
       map("n", "<leader>tt", function()
         require("vstask").jobs()
       end, { desc = "Show task jobs" })
@@ -762,6 +760,8 @@ return {
       })
 
       vim.api.nvim_set_hl(0, "NeoTreeDirectoryName", { fg = "#83a598" })
+      vim.api.nvim_set_hl(0, "NeoTreeFileName", { fg = "#bdae93" })
+      vim.api.nvim_set_hl(0, "NeoTreeFileNameOpened", { fg = "#d5c4a1" })
       vim.api.nvim_set_hl(0, "NeoTreeGitAdded", { fg = "#b8bb26" })
       vim.api.nvim_set_hl(0, "NeoTreeGitModified", { fg = "#fabd2f" })
       vim.api.nvim_set_hl(0, "NeoTreeGitUntracked", { fg = "#b8bb26" })
@@ -772,10 +772,6 @@ return {
       vim.api.nvim_set_hl(0, "NeoTreeDiagnosticInfo", { fg = "#83a598" })
       vim.api.nvim_set_hl(0, "NeoTreeDiagnosticHint", { fg = "#8ec07c" })
     end,
-  },
-
-  {
-    "tpope/vim-fugitive",
   },
 
   -- UI toolkit used by opencode.nvim (managed terminal), lazygit, media previews,
@@ -1122,7 +1118,7 @@ return {
         },
         highlight = {
           enable = true,
-          disable = { "markdown", "markdown_inline" },
+           disable = { "csv", "markdown", "markdown_inline" },
         },
         indent = {
           enable = true,
@@ -1258,7 +1254,11 @@ return {
       end
 
       local function clangd_cmd()
-        local cmd = { "clangd", "--clang-tidy" }
+        local cmd = {
+          "clangd",
+          "--clang-tidy",
+          "--query-driver=**/arm-zephyr-eabi-gcc,**/arm-zephyr-eabi-g++",
+        }
         local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
         if compile_commands_dir then
           table.insert(cmd, "--compile-commands-dir=" .. compile_commands_dir)

@@ -1,94 +1,82 @@
-local previous_showtabline
-
-local function hide_tabline()
-  previous_showtabline = vim.o.showtabline
-  vim.o.showtabline = 0
-end
-
-local function restore_tabline()
-  if previous_showtabline ~= nil then
-    vim.o.showtabline = previous_showtabline
-    previous_showtabline = nil
-  end
-end
-
-local function close_diffview()
-  pcall(vim.cmd, "DiffviewClose")
-  restore_tabline()
-  vim.schedule(function()
-    local wins = vim.api.nvim_tabpage_list_wins(0)
-    if #wins == 1 then
-      local buf = vim.api.nvim_win_get_buf(wins[1])
-      if vim.api.nvim_buf_get_name(buf) == "" and vim.api.nvim_buf_line_count(buf) <= 1 then
-        pcall(vim.cmd, "tabclose")
-      end
-    end
-  end)
-end
-
--- VS Code "Source Control"-style diff viewer in a separate Neovim tab,
--- so normal buffer/window layout is never disturbed by buffer switches.
--- Navigate files with <Tab>/<S-Tab>, close with <leader>gd or `q`.
 return {
   {
     "sindrets/diffview.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
-    cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewFileHistory", "DiffviewToggleFiles" },
+    cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFileHistory" },
     keys = {
+      { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Open Git diff" },
       {
-        "<leader>gd",
+        "<leader>dm",
         function()
-          local views = require("diffview.lib").views
-          if next(views) == nil then
-            hide_tabline()
-            vim.cmd("tabnew")
-            local empty_buf = vim.api.nvim_get_current_buf()
-            vim.bo[empty_buf].bufhidden = "wipe"
-            vim.cmd("DiffviewOpen")
-            vim.schedule(function()
-              if vim.api.nvim_buf_is_valid(empty_buf) and vim.api.nvim_buf_get_name(empty_buf) == "" then
-                pcall(vim.api.nvim_buf_delete, empty_buf, { force = true })
+          local path = vim.api.nvim_buf_get_name(0)
+          if path == "" or vim.fn.filereadable(path) ~= 1 then
+            vim.notify("Current buffer is not a file", vim.log.levels.WARN, { title = "diffview" })
+            return
+          end
+          local dir = vim.fn.fnamemodify(path, ":h")
+          local root_result = vim.system({ "git", "-C", dir, "rev-parse", "--show-toplevel" }, { text = true }):wait()
+          if root_result.code ~= 0 then
+            vim.notify("Current file is not in a Git repository", vim.log.levels.WARN, { title = "diffview" })
+            return
+          end
+          local root = vim.trim(root_result.stdout)
+          local relative = vim.fs.relpath(root, path)
+          if not relative then
+            vim.notify("Could not resolve file path relative to Git root", vim.log.levels.WARN, { title = "diffview" })
+            return
+          end
+          local exists = vim.system({ "git", "-C", root, "cat-file", "-e", "main:" .. relative }, { text = true }):wait()
+          if exists.code ~= 0 then
+            vim.notify("File does not exist on main: " .. relative, vim.log.levels.WARN, { title = "diffview" })
+            return
+          end
+          local line = vim.api.nvim_win_get_cursor(0)[1]
+          vim.api.nvim_create_autocmd("User", {
+            pattern = "DiffviewViewOpened",
+            once = true,
+            callback = function()
+              for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local buffer = vim.api.nvim_win_get_buf(win)
+                local name = vim.api.nvim_buf_get_name(buffer)
+                if name:find(relative, 1, true) then
+                  vim.api.nvim_win_set_cursor(win, { math.min(line, vim.api.nvim_buf_line_count(buffer)), 0 })
+                end
               end
-            end)
-          else
-            close_diffview()
+            end,
+          })
+          vim.cmd("DiffviewOpen main -- " .. vim.fn.fnameescape(relative))
+        end,
+        desc = "Diff current file against main",
+      },
+    },
+    opts = {
+      enhanced_diff_hl = true,
+      view = {
+        default = {
+          layout = "diff2_horizontal",
+          winbar_info = true,
+        },
+        merge_tool = { layout = "diff3_horizontal" },
+      },
+      file_panel = {
+        listing_style = "tree",
+        win_config = { position = "left", width = 34 },
+      },
+    },
+    config = function(_, opts)
+      require("diffview").setup(opts)
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "DiffviewViewOpened",
+        callback = function()
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local bufnr = vim.api.nvim_win_get_buf(win)
+            vim.keymap.set("n", "<Esc>", "<cmd>tabclose<cr>", {
+              buffer = bufnr,
+              silent = true,
+              desc = "Close Diffview tab",
+            })
           end
         end,
-        desc = "Toggle Git diff view (new tab)",
-      },
-      { "<leader>gH", "<cmd>DiffviewFileHistory %<cr>", desc = "File history (current file)" },
-      { "<leader>gA", "<cmd>DiffviewFileHistory<cr>", desc = "Branch history (all files)" },
-    },
-    config = function()
-      local actions = require("diffview.actions")
-      local function block_buffer_switch()
-        vim.notify("Close Diffview before switching buffers", vim.log.levels.WARN, { title = "diffview" })
-      end
-      local view_keymaps = {
-        { "n", "<Tab>", actions.select_next_entry, { desc = "Next changed file" } },
-        { "n", "<S-Tab>", actions.select_prev_entry, { desc = "Prev changed file" } },
-        { "n", "q", close_diffview, { desc = "Close diff view" } },
-      }
-      local file_panel_keymaps = vim.deepcopy(view_keymaps)
-      for i = 1, 9 do
-        table.insert(view_keymaps, { "n", "<leader>" .. i, block_buffer_switch, { desc = "Blocked in Diffview" } })
-        table.insert(file_panel_keymaps, { "n", "<leader>" .. i, block_buffer_switch, { desc = "Blocked in Diffview" } })
-      end
-
-      require("diffview").setup({
-        enhanced_diff_hl = true,
-        view = {
-          default = { winbar_info = true },
-          merge_tool = { layout = "diff3_mixed" },
-        },
-        file_panel = {
-          listing_style = "tree",
-          win_config = { position = "left", width = 34 },
-        },
-        keymaps = {
-          view = view_keymaps,
-          file_panel = file_panel_keymaps,
-        },
       })
     end,
   },

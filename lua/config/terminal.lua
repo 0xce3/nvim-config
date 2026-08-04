@@ -5,11 +5,112 @@
 
 local M = {}
 
+local function diagnostic_from_line(line)
+  line = line:gsub("\27%[[0-9;?]*[ -/]*[@-~]", "")
+  line = vim.trim(line)
+  local path, row, col, message = line:match("(.+):(%d+):(%d+):%s*(.*)")
+  if not path or not message then return nil end
+  local severity = message:match("^(error|warning|note):")
+  if not severity then return nil end
+  path = vim.trim(path)
+  return {
+    filename = path,
+    lnum = tonumber(row),
+    col = tonumber(col),
+    text = line,
+    type = severity == "error" and "E" or severity == "warning" and "W" or "I",
+  }
+end
+
+local function resolve_diagnostic_filename(filename)
+  if vim.fn.filereadable(filename) == 1 then return filename end
+  local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
+  local project = vim.fs.basename(root)
+  local relative = filename:match("/" .. vim.pesc(project) .. "/(.+)$")
+  if relative then
+    local candidate = vim.fs.joinpath(root, relative)
+    if vim.fn.filereadable(candidate) == 1 then return candidate end
+  end
+  return filename
+end
+
+local function jump_to_diagnostic()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(0)[1]
+  local item
+  for offset = 0, 20 do
+    for _, line_number in ipairs({ cursor - offset, cursor + offset }) do
+      if line_number >= 1 and line_number <= vim.api.nvim_buf_line_count(bufnr) then
+        item = diagnostic_from_line(vim.api.nvim_buf_get_lines(bufnr, line_number - 1, line_number, false)[1] or "")
+        if item then break end
+      end
+    end
+    if item then break end
+  end
+  if not item then
+    vim.notify("No compiler diagnostic on this line", vim.log.levels.INFO, { title = "Task Terminal" })
+    return
+  end
+  item.filename = resolve_diagnostic_filename(item.filename)
+  vim.cmd("edit " .. vim.fn.fnameescape(item.filename))
+  vim.api.nvim_win_set_cursor(0, { item.lnum, math.max(item.col - 1, 0) })
+end
+
+local function populate_diagnostics(bufnr)
+  local items = {}
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    local item = diagnostic_from_line(line)
+    if item then
+      item.filename = resolve_diagnostic_filename(item.filename)
+      table.insert(items, item)
+    end
+  end
+  vim.fn.setqflist({}, " ", { title = "Task diagnostics", items = items })
+  if #items == 0 then
+    vim.notify("No compiler diagnostics found", vim.log.levels.INFO, { title = "Task Terminal" })
+    return
+  end
+  vim.cmd("copen")
+end
+
 local state = {
   buf = nil,
   chan = nil,
   previous_buf = nil,
+  task_running = false,
+  task_status = nil,
+  task_label = nil,
+  spinner = 1,
+  marker = nil,
 }
+
+local debug_state = { buf = nil, chan = nil, previous_buf = nil, waiting = false, wait_label = nil }
+
+local function redraw_spinner()
+  if not state.task_running then return end
+  vim.cmd("redrawstatus")
+  vim.defer_fn(redraw_spinner, 120)
+end
+
+local function mark_task_complete()
+  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(state.buf, 0, -1, false)) do
+    local exit_code = state.marker and line:match(vim.pesc(state.marker) .. ":(%d+)")
+    if exit_code then
+      exit_code = tonumber(exit_code)
+      state.task_running = false
+      state.marker = nil
+      state.task_status = exit_code == 0 and "success" or "failed"
+      vim.cmd("redrawstatus")
+      if exit_code == 0 then
+        vim.notify("Task completed successfully", vim.log.levels.INFO, { title = "Task Terminal" })
+      else
+        vim.notify("Task failed with exit code " .. exit_code, vim.log.levels.ERROR, { title = "Task Terminal" })
+      end
+      return
+    end
+  end
+end
 
 local function buf_ok()
   return state.buf ~= nil and vim.api.nvim_buf_is_valid(state.buf)
@@ -17,6 +118,25 @@ end
 
 function M.is_terminal_buffer(bufnr)
   return buf_ok() and bufnr == state.buf
+end
+
+function M.is_task_running()
+  return state.task_running
+end
+
+function M.task_status()
+  return state.task_status
+end
+
+function M.task_label()
+  return state.task_label
+end
+
+function M.task_spinner()
+  local ok, astroui = pcall(require, "astroui")
+  if not ok then return "..." end
+  local frames = astroui.get_spinner("LSPLoading", 1) or { "..." }
+  return frames[math.floor(vim.uv.hrtime() / 120000000) % #frames + 1]
 end
 
 local function capture()
@@ -30,12 +150,29 @@ local function capture()
     pcall(vim.api.nvim_buf_delete, existing, { force = true })
   end
   vim.api.nvim_buf_set_name(state.buf, "Task Terminal")
+  vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+    buffer = state.buf,
+    silent = true,
+    desc = "Leave task terminal mode",
+  })
+  vim.keymap.set("t", "<leader>tr", function()
+    vim.schedule(function() require("config.vscode_debug").pick_task() end)
+  end, {
+    buffer = state.buf,
+    silent = true,
+    desc = "Run VS Code task",
+  })
+  vim.keymap.set("n", "<CR>", jump_to_diagnostic, { buffer = state.buf, silent = true, desc = "Jump to compiler diagnostic" })
+  vim.keymap.set("n", "<leader>te", function() populate_diagnostics(state.buf) end, { buffer = state.buf, silent = true, desc = "Open task diagnostics" })
+  vim.keymap.set("n", "]q", function() vim.cmd("cnext") end, { buffer = state.buf, silent = true, desc = "Next task diagnostic" })
+  vim.keymap.set("n", "[q", function() vim.cmd("cprev") end, { buffer = state.buf, silent = true, desc = "Previous task diagnostic" })
+  vim.api.nvim_buf_attach(state.buf, false, { on_lines = mark_task_complete })
 
   vim.api.nvim_create_autocmd("TermClose", {
     buffer = state.buf,
     once = true,
     callback = function()
-      state.buf, state.chan = nil, nil
+      state.buf, state.chan, state.task_running = nil, nil, false
     end,
   })
 end
@@ -45,9 +182,10 @@ local function open()
     vim.api.nvim_set_current_buf(state.buf)
   else
     -- Telescope's prompt buffer is modified while a task is selected, and
-    -- :terminal cannot replace a modified buffer. Switch this window to a
-    -- fresh buffer first, preserving the original buffer via 'hidden'.
-    vim.cmd("enew!")
+    -- :terminal cannot replace a modified buffer. Use a scratch buffer first
+    -- so special buffers such as Neo-tree remain untouched.
+    local scratch = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(scratch)
     vim.cmd("terminal")
     capture()
   end
@@ -70,21 +208,44 @@ function M.toggle()
   open()
 end
 
-function M.run(command)
+function M.run(command, label)
   if not command or command == "" then
     return
   end
 
   local fresh = not buf_ok()
   local current = vim.api.nvim_get_current_buf()
+  if buf_ok() and current == state.buf and state.previous_buf and vim.api.nvim_buf_is_valid(state.previous_buf) then
+    vim.api.nvim_set_current_buf(state.previous_buf)
+    current = state.previous_buf
+  end
   if not (buf_ok() and current == state.buf) then
     state.previous_buf = current
   end
-  open()
+
+  if fresh then
+    -- Create the reusable terminal in the current window, then immediately
+    -- restore the user's buffer. Tasks remain visible through F12/<leader>tj.
+    open()
+    if vim.api.nvim_buf_is_valid(current) then
+      vim.api.nvim_set_current_buf(current)
+      vim.cmd("stopinsert")
+    end
+  end
 
   local function send()
     if state.chan then
-      vim.fn.chansend(state.chan, command .. "\n")
+      state.task_running = true
+      state.task_status = nil
+      state.task_label = label or "Task"
+      state.spinner = 1
+      state.marker = "__NVIM_TASK_DONE_" .. tostring(vim.loop.hrtime()) .. "__"
+      vim.cmd("redrawstatus")
+      redraw_spinner()
+      vim.fn.chansend(
+        state.chan,
+        "{ " .. command .. "; }; task_exit=$?; printf '\\n" .. state.marker .. ":%s\\n' \"$task_exit\"\n"
+      )
     end
   end
 
@@ -95,6 +256,104 @@ function M.run(command)
   end
 end
 
+function M.run_debug(command)
+  if not command or command == "" then return end
+  if debug_state.buf and vim.api.nvim_buf_is_valid(debug_state.buf) then
+    vim.api.nvim_set_current_buf(debug_state.buf)
+    vim.fn.chansend(debug_state.chan, command .. "\n")
+    vim.cmd("startinsert")
+    return
+  end
+
+  debug_state.previous_buf = vim.api.nvim_get_current_buf()
+  local scratch = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(scratch)
+  vim.cmd("terminal")
+  debug_state.buf = vim.api.nvim_get_current_buf()
+  debug_state.chan = vim.b[debug_state.buf].terminal_job_id
+  vim.bo[debug_state.buf].buflisted = true
+  vim.bo[debug_state.buf].bufhidden = "hide"
+  vim.api.nvim_buf_set_name(debug_state.buf, "Debug Terminal")
+  vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], {
+    buffer = debug_state.buf,
+    silent = true,
+    desc = "Leave debug terminal mode",
+  })
+  vim.keymap.set("t", "<C-c>", function() M.stop_debug_session() end, {
+    buffer = debug_state.buf,
+    silent = true,
+    desc = "Stop debug session",
+  })
+  vim.api.nvim_create_autocmd("TermClose", {
+    buffer = debug_state.buf,
+    once = true,
+    callback = function()
+      debug_state.buf, debug_state.chan = nil, nil
+      vim.schedule(function()
+        local dap = require("dap")
+        if dap.session() then pcall(dap.terminate) end
+      end)
+    end,
+  })
+  vim.defer_fn(function()
+    if debug_state.chan then vim.fn.chansend(debug_state.chan, command .. "\n") end
+  end, 150)
+  vim.defer_fn(function()
+    if debug_state.buf and vim.api.nvim_buf_is_valid(debug_state.buf) then
+      vim.api.nvim_set_current_buf(debug_state.buf)
+      vim.cmd("startinsert")
+    end
+  end, 500)
+end
+
+function M.start_debug_wait(label)
+  debug_state.waiting = true
+  debug_state.wait_label = label or "Debug server"
+  vim.cmd("redrawstatus")
+end
+
+function M.stop_debug_wait()
+  debug_state.waiting = false
+  debug_state.wait_label = nil
+  vim.cmd("redrawstatus")
+end
+
+function M.is_debug_waiting()
+  return debug_state.waiting
+end
+
+function M.debug_wait_label()
+  return debug_state.wait_label
+end
+
+function M.toggle_debug()
+  if not debug_state.buf or not vim.api.nvim_buf_is_valid(debug_state.buf) then
+    vim.notify("Debug terminal is not running", vim.log.levels.WARN, { title = "debug" })
+    return
+  end
+  local current = vim.api.nvim_get_current_buf()
+  if current == debug_state.buf then
+    if debug_state.previous_buf and vim.api.nvim_buf_is_valid(debug_state.previous_buf) then
+      vim.api.nvim_set_current_buf(debug_state.previous_buf)
+    end
+  else
+    debug_state.previous_buf = current
+    vim.api.nvim_set_current_buf(debug_state.buf)
+    vim.cmd("startinsert")
+  end
+end
+
+function M.stop_debug()
+  M.stop_debug_wait()
+  if debug_state.chan then vim.fn.chansend(debug_state.chan, "\003") end
+end
+
+function M.stop_debug_session()
+  M.stop_debug()
+  local dap = require("dap")
+  if dap.session() then pcall(dap.terminate) end
+end
+
 function M.send(keys)
   if not state.chan then
     vim.notify("Task terminal is not running", vim.log.levels.WARN, { title = "terminal" })
@@ -102,6 +361,15 @@ function M.send(keys)
   end
   vim.fn.chansend(state.chan, vim.api.nvim_replace_termcodes(keys, true, false, true))
   return true
+end
+
+function M.stop_task()
+  if not state.chan or not state.task_running then return end
+  vim.fn.chansend(state.chan, "\003")
+  state.task_running = false
+  state.task_status = "failed"
+  state.marker = nil
+  vim.cmd("redrawstatus")
 end
 
 function M.tmux(command)
