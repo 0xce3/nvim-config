@@ -805,14 +805,14 @@ return {
       {
         "<leader>gl",
         function()
-          require("snacks").lazygit.open()
+          require("config.lazygit").open()
         end,
         desc = "Open lazygit",
       },
       {
         "<leader>gL",
         function()
-          require("snacks").lazygit.log()
+          require("config.lazygit").log()
         end,
         desc = "Lazygit log (cwd)",
       },

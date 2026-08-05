@@ -113,7 +113,7 @@ return {
               vim.notify("snacks.nvim is not available", vim.log.levels.ERROR)
               return
             end
-            snacks.lazygit.open()
+            require("config.lazygit").open()
           end,
           desc = "Open lazygit",
         },

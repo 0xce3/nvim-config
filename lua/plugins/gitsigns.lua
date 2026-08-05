@@ -6,7 +6,7 @@ return {
       opts.on_attach = function(bufnr)
         if original_on_attach then original_on_attach(bufnr) end
         vim.keymap.set("n", "<leader>gl", function()
-          require("snacks").lazygit.open()
+          require("config.lazygit").open()
         end, { buffer = bufnr, desc = "Open lazygit" })
       end
     end,
