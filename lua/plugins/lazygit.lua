@@ -9,6 +9,9 @@ return {
       },
       lazygit = {
         enabled = true,
+        -- LazyGit 0.64 errors when Snacks injects a theme config without a
+        -- user config.yml. Keep this portable across fresh installations.
+        configure = false,
         win = {
           style = "lazygit",
           border = "rounded",
