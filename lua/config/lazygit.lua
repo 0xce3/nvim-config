@@ -1,30 +1,27 @@
 local M = {}
+local config_file
 
-local function ensure_config_file()
-  local config_dir = vim.fn.systemlist({ "lazygit", "-cd" })[1]
-  if vim.v.shell_error ~= 0 or not config_dir or config_dir == "" then return end
-
-  local config_file = vim.fs.joinpath(config_dir, "config.yml")
-  if vim.uv.fs_stat(config_file) then return end
-
-  local ok, err = pcall(vim.fn.mkdir, config_dir, "p")
-  if not ok then
-    vim.notify(err, vim.log.levels.ERROR, { title = "lazygit" })
-    return
+local function with_config(opts, args)
+  if not config_file then
+    config_file = vim.fn.tempname() .. ".yml"
+    local ok, err = pcall(vim.fn.writefile, {}, config_file)
+    if not ok then
+      vim.notify(err, vim.log.levels.ERROR, { title = "lazygit" })
+      config_file = nil
+    end
   end
 
-  ok, err = pcall(vim.fn.writefile, {}, config_file)
-  if not ok then vim.notify(err, vim.log.levels.ERROR, { title = "lazygit" }) end
+  opts = vim.deepcopy(opts or {})
+  opts.args = vim.list_extend(config_file and { "-ucf", config_file } or {}, opts.args or args or {})
+  return opts
 end
 
 function M.open(opts)
-  ensure_config_file()
-  return require("snacks").lazygit.open(opts)
+  return require("snacks").lazygit.open(with_config(opts))
 end
 
 function M.log(opts)
-  ensure_config_file()
-  return require("snacks").lazygit.log(opts)
+  return require("snacks").lazygit.open(with_config(opts, { "log" }))
 end
 
 return M
