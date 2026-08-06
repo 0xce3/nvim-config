@@ -3,6 +3,7 @@
 return {
   entry = function()
     local hovered = cx.active.current.hovered
-    if hovered and not hovered.cha.is_dir then ya.emit("open", { hovered = true }) end
+    if not hovered then return end
+    ya.emit(hovered.cha.is_dir and "enter" or "open", { hovered = true })
   end,
 }

@@ -1,4 +1,9 @@
 [[mgr.prepend_keymap]]
 on = "<Enter>"
 run = "plugin open-file"
-desc = "Open files only"
+desc = "Enter directories or open files"
+
+[[mgr.prepend_keymap]]
+on = "<Backspace>"
+run = "leave"
+desc = "Go to parent directory"
