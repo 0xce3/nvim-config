@@ -59,8 +59,8 @@ function M.open_window()
 
   state.cwd_file = state.cwd_file or vim.fn.tempname()
   state.chooser_file = state.chooser_file or vim.fn.tempname()
-  vim.fn.writefile({}, state.cwd_file)
-  vim.fn.writefile({}, state.chooser_file)
+  vim.fn.delete(state.cwd_file)
+  vim.fn.delete(state.chooser_file)
 
   local entry = state.cwd
   if not entry then
@@ -73,11 +73,11 @@ function M.open_window()
   vim.bo[state.buf].bufhidden = "hide"
   state.job = vim.fn.termopen({
     "yazi",
+    entry,
     "--cwd-file",
     state.cwd_file,
     "--chooser-file",
     state.chooser_file,
-    entry,
   }, {
     on_exit = function(_, exit_code) vim.schedule(function() finish(exit_code) end) end,
   })
