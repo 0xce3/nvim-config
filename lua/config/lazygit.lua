@@ -2,6 +2,15 @@ local M = {}
 local config_file
 local window = { buf = nil, job = nil }
 
+local function resize_window()
+  if not window.buf or not window.job or vim.api.nvim_get_current_buf() ~= window.buf then return end
+
+  local win = vim.api.nvim_get_current_win()
+  pcall(vim.fn.jobresize, window.job, vim.api.nvim_win_get_width(win), vim.api.nvim_win_get_height(win))
+  local pid = vim.fn.jobpid(window.job)
+  if pid > 0 then pcall(vim.uv.kill, pid, "sigwinch") end
+end
+
 local function with_config(opts, args)
   if not config_file then
     config_file = vim.fn.tempname() .. ".yml"
@@ -62,6 +71,12 @@ function M.open_window()
   })
   vim.api.nvim_buf_set_name(window.buf, "Lazygit")
   vim.bo[window.buf].filetype = "lazygit"
+  vim.api.nvim_create_autocmd("BufEnter", {
+    buffer = window.buf,
+    callback = function() vim.schedule(resize_window) end,
+    desc = "Resize the LazyGit terminal after restoring its buffer",
+  })
+  resize_window()
   vim.cmd("startinsert")
 end
 
