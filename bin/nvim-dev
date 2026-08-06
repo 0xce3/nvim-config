@@ -164,8 +164,14 @@ PY
 
 container_workspace() {
   local container="$1"
-  local root_name json_ws label_ws
+  local root_name env_ws json_ws label_ws
   root_name="$(basename "$root")"
+
+  env_ws="$(docker exec "$container" sh -lc 'printf "%s" "${NVIM_WORKSPACE:-}"' 2>/dev/null || true)"
+  if [[ -n "$env_ws" ]] && docker exec "$container" test -d "$env_ws" 2>/dev/null; then
+    printf '%s\n' "$env_ws"
+    return 0
+  fi
 
   json_ws="$(devcontainer_json_value workspaceFolder || true)"
   if [[ -n "$json_ws" ]]; then
@@ -395,6 +401,7 @@ if [ ! -d \"\$workspace\" ]; then workspace=\$PWD; fi
 cd \"\$workspace\"
 printf '%s\n' $(quote "$port") > /tmp/$(quote "nvim-dev-$root_name.port")
 export NVIM_DEV_REMOTE=1
+export NVIM_DEV_WORKSPACE=$(quote "$workspace")
 exec nvim --listen 0.0.0.0:$port --headless"
 
   docker exec -d "$container" sh -lc "$script" >/dev/null
