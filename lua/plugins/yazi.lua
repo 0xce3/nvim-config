@@ -1,5 +1,9 @@
 return {
   {
+    "nvim-neo-tree/neo-tree.nvim",
+    enabled = false,
+  },
+  {
     "mikavilpas/yazi.nvim",
     version = "*",
     dependencies = {
