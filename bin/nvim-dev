@@ -536,7 +536,7 @@ fi
 }
 
 ensure_container_git_forge() {
-  local container="$1" remote_user answer remote_url remote_host cli forge
+  local container="$1" remote_user remote_home answer remote_url remote_host cli forge
   remote_user="$(devcontainer_json_value remoteUser || true)"
   [[ -n "$remote_user" ]] || remote_user="$(docker inspect -f '{{.Config.User}}' "$container" 2>/dev/null || true)"
   [[ -n "$remote_user" ]] || remote_user=root
@@ -556,8 +556,34 @@ ensure_container_git_forge() {
   fi
 
   if ! docker exec -u "$remote_user" "$container" sh -lc "command -v $cli >/dev/null 2>&1" >/dev/null 2>&1; then
-    warn "$forge CLI missing in container" "install $cli in the devcontainer"
-    return 0
+    [[ -t 0 && -t 1 ]] || { warn "$forge CLI missing in container" "install $cli in the devcontainer"; return 0; }
+    printf '%b' "${c_blue}?${c_reset} Install $forge CLI in the devcontainer? [y/N] " >&2
+    read -r answer
+    case "${answer,,}" in
+      y|yes)
+        if [[ "$cli" == glab ]]; then
+          docker cp "$(command -v glab)" "$container:/usr/local/bin/glab" >/dev/null \
+            && docker exec -u root "$container" chmod 0755 /usr/local/bin/glab \
+            || { warn "$forge CLI install failed" "install $cli in the devcontainer manually"; return 0; }
+        else
+          docker exec -u root "$container" sh -lc 'apt-get update && apt-get install -y gh' \
+            || { warn "$forge CLI install failed" "install $cli in the devcontainer manually"; return 0; }
+        fi
+        ok "$forge CLI installed" "$cli"
+        ;;
+      *)
+        warn "$forge CLI skipped" "install $cli in the devcontainer manually"
+        return 0
+        ;;
+    esac
+  fi
+
+  if [[ "$cli" == glab ]]; then
+    remote_home="$(docker exec -u "$remote_user" "$container" sh -lc 'printf %s "$HOME"')"
+    docker exec -u root "$container" sh -lc "
+      mkdir -p $(quote "$remote_home/.config/glab-cli")
+      chown -R \$(id -u $(quote "$remote_user")):$(docker exec "$container" id -g "$remote_user") $(quote "$remote_home/.config/glab-cli")
+    " || { warn "$forge CLI setup failed" "prepare $remote_home/.config/glab-cli manually"; return 0; }
   fi
 
   if docker exec -u "$remote_user" "$container" "$cli" auth status --hostname "$remote_host" >/dev/null 2>&1; then
