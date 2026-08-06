@@ -50,7 +50,7 @@ vim.keymap.set("n", "<leader>gl", function()
   require("config.lazygit").open()
 end, { desc = "Open lazygit" })
 
-vim.keymap.set({ "n", "v" }, "<leader>e", "<Cmd>Yazi<CR>", { desc = "Open yazi at current file" })
+vim.keymap.set({ "n", "v" }, "<leader>e", "<Cmd>Yazi toggle<CR>", { desc = "Open or resume yazi" })
 vim.keymap.set("n", "<leader>E", "<Cmd>Yazi cwd<CR>", { desc = "Open yazi in working directory" })
 
 vim.keymap.set("n", "<leader>gg", function()
