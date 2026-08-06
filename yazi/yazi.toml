@@ -1,0 +1,6 @@
+[plugin]
+prepend_previewers = [
+  { url = "*.bb", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
+  { url = "*.bbappend", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
+  { url = "*.bbclass", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
+]

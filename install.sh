@@ -345,7 +345,12 @@ install_language_tools() {
 }
 
 install_media_tools() {
-  step "media preview tools" "snacks.image"
+  step "media preview tools" "snacks.image yazi"
+  ensure_command "$manager" bat "" "syntax-highlighted Yazi previews"
+  if ! command -v bat >/dev/null 2>&1 && command -v batcat >/dev/null 2>&1; then
+    run mkdir -p "$HOME/.local/bin"
+    run ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
+  fi
   ensure_command "$manager" kitty "" "inline image rendering in terminal"
   ensure_command "$manager" convert "" "image conversion for previews"
   ensure_command "$manager" gs "" "PDF rendering for previews"
