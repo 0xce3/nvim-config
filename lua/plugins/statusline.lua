@@ -64,13 +64,14 @@ return {
         {
           provider = function()
             local remote = vim.env.NVIM_DEV_REMOTE == "1"
-            return (remote and "  remote" or "  local") .. " "
-          end,
-          hl = function()
-            return { fg = vim.env.NVIM_DEV_REMOTE == "1" and "#83a598" or "#b8bb26", bold = true }
+            return status.utils.stylize(remote and "remote" or "local", {
+              icon = { kind = remote and "Remote" or "Local", padding = { right = 1 } },
+              padding = { right = 1 },
+            })
           end,
         },
-        surround = { separator = "right" },
+        hl = status.hl.get_attributes "git_branch",
+        surround = { separator = "left", color = "git_branch_bg" },
       })
     end,
   },
