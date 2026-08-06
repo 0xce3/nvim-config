@@ -18,7 +18,7 @@ return {
 
         -- install any other package
         -- Newer release binaries require glibc 2.39 and fail on Ubuntu 22.04 devcontainers.
-        "tree-sitter-cli@v0.25.10",
+        { "tree-sitter-cli", version = "v0.25.10" },
       },
     },
   },

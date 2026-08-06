@@ -471,7 +471,11 @@ ensure_container_tools() {
     set -e
     cfg=\"\${XDG_CONFIG_HOME:-\$HOME/.config}\"
     tag_file=\"\$cfg/nvim/.nvim-tools.ok\"
-    if [ -f \"\$tag_file\" ] && [ \"\$(cat \"\$tag_file\" 2>/dev/null || true)\" = $(quote "$config_hash") ]; then
+    if [ -f \"\$tag_file\" ] \
+      && [ \"\$(cat \"\$tag_file\" 2>/dev/null || true)\" = $(quote "$config_hash") ] \
+      && nvim --version >/dev/null 2>&1 \
+      && lazygit --version >/dev/null 2>&1 \
+      && yazi --version >/dev/null 2>&1; then
       printf '%s\n' cached
     else
       printf '%s\n' \"\$cfg\"
@@ -489,6 +493,7 @@ set -e
 for cmd in nvim git rg fzf curl tar unzip clang-format lazygit yazi gdb; do
   command -v "$cmd" >/dev/null 2>&1 || { missing=1; break; }
 done
+yazi --version >/dev/null 2>&1 || missing=1
 python3 - <<'PY' >/dev/null 2>&1 || missing=1
 import yaml
 PY
@@ -513,11 +518,11 @@ if [ -n "${missing:-}" ]; then
         rm -rf "$tmp"
       fi
     fi
-    if ! command -v yazi >/dev/null 2>&1; then
+    if ! yazi --version >/dev/null 2>&1; then
       arch="$(uname -m)"
       case "$arch" in
-        x86_64|amd64) target=x86_64-unknown-linux-gnu ;;
-        aarch64|arm64) target=aarch64-unknown-linux-gnu ;;
+        x86_64|amd64) target=x86_64-unknown-linux-musl ;;
+        aarch64|arm64) target=aarch64-unknown-linux-musl ;;
         *) target= ;;
       esac
       if [ -n "$target" ]; then
