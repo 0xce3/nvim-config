@@ -83,6 +83,13 @@ function M.open_window()
   })
   vim.api.nvim_buf_set_name(state.buf, "Yazi")
   vim.bo[state.buf].filetype = "yazi"
+  vim.keymap.set("t", "<Esc>", function()
+    if state.job then vim.fn.chansend(state.job, "\27") end
+  end, {
+    buffer = state.buf,
+    silent = true,
+    desc = "Send Escape to Yazi",
+  })
   vim.api.nvim_create_autocmd("BufEnter", {
     buffer = state.buf,
     callback = function() vim.schedule(resize_window) end,
