@@ -11,6 +11,7 @@ return {
       opts.picker.win = opts.picker.win or {}
       opts.picker.win.input = opts.picker.win.input or {}
       opts.picker.win.input.keys = opts.picker.win.input.keys or {}
+      opts.picker.win.input.keys["<Esc>"] = { "close", mode = { "n", "i" } }
       opts.picker.win.input.keys["<S-j>"] = { "preview_scroll_down", mode = { "n", "i" } }
       opts.picker.win.input.keys["<S-Down>"] = { "preview_scroll_down", mode = { "n", "i" } }
       opts.picker.win.input.keys["<S-Up>"] = { "preview_scroll_up", mode = { "n", "i" } }
