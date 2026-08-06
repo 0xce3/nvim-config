@@ -97,10 +97,7 @@ return {
           function() close_buffer(0, false) end,
           desc = "Close buffer",
         },
-        ["<Leader>q"] = {
-          function() close_buffer(0, false) end,
-          desc = "Close buffer",
-        },
+        ["<Leader>q"] = false,
         ["<Leader>Q"] = { "<Cmd>confirm qall<CR>", desc = "Exit AstroNvim" },
         ["<Leader>C"] = {
           function() close_buffer(0, true) end,
