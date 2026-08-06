@@ -1,5 +1,6 @@
 local M = {}
 local config_file
+local window = { buf = nil, job = nil }
 
 local function with_config(opts, args)
   if not config_file then
@@ -24,18 +25,28 @@ function M.log(opts)
   return require("snacks").lazygit.open(with_config(opts, { "log" }))
 end
 
-function M.open_split()
+function M.open_window()
+  if window.buf and vim.api.nvim_buf_is_valid(window.buf) then
+    local wins = vim.fn.win_findbuf(window.buf)
+    if #wins > 0 then
+      vim.api.nvim_set_current_win(wins[1])
+    else
+      vim.api.nvim_set_current_buf(window.buf)
+    end
+    if window.job then vim.cmd("startinsert") end
+    return
+  end
+
   local opts = with_config()
   local cmd = vim.list_extend({ "lazygit" }, opts.args)
 
-  vim.cmd("botright 15new")
-  local win = vim.api.nvim_get_current_win()
-  local buf = vim.api.nvim_get_current_buf()
-  vim.api.nvim_buf_set_name(buf, "Lazygit")
-  vim.bo[buf].bufhidden = "wipe"
+  window.buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_set_current_buf(window.buf)
+  vim.bo[window.buf].bufhidden = "hide"
 
-  vim.fn.termopen(cmd, {
+  window.job = vim.fn.termopen(cmd, {
     on_exit = function(_, exit_code)
+      window.job = nil
       if exit_code ~= 0 then
         vim.schedule(function()
           vim.notify("Lazygit exited with code " .. exit_code, vim.log.levels.ERROR, { title = "lazygit" })
@@ -43,10 +54,14 @@ function M.open_split()
         return
       end
       vim.schedule(function()
-        if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
+        local buf = window.buf
+        window.buf = nil
+        if buf and vim.api.nvim_buf_is_valid(buf) then require("astrocore.buffer").close(buf, true) end
       end)
     end,
   })
+  vim.api.nvim_buf_set_name(window.buf, "Lazygit")
+  vim.bo[window.buf].filetype = "lazygit"
   vim.cmd("startinsert")
 end
 

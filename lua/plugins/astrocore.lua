@@ -120,8 +120,8 @@ return {
           desc = "Open lazygit",
         },
         ["<Leader>gL"] = {
-          function() require("config.lazygit").open_split() end,
-          desc = "Open lazygit in split",
+          function() require("config.lazygit").open_window() end,
+          desc = "Open lazygit buffer",
         },
         ["<Leader>fg"] = {
           function() require("snacks").picker.grep() end,

@@ -1,5 +1,14 @@
 return {
   {
+    "nvim-mini/mini.icons",
+    optional = true,
+    opts = {
+      file = {
+        Lazygit = { glyph = "", hl = "MiniIconsOrange" },
+      },
+    },
+  },
+  {
     "folke/snacks.nvim",
     opts = {
       win = {
