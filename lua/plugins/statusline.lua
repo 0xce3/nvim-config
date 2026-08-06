@@ -70,6 +70,7 @@ return {
             })
           end,
         },
+        { provider = "|" },
         hl = status.hl.get_attributes "git_branch",
         surround = { separator = "left", color = "git_branch_bg" },
       })
