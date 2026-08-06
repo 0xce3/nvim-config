@@ -208,6 +208,15 @@ function M.toggle()
   open()
 end
 
+function M.restore()
+  if buf_ok() then
+    vim.api.nvim_set_current_buf(state.buf)
+  else
+    open()
+  end
+  vim.cmd("stopinsert")
+end
+
 function M.run(command, label)
   if not command or command == "" then
     return
