@@ -1,0 +1,4 @@
+[[mgr.prepend_keymap]]
+on = "<Enter>"
+run = "plugin open-file"
+desc = "Open files only"
