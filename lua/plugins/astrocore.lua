@@ -119,6 +119,10 @@ return {
           end,
           desc = "Open lazygit",
         },
+        ["<Leader>gL"] = {
+          function() require("config.lazygit").open_split() end,
+          desc = "Open lazygit in split",
+        },
         ["<Leader>fg"] = {
           function() require("snacks").picker.grep() end,
           desc = "Grep project",
