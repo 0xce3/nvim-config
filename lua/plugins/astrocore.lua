@@ -109,19 +109,12 @@ return {
         },
         ["go"] = { "<C-o>", desc = "Jump back" },
         ["<Leader>gl"] = {
-          function()
-            local ok, snacks = pcall(require, "snacks")
-            if not ok then
-              vim.notify("snacks.nvim is not available", vim.log.levels.ERROR)
-              return
-            end
-            require("config.lazygit").open()
-          end,
-          desc = "Open lazygit",
-        },
-        ["<Leader>gL"] = {
           function() require("config.lazygit").open_window() end,
           desc = "Open lazygit buffer",
+        },
+        ["<Leader>gL"] = {
+          function() require("config.lazygit").open() end,
+          desc = "Open lazygit float",
         },
         ["<Leader>fg"] = {
           function() require("snacks").picker.grep() end,

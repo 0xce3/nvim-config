@@ -47,8 +47,11 @@ vim.keymap.set("v", "<C-x>", '"+d', { desc = "Cut selection to system clipboard"
 
 -- Set this after all AstroNvim plugin specs so no Git mapping can shadow it.
 vim.keymap.set("n", "<leader>gl", function()
+  require("config.lazygit").open_window()
+end, { desc = "Open lazygit buffer" })
+vim.keymap.set("n", "<leader>gL", function()
   require("config.lazygit").open()
-end, { desc = "Open lazygit" })
+end, { desc = "Open lazygit float" })
 
 vim.keymap.set({ "n", "v" }, "<leader>e", "<Cmd>Yazi toggle<CR>", { desc = "Open or resume yazi" })
 vim.keymap.set("n", "<leader>E", "<Cmd>Yazi cwd<CR>", { desc = "Open yazi in working directory" })

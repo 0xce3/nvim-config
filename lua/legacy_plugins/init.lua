@@ -726,16 +726,16 @@ return {
       {
         "<leader>gl",
         function()
-          require("config.lazygit").open()
+          require("config.lazygit").open_window()
         end,
-        desc = "Open lazygit",
+        desc = "Open lazygit buffer",
       },
       {
         "<leader>gL",
         function()
-          require("config.lazygit").log()
+          require("config.lazygit").open()
         end,
-        desc = "Lazygit log (cwd)",
+        desc = "Open lazygit float",
       },
     },
   },

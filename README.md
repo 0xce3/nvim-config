@@ -83,8 +83,8 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
 | `<Tab>` / `<S-Tab>` | Open buffer picker / previous listed buffer |
 | `<leader>gg` | Fugitive Git status |
-| `<leader>gl` | Lazygit |
-| `<leader>gL` | Lazygit in a dedicated terminal buffer |
+| `<leader>gl` | Lazygit in a dedicated terminal buffer |
+| `<leader>gL` | Lazygit in a floating Snacks window |
 | `<leader>gn` / `<leader>gp` | Next / previous Git hunk |
 | `<leader>fc` | Pick active `compile_commands.json` for clangd |
 | `<leader>tr` | Run VS Code task |

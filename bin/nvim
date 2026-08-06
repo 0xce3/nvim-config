@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "$#" -eq 0 ]]; then
-  target="$HOME"
+  target="."
 else
   target="$1"
 fi
@@ -144,8 +144,12 @@ if [[ "$#" -gt 0 && -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcon
 fi
 
 if [[ "$#" -eq 0 ]]; then
-  cd "$HOME"
-  exec "$nvim_bin" "$HOME"
+  exec "$nvim_bin"
+fi
+
+if [[ "$#" -eq 1 && -d "$target" ]]; then
+  cd "${root:-$target}"
+  exec "$nvim_bin"
 fi
 
 exec "$nvim_bin" "$@"
