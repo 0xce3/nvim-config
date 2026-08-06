@@ -17,7 +17,8 @@ return {
         "stylua",
 
         -- install any other package
-        "tree-sitter-cli",
+        -- Newer release binaries require glibc 2.39 and fail on Ubuntu 22.04 devcontainers.
+        "tree-sitter-cli@v0.25.10",
       },
     },
   },
