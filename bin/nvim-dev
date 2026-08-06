@@ -394,6 +394,7 @@ if [ ! -d \"\$workspace\" ]; then workspace=/workspace/$(quote "$root_name"); fi
 if [ ! -d \"\$workspace\" ]; then workspace=\$PWD; fi
 cd \"\$workspace\"
 printf '%s\n' $(quote "$port") > /tmp/$(quote "nvim-dev-$root_name.port")
+export NVIM_DEV_REMOTE=1
 exec nvim --listen 0.0.0.0:$port --headless"
 
   docker exec -d "$container" sh -lc "$script" >/dev/null

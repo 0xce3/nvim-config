@@ -60,6 +60,18 @@ return {
         },
         surround = { separator = "right" },
       })
+      table.insert(opts.statusline, 2, status.component.builder {
+        {
+          provider = function()
+            local remote = vim.env.NVIM_DEV_REMOTE == "1"
+            return (remote and "  remote" or "  local") .. " "
+          end,
+          hl = function()
+            return { fg = vim.env.NVIM_DEV_REMOTE == "1" and "#83a598" or "#b8bb26", bold = true }
+          end,
+        },
+        surround = { separator = "right" },
+      })
     end,
   },
 }
