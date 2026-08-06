@@ -7,8 +7,8 @@ local function resize_window()
 
   local win = vim.api.nvim_get_current_win()
   pcall(vim.fn.jobresize, window.job, vim.api.nvim_win_get_width(win), vim.api.nvim_win_get_height(win))
-  local pid = vim.fn.jobpid(window.job)
-  if pid > 0 then pcall(vim.uv.kill, pid, "sigwinch") end
+  local ok, pid = pcall(vim.fn.jobpid, window.job)
+  if ok and pid > 0 then pcall(vim.uv.kill, pid, "sigwinch") end
 end
 
 local function with_config(opts, args)

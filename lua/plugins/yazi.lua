@@ -1,5 +1,14 @@
 return {
   {
+    "nvim-mini/mini.icons",
+    optional = true,
+    opts = {
+      file = {
+        Yazi = { glyph = "", hl = "MiniIconsYellow" },
+      },
+    },
+  },
+  {
     "nvim-neo-tree/neo-tree.nvim",
     enabled = false,
   },

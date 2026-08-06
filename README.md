@@ -78,8 +78,8 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | Key | Action |
 |-----|--------|
 | `<leader>w` | Save file |
-| `<leader>e` | Open or resume the last Yazi session |
-| `<leader>E` | Open Yazi in the working directory |
+| `<leader>e` | Yazi in a dedicated terminal buffer |
+| `<leader>E` | Yazi in a floating window |
 | `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
 | `<Tab>` / `<S-Tab>` | Open buffer picker / previous listed buffer |
 | `<leader>gg` | Fugitive Git status |
