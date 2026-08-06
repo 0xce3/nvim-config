@@ -463,7 +463,7 @@ sync_nvim_config_to_container() {
 ensure_container_tools() {
   local container="$1" start config_hash check_out
   start=$SECONDS
-  step "check tools" "nvim git rg fzf clang-format lazygit PyYAML"
+  step "check tools" "nvim git rg fzf clang-format lazygit yazi PyYAML"
 
   config_hash="$(tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner --exclude=nvim/.git -C "$HOME/.config" -cf - nvim 2>/dev/null | sha256sum | cut -d ' ' -f 1 || true)"
 
@@ -486,7 +486,7 @@ ensure_container_tools() {
 
   docker exec -u root "$container" sh -lc '
 set -e
-for cmd in nvim git rg fzf curl tar clang-format lazygit gdb; do
+for cmd in nvim git rg fzf curl tar unzip clang-format lazygit yazi gdb; do
   command -v "$cmd" >/dev/null 2>&1 || { missing=1; break; }
 done
 python3 - <<'PY' >/dev/null 2>&1 || missing=1
@@ -496,7 +496,7 @@ if [ -n "${missing:-}" ]; then
   if command -v apt-get >/dev/null 2>&1; then
     rm -f /etc/apt/sources.list.d/lazygit-team-ubuntu-release-*.list /etc/apt/sources.list.d/lazygit-team-ubuntu-release-*.sources
     apt-get update
-    apt-get install -y software-properties-common curl git ripgrep fd-find fzf tar python3 python3-pip python3-yaml clang-format gdb
+    apt-get install -y software-properties-common curl git ripgrep fd-find fzf tar unzip python3 python3-pip python3-yaml clang-format gdb
     if ! command -v lazygit >/dev/null 2>&1; then
       arch="$(uname -m)"
       case "$arch" in
@@ -510,6 +510,21 @@ if [ -n "${missing:-}" ]; then
         curl -fsSL -o "$tmp/lazygit.tar.gz" "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${version}_Linux_${asset_arch}.tar.gz"
         tar -C "$tmp" -xf "$tmp/lazygit.tar.gz" lazygit
         install -m 0755 "$tmp/lazygit" /usr/local/bin/lazygit
+        rm -rf "$tmp"
+      fi
+    fi
+    if ! command -v yazi >/dev/null 2>&1; then
+      arch="$(uname -m)"
+      case "$arch" in
+        x86_64|amd64) target=x86_64-unknown-linux-gnu ;;
+        aarch64|arm64) target=aarch64-unknown-linux-gnu ;;
+        *) target= ;;
+      esac
+      if [ -n "$target" ]; then
+        tmp="$(mktemp -d)"
+        curl -fsSL -o "$tmp/yazi.zip" "https://github.com/sxyazi/yazi/releases/latest/download/yazi-${target}.zip"
+        unzip -q "$tmp/yazi.zip" -d "$tmp"
+        install -m 0755 "$tmp/yazi-${target}/yazi" "$tmp/yazi-${target}/ya" /usr/local/bin/
         rm -rf "$tmp"
       fi
     fi

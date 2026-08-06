@@ -250,6 +250,26 @@ install_lazygit_github() {
   ok "lazygit installed" "$version"
 }
 
+install_yazi_github() {
+  command -v yazi >/dev/null 2>&1 && { ok "yazi" "installed"; return 0; }
+  [[ "$skip_packages" -eq 1 ]] && { warn "yazi missing" "skipped"; return 0; }
+  [[ "$(prompt_action "Install yazi from GitHub release?")" == install ]] || { warn "skipped" "yazi"; return 0; }
+  [[ "$dry_run" -eq 1 ]] && { run curl -fsSL https://github.com/sxyazi/yazi/releases/latest; return 0; }
+
+  local tmp target
+  tmp="$(mktemp -d)"
+  case "$(uname -m)" in
+    x86_64|amd64) target=x86_64-unknown-linux-gnu ;;
+    aarch64|arm64) target=aarch64-unknown-linux-gnu ;;
+    *) fail "unsupported architecture" "$(uname -m)"; rm -rf "$tmp"; return 1 ;;
+  esac
+  curl -fsSL -o "$tmp/yazi.zip" "https://github.com/sxyazi/yazi/releases/latest/download/yazi-${target}.zip"
+  unzip -q "$tmp/yazi.zip" -d "$tmp"
+  as_root install -m 0755 "$tmp/yazi-${target}/yazi" "$tmp/yazi-${target}/ya" /usr/local/bin/
+  rm -rf "$tmp"
+  ok "yazi" "installed"
+}
+
 install_wrappers() {
   step "install wrappers" "nvim nvim-dev opencode"
   run "$config_dir/bin/install-wrappers"
@@ -431,6 +451,7 @@ main() {
   ensure_command "$manager" gh "" "GitHub integration"
 
   install_lazygit_github
+  install_yazi_github
   install_opencode
   install_wrappers
   install_language_tools
