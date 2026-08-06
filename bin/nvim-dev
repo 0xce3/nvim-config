@@ -587,6 +587,9 @@ ensure_container_git_forge() {
   fi
 
   if docker exec -u "$remote_user" "$container" "$cli" auth status --hostname "$remote_host" >/dev/null 2>&1; then
+    if [[ "$cli" == glab ]]; then
+      docker exec -u "$remote_user" "$container" git config --global "credential.https://$remote_host.helper" '!glab auth git-credential'
+    fi
     ok "$forge CLI authenticated" "container user $remote_user"
     return 0
   fi
@@ -597,6 +600,9 @@ ensure_container_git_forge() {
   case "${answer,,}" in
     y|yes)
       docker exec -it -u "$remote_user" "$container" "$cli" auth login --hostname "$remote_host"
+      if [[ "$cli" == glab ]]; then
+        docker exec -u "$remote_user" "$container" git config --global "credential.https://$remote_host.helper" '!glab auth git-credential'
+      fi
       ;;
     *) warn "$forge authentication skipped" "run $cli auth login --hostname $remote_host in the devcontainer manually" ;;
   esac
