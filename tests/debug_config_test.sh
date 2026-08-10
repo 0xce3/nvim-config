@@ -74,6 +74,8 @@ end' +qa
 cat > "$fixture_root/task_input_test.lua" <<'LUA'
 local prompts = { ["Version: "] = "v2.3.4", ["Message: "] = "Release 2.3.4" }
 vim.ui.input = function(opts, callback)
+  assert(opts.icon_pos == false, "task input icon must be disabled")
+  assert(opts.expand == false, "task input resizing must be disabled")
   callback(prompts[opts.prompt])
 end
 

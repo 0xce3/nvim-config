@@ -328,6 +328,8 @@ local function prompt_task_inputs(task, tasks, definitions, supplied, callback)
     vim.ui.input({
       prompt = (definition.description or id) .. ": ",
       default = definition.default,
+      icon_pos = false,
+      expand = false,
     }, function(value)
       if value == nil then return end
       values[id] = value
