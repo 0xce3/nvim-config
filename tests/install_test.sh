@@ -18,7 +18,7 @@ assert_contains() {
 [[ -f "$install_script" ]] || fail "install.sh exists"
 
 bash -n "$install_script"
-bash -n "$repo_root/bin/nvim-download" "$repo_root/bin/nvim-dev"
+bash -n "$repo_root/bin/nvim-download" "$repo_root/bin/nvim-open" "$repo_root/bin/nvim-dev"
 
 download_test_dir="$(mktemp -d)"
 printf 'pdf fixture\n' > "$download_test_dir/manual.pdf"

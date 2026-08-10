@@ -3,3 +3,8 @@ prepend_rules = [
   { url = ".*", fg = "#737aa2", dim = true },
   { url = "*/.*", fg = "#737aa2", dim = true },
 ]
+
+[icon]
+prepend_globs = [
+  { url = "*/.*", text = "󰘓", fg = "#737aa2" },
+]

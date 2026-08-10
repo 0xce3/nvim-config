@@ -751,7 +751,7 @@ windows_download_dir() {
 }
 
 download_bridge() {
-  local parent_pid="$1" request_dir="$root/.git/nvim-download" target_dir request processing response source_file name stem ext candidate index
+  local parent_pid="$1" request_dir="$root/.git/nvim-download" target_dir request processing response source_file host_file windows_path name stem ext candidate index
   target_dir="$(windows_download_dir)" || return 0
   mkdir -p "$request_dir" "$target_dir"
 
@@ -786,6 +786,33 @@ download_bridge() {
         printf '%s\n' "$candidate" > "$response"
       else
         printf 'ERROR:Could not copy file from devcontainer\n' > "$response"
+      fi
+      rm -f "$processing"
+    done
+
+    for request in "$request_dir"/*.open-request; do
+      [[ -f "$request" ]] || continue
+      processing="${request%.open-request}.open-processing.$$"
+      mv "$request" "$processing" 2>/dev/null || continue
+      source_file="$(cat "$processing")"
+      response="${request%.open-request}.open-response"
+      case "$source_file" in
+        "$workspace"/*) host_file="$root/${source_file#"$workspace"/}" ;;
+        *)
+          printf 'ERROR:Only files inside the devcontainer workspace can be opened on Windows\n' > "$response"
+          rm -f "$processing"
+          continue
+          ;;
+      esac
+
+      if [[ ! -f "$host_file" ]]; then
+        printf 'ERROR:Selected file is not visible in the WSL workspace\n' > "$response"
+      elif ! windows_path="$(wslpath -w "$host_file")"; then
+        printf 'ERROR:Could not translate the file path for Windows\n' > "$response"
+      elif powershell.exe -NoProfile -Command 'Start-Process -LiteralPath $args[0]' "$windows_path" >/dev/null 2>&1; then
+        printf 'OK\n' > "$response"
+      else
+        printf 'ERROR:Windows could not open the selected file\n' > "$response"
       fi
       rm -f "$processing"
     done

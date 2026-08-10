@@ -1,6 +1,16 @@
 [mgr]
 show_hidden = true
 
+[opener]
+windows_pdf = [
+  { run = "nvim-open %s1", desc = "Open PDF in Windows", for = "unix" },
+]
+
+[open]
+prepend_rules = [
+  { url = "*.pdf", use = "windows_pdf" },
+]
+
 [plugin]
 prepend_previewers = [
   { url = "*.bb", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
