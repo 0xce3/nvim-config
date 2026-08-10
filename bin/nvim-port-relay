@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+import argparse
+import asyncio
+import contextlib
+
+
+STDIO_RELAY = r"""
+import os
+import socket
+import sys
+import threading
+
+sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])))
+
+def upload():
+    try:
+        while data := os.read(0, 65536):
+            sock.sendall(data)
+        sock.shutdown(socket.SHUT_WR)
+    except (BrokenPipeError, OSError):
+        pass
+
+threading.Thread(target=upload, daemon=True).start()
+try:
+    while data := sock.recv(65536):
+        os.write(1, data)
+finally:
+    sock.close()
+"""
+
+
+async def copy_stream(reader, writer):
+    try:
+        while data := await reader.read(65536):
+            writer.write(data)
+            await writer.drain()
+    except (BrokenPipeError, ConnectionError):
+        pass
+    finally:
+        with contextlib.suppress(Exception):
+            writer.close()
+
+
+async def handle_client(reader, writer, args):
+    try:
+        target_reader, target_writer = await asyncio.open_connection(args.target_host, args.target_port)
+    except OSError:
+        if not args.container:
+            writer.close()
+            return
+        process = await asyncio.create_subprocess_exec(
+            "docker",
+            "exec",
+            "-i",
+            args.container,
+            "python3",
+            "-c",
+            STDIO_RELAY,
+            str(args.target_port),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.gather(copy_stream(reader, process.stdin), copy_stream(process.stdout, writer))
+        with contextlib.suppress(ProcessLookupError):
+            process.terminate()
+        await process.wait()
+        return
+
+    await asyncio.gather(copy_stream(reader, target_writer), copy_stream(target_reader, writer))
+
+
+async def main(args):
+    server = await asyncio.start_server(
+        lambda reader, writer: handle_client(reader, writer, args),
+        args.listen_host,
+        args.listen_port,
+    )
+    async with server:
+        await server.serve_forever()
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--listen-host", default="127.0.0.1")
+parser.add_argument("--listen-port", type=int, required=True)
+parser.add_argument("--target-host", required=True)
+parser.add_argument("--target-port", type=int, required=True)
+parser.add_argument("--container")
+asyncio.run(main(parser.parse_args()))

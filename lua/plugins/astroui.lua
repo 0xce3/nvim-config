@@ -114,6 +114,7 @@ return {
     icons = {
       Local = "",
       Remote = "",
+      Ports = "󰑩",
       -- configure the loading of the lsp in the status line
       LSPLoading1 = "⠋",
       LSPLoading2 = "⠙",

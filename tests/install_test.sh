@@ -19,6 +19,7 @@ assert_contains() {
 
 bash -n "$install_script"
 bash -n "$repo_root/bin/nvim-download" "$repo_root/bin/nvim-open" "$repo_root/bin/nvim-dev"
+python3 -c 'compile(open(__import__("sys").argv[1], encoding="utf-8").read(), __import__("sys").argv[1], "exec")' "$repo_root/bin/nvim-port-relay"
 
 download_test_dir="$(mktemp -d)"
 printf 'pdf fixture\n' > "$download_test_dir/manual.pdf"

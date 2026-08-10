@@ -162,6 +162,49 @@ if isinstance(value, str):
 PY
 }
 
+devcontainer_forward_ports() {
+  python3 - "$(devcontainer_json)" <<'PY'
+import json, re, sys
+
+def strip_jsonc(text):
+    out, i, in_string = [], 0, False
+    while i < len(text):
+        if in_string:
+            out.append(text[i])
+            if text[i] == "\\" and i + 1 < len(text):
+                i += 1
+                out.append(text[i])
+            elif text[i] == '"':
+                in_string = False
+        elif text[i] == '"':
+            in_string = True
+            out.append(text[i])
+        elif text[i:i + 2] == "//":
+            i = text.find("\n", i)
+            if i == -1:
+                break
+            out.append("\n")
+        elif text[i:i + 2] == "/*":
+            i = text.find("*/", i + 2)
+            if i == -1:
+                break
+            i += 1
+        else:
+            out.append(text[i])
+        i += 1
+
+    return "".join(out)
+
+with open(sys.argv[1], encoding="utf-8") as config_file:
+    config = json.loads(strip_jsonc(config_file.read()))
+
+for value in config.get("forwardPorts", []):
+    match = re.search(r"(\d+)$", str(value))
+    if match and 0 < int(match.group(1)) < 65536:
+        print(match.group(1))
+PY
+}
+
 container_workspace() {
   local container="$1"
   local root_name env_ws json_ws label_ws
@@ -823,5 +866,80 @@ download_bridge() {
 }
 
 download_bridge "$$" &
+
+container_listening_ports() {
+  docker exec "$container" sh -lc 'ss -H -ltn 2>/dev/null' | while read -r _ _ _ address _; do
+    port="${address##*:}"
+    case "$port" in
+      ''|*[!0-9]*) ;;
+      *) printf '%s\n' "$port" ;;
+    esac
+  done
+}
+
+port_forward_bridge() {
+  local parent_pid="$1" relay="$HOME/.config/nvim/bin/nvim-port-relay" relay_log_dir status_file lock_file
+  local forwarded_port relay_pid
+  declare -A relays=()
+  relay_log_dir="${XDG_STATE_HOME:-$HOME/.local/state}/nvim/port-relays-$root_name"
+  status_file="$root/.git/nvim-forwarded-ports"
+  mkdir -p "$relay_log_dir"
+
+  if command -v flock >/dev/null 2>&1; then
+    lock_file="$relay_log_dir/bridge.lock"
+    exec 9>"$lock_file"
+    until flock -n 9; do
+      kill -0 "$parent_pid" 2>/dev/null || return 0
+      sleep 2
+    done
+  fi
+
+  while kill -0 "$parent_pid" 2>/dev/null; do
+    declare -A wanted=()
+    while read -r forwarded_port; do
+      case "$forwarded_port" in
+        ''|*[!0-9]*) continue ;;
+      esac
+      if (( forwarded_port >= 1024 && forwarded_port != port )); then
+        wanted[$forwarded_port]=1
+      fi
+    done < <({ devcontainer_forward_ports; container_listening_ports; } | sort -nu)
+
+    for forwarded_port in "${!wanted[@]}"; do
+      relay_pid="${relays[$forwarded_port]:-}"
+      if [[ -n "$relay_pid" ]] && kill -0 "$relay_pid" 2>/dev/null; then
+        continue
+      fi
+      python3 "$relay" \
+        --listen-port "$forwarded_port" \
+        --target-host "$host" \
+        --target-port "$forwarded_port" \
+        --container "$container" \
+        >"$relay_log_dir/$forwarded_port.log" 2>&1 &
+      relays[$forwarded_port]=$!
+    done
+
+    for forwarded_port in "${!relays[@]}"; do
+      if [[ -z "${wanted[$forwarded_port]:-}" ]]; then
+        kill "${relays[$forwarded_port]}" 2>/dev/null || true
+        unset 'relays[$forwarded_port]'
+      fi
+    done
+    for forwarded_port in "${!relays[@]}"; do
+      relay_pid="${relays[$forwarded_port]}"
+      if kill -0 "$relay_pid" 2>/dev/null; then printf '%s\n' "$forwarded_port"; fi
+    done | sort -n > "$status_file.tmp.$$"
+    mv "$status_file.tmp.$$" "$status_file"
+    sleep 2
+  done
+
+  for relay_pid in "${relays[@]}"; do
+    kill "$relay_pid" 2>/dev/null || true
+  done
+  rm -f "$status_file" "$status_file.tmp.$$"
+}
+
+info "port forwarding" "container TCP ports → Windows localhost"
+port_forward_bridge "$$" &
 
 exec "$nvim_bin" --server "$addr" --remote-ui

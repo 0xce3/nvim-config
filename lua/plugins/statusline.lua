@@ -1,10 +1,40 @@
 -- Customize only the statusline tree. Do not modify AstroUI's shared status
 -- component defaults because the buffer tabline derives icons from them.
+local ports_cache = { updated = 0, values = {} }
+
+local function forwarded_ports()
+  local now = vim.uv.now()
+  if now - ports_cache.updated < 1000 then return ports_cache.values end
+  ports_cache.updated = now
+
+  local workspace = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
+  if not workspace or workspace == "" then
+    ports_cache.values = {}
+    return ports_cache.values
+  end
+  local ok, lines = pcall(vim.fn.readfile, vim.fs.joinpath(workspace, ".git", "nvim-forwarded-ports"))
+  ports_cache.values = ok and vim.tbl_filter(function(port) return port:match("^%d+$") ~= nil end, lines) or {}
+  return ports_cache.values
+end
+
 return {
   {
     "rebelot/heirline.nvim",
     opts = function(_, opts)
       local status = require("astroui.status")
+
+      if vim.env.NVIM_DEV_REMOTE == "1" then
+        local timer = vim.uv.new_timer()
+        timer:start(2000, 2000, vim.schedule_wrap(function()
+          if vim.v.exiting == 0 then vim.cmd.redrawstatus() end
+        end))
+        vim.api.nvim_create_autocmd("VimLeavePre", {
+          once = true,
+          callback = function()
+            if not timer:is_closing() then timer:stop(); timer:close() end
+          end,
+        })
+      end
 
       opts.statusline[3] = status.component.file_info {
         file_icon = false,
@@ -57,6 +87,24 @@ return {
             if task_status == "failed" then return { fg = "#fb4934", bold = true } end
             return { fg = "#fabd2f", bold = true }
           end,
+        },
+        surround = { separator = "right" },
+      })
+      table.insert(opts.statusline, 9, status.component.builder {
+        condition = function() return #forwarded_ports() > 0 end,
+        {
+          provider = function() return require("astroui").get_icon("Ports", 1, true) end,
+          hl = { fg = "#83a598" },
+        },
+        {
+          provider = function()
+            local ports = forwarded_ports()
+            local shown = { ports[1] }
+            if ports[2] then shown[#shown + 1] = ports[2] end
+            local suffix = #ports > 2 and ", +" .. (#ports - 2) or ""
+            return "Ports: " .. table.concat(shown, ", ") .. suffix
+          end,
+          hl = { fg = "#83a598", bold = true },
         },
         surround = { separator = "right" },
       })
