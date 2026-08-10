@@ -17,11 +17,32 @@ local function forwarded_ports()
   return ports_cache.values
 end
 
+local function show_forwarded_ports()
+  local ports = forwarded_ports()
+  if #ports == 0 then
+    vim.notify("No forwarded ports", vim.log.levels.INFO, { title = "Devcontainer Ports" })
+    return
+  end
+
+  local lines = vim.tbl_map(function(port)
+    if port == "443" or port == "8443" then return "https://localhost:" .. port end
+    if port == "22" or port == "10022" then return "ssh -p " .. port .. " localhost" end
+    return "http://localhost:" .. port
+  end, ports)
+  vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO, { title = "Devcontainer Ports" })
+end
+
 return {
   {
     "rebelot/heirline.nvim",
     opts = function(_, opts)
       local status = require("astroui.status")
+
+      vim.api.nvim_create_user_command("ForwardedPorts", show_forwarded_ports, {
+        desc = "Show forwarded devcontainer ports",
+        force = true,
+      })
+      vim.keymap.set("n", "<leader>tp", show_forwarded_ports, { desc = "Show forwarded ports" })
 
       if vim.env.NVIM_DEV_REMOTE == "1" then
         local timer = vim.uv.new_timer()
@@ -105,6 +126,10 @@ return {
             return "Ports: " .. table.concat(shown, ", ") .. suffix
           end,
           hl = { fg = "#83a598", bold = true },
+        },
+        on_click = {
+          name = "heirline_forwarded_ports",
+          callback = show_forwarded_ports,
         },
         surround = { separator = "right" },
       })
