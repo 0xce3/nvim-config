@@ -523,7 +523,7 @@ function M.pick_task()
             return
           end
           write_recent_task(selection.value)
-          M.run_task(selection.value)
+          vim.schedule(function() M.run_task(selection.value) end)
         end)
 
         map("i", "<Tab>", function()

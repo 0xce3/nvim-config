@@ -27,6 +27,32 @@ cat > "$fixture_root/.vscode/launch.json" <<'JSONC'
 }
 JSONC
 
+cat > "$fixture_root/.vscode/tasks.json" <<'JSONC'
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Create tag",
+      "type": "shell",
+      "command": "printf '%s:%s' '${input:tagVersion}' '${input:tagMessage}'"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "tagVersion",
+      "type": "promptString",
+      "description": "Version",
+      "default": "v1.0.0"
+    },
+    {
+      "id": "tagMessage",
+      "type": "promptString",
+      "description": "Message"
+    }
+  ]
+}
+JSONC
+
 cd "$fixture_root"
 nvim --headless -u "$repo_root/init.lua" +'lua do
   local debug_config = require("config.vscode_debug")
@@ -40,5 +66,25 @@ nvim --headless -u "$repo_root/init.lua" +'lua do
   assert(dap_config.miDebuggerPath == "/usr/bin/gdb", "unexpected gdb path")
   assert(dap_config.miDebuggerServerAddress == "127.0.0.1:4112", "unexpected gdbserver address")
 end' +qa
+
+cat > "$fixture_root/task_input_test.lua" <<'LUA'
+local prompts = { ["Version: "] = "v2.3.4", ["Message: "] = "Release 2.3.4" }
+vim.ui.input = function(opts, callback)
+  callback(prompts[opts.prompt])
+end
+
+local command
+package.loaded["vstask.Job"] = {
+  clean_command = function(value) return value end,
+  start_job = function(opts) command = opts.command end,
+}
+
+local debug_config = require("config.vscode_debug")
+assert(debug_config.run_task("Create tag"), "expected task to start")
+assert(command == "printf '%s:%s' 'v2.3.4' 'Release 2.3.4'", "task inputs were not expanded: " .. tostring(command))
+vim.cmd.quitall()
+LUA
+
+nvim --headless -u "$repo_root/init.lua" -l "$fixture_root/task_input_test.lua"
 
 printf 'debug_config_test.sh: ok\n'
