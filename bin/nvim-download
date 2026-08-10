@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_file="${1:-}"
+[[ -n "$source_file" ]] || { printf 'No file selected\n' >&2; exit 1; }
+source_file="$(realpath "$source_file")"
+[[ -f "$source_file" ]] || { printf 'Not a file: %s\n' "$source_file" >&2; exit 1; }
+
+windows_download_dir() {
+  if [[ -n "${NVIM_WINDOWS_DOWNLOAD_DIR:-}" ]]; then
+    printf '%s\n' "$NVIM_WINDOWS_DOWNLOAD_DIR"
+    return
+  fi
+  command -v powershell.exe >/dev/null 2>&1 || return 1
+  command -v wslpath >/dev/null 2>&1 || return 1
+
+  local profile
+  profile="$(powershell.exe -NoProfile -Command '[Environment]::GetFolderPath("UserProfile")' | tr -d '\r')"
+  [[ -n "$profile" ]] || return 1
+  wslpath -u "$profile\\Downloads"
+}
+
+if [[ "${DEVCONTAINER:-}" != "true" ]]; then
+  target_dir="$(windows_download_dir)" || {
+    printf 'Windows Downloads not found; set NVIM_WINDOWS_DOWNLOAD_DIR\n' >&2
+    exit 1
+  }
+  mkdir -p "$target_dir"
+  name="$(basename "$source_file")"
+  target="$target_dir/$name"
+  if [[ -e "$target" ]]; then
+    stem="$name"
+    ext=""
+    if [[ "$name" == *.* && "$name" != .* ]]; then
+      stem="${name%.*}"
+      ext=".${name##*.}"
+    fi
+    index=1
+    while [[ -e "$target_dir/$stem ($index)$ext" ]]; do index=$((index + 1)); done
+    target="$target_dir/$stem ($index)$ext"
+  fi
+  cp -- "$source_file" "$target"
+  printf 'Downloaded to %s\n' "$target"
+  exit 0
+fi
+
+workspace="${NVIM_DEV_CONTAINER_WORKSPACE:-}"
+[[ -n "$workspace" && -d "$workspace/.git" ]] || {
+  printf 'Downloads require a Git workspace started through nvim-dev\n' >&2
+  exit 1
+}
+
+request_dir="$workspace/.git/nvim-download"
+request_id="$(date +%s%N)-$$-$RANDOM"
+request="$request_dir/$request_id.request"
+response="$request_dir/$request_id.response"
+mkdir -p "$request_dir"
+printf '%s\n' "$source_file" > "$request.tmp"
+mv "$request.tmp" "$request"
+
+for _ in $(seq 1 300); do
+  if [[ -f "$response" ]]; then
+    result="$(cat "$response")"
+    rm -f "$response"
+    if [[ "$result" == ERROR:* ]]; then
+      printf '%s\n' "${result#ERROR:}" >&2
+      exit 1
+    fi
+    printf 'Downloaded to %s\n' "$result"
+    exit 0
+  fi
+  sleep 0.1
+done
+
+rm -f "$request"
+printf 'Download bridge did not respond\n' >&2
+exit 1

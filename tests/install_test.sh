@@ -18,6 +18,16 @@ assert_contains() {
 [[ -f "$install_script" ]] || fail "install.sh exists"
 
 bash -n "$install_script"
+bash -n "$repo_root/bin/nvim-download" "$repo_root/bin/nvim-dev"
+
+download_test_dir="$(mktemp -d)"
+printf 'pdf fixture\n' > "$download_test_dir/manual.pdf"
+mkdir "$download_test_dir/Downloads"
+NVIM_WINDOWS_DOWNLOAD_DIR="$download_test_dir/Downloads" "$repo_root/bin/nvim-download" "$download_test_dir/manual.pdf" >/dev/null
+NVIM_WINDOWS_DOWNLOAD_DIR="$download_test_dir/Downloads" "$repo_root/bin/nvim-download" "$download_test_dir/manual.pdf" >/dev/null
+[[ -f "$download_test_dir/Downloads/manual.pdf" ]] || fail "downloaded file exists"
+[[ -f "$download_test_dir/Downloads/manual (1).pdf" ]] || fail "download name conflict is resolved"
+rm -rf "$download_test_dir"
 
 readme_install_command="$(grep -F 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"' "$repo_root/README.md" | head -n 1)"
 [[ -n "$readme_install_command" ]] || fail "README install command exists"

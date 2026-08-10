@@ -7,3 +7,13 @@ prepend_previewers = [
   { url = "*.bbappend", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
   { url = "*.bbclass", run = "piper -- bat -p --color=always --language=bash \"$1\"" },
 ]
+
+[[plugin.prepend_fetchers]]
+url = "*"
+run = "vscode-git-colors"
+group = "vscode-git-colors"
+
+[[plugin.prepend_fetchers]]
+url = "*/"
+run = "vscode-git-colors"
+group = "vscode-git-colors"

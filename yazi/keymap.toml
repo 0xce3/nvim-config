@@ -7,3 +7,33 @@ desc = "Enter directories or open files"
 on = "<Backspace>"
 run = "leave"
 desc = "Go to parent directory"
+
+[[mgr.prepend_keymap]]
+on = "D"
+run = "shell --block -- nvim-download %h"
+desc = "Download file to Windows"
+
+[[confirm.prepend_keymap]]
+on = "<Left>"
+run = "arrow -1"
+desc = "Select previous answer"
+
+[[confirm.prepend_keymap]]
+on = "<Right>"
+run = "arrow 1"
+desc = "Select next answer"
+
+[[confirm.prepend_keymap]]
+on = "<Up>"
+run = "arrow -1"
+desc = "Select previous answer"
+
+[[confirm.prepend_keymap]]
+on = "<Down>"
+run = "arrow 1"
+desc = "Select next answer"
+
+[[confirm.prepend_keymap]]
+on = "<Enter>"
+run = "close --submit"
+desc = "Confirm selected answer"

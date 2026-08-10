@@ -1,0 +1,7 @@
+[[plugin.deps]]
+use = "ShikherVerma/yazi-plugins:vscode-git-colors"
+rev = "88bccaf"
+hash = "aee001ff3160481ffda68f781915591a"
+
+[flavor]
+deps = []

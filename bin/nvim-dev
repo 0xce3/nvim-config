@@ -734,4 +734,63 @@ fi
 wait_for_server "$addr" || die "timed out waiting for container nvim server at $addr"
 ok "attach remote UI"
 
+windows_download_dir() {
+  if [[ -n "${NVIM_WINDOWS_DOWNLOAD_DIR:-}" ]]; then
+    printf '%s\n' "$NVIM_WINDOWS_DOWNLOAD_DIR"
+    return
+  fi
+  command -v powershell.exe >/dev/null 2>&1 || return 1
+  command -v wslpath >/dev/null 2>&1 || return 1
+
+  local profile
+  profile="$(powershell.exe -NoProfile -Command '[Environment]::GetFolderPath("UserProfile")' | tr -d '\r')"
+  [[ -n "$profile" ]] || return 1
+  wslpath -u "$profile\\Downloads"
+}
+
+download_bridge() {
+  local parent_pid="$1" request_dir="$root/.git/nvim-download" target_dir request processing response source_file name stem ext candidate index
+  target_dir="$(windows_download_dir)" || return 0
+  mkdir -p "$request_dir" "$target_dir"
+
+  while kill -0 "$parent_pid" 2>/dev/null; do
+    for request in "$request_dir"/*.request; do
+      [[ -f "$request" ]] || continue
+      processing="${request%.request}.processing.$$"
+      mv "$request" "$processing" 2>/dev/null || continue
+      source_file="$(cat "$processing")"
+      response="${request%.request}.response"
+      if ! docker exec "$container" test -f "$source_file" 2>/dev/null; then
+        printf 'ERROR:Selected file no longer exists\n' > "$response"
+        rm -f "$processing"
+        continue
+      fi
+
+      name="$(basename "$source_file")"
+      candidate="$target_dir/$name"
+      if [[ -e "$candidate" ]]; then
+        stem="$name"
+        ext=""
+        if [[ "$name" == *.* && "$name" != .* ]]; then
+          stem="${name%.*}"
+          ext=".${name##*.}"
+        fi
+        index=1
+        while [[ -e "$target_dir/$stem ($index)$ext" ]]; do index=$((index + 1)); done
+        candidate="$target_dir/$stem ($index)$ext"
+      fi
+
+      if docker cp "$container:$source_file" "$candidate" >/dev/null 2>&1; then
+        printf '%s\n' "$candidate" > "$response"
+      else
+        printf 'ERROR:Could not copy file from devcontainer\n' > "$response"
+      fi
+      rm -f "$processing"
+    done
+    sleep 0.1
+  done
+}
+
+download_bridge "$$" &
+
 exec "$nvim_bin" --server "$addr" --remote-ui
