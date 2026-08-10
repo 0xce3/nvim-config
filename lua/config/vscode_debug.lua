@@ -266,6 +266,7 @@ local function collect_input_ids(task, tasks, seen, ids)
   end
 
   collect(task.command)
+  collect(task.args)
   collect(task.options)
   local deps = type(task.dependsOn) == "string" and { task.dependsOn } or task.dependsOn or {}
   for _, label in ipairs(deps) do

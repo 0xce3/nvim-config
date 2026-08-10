@@ -34,7 +34,11 @@ cat > "$fixture_root/.vscode/tasks.json" <<'JSONC'
     {
       "label": "Create tag",
       "type": "shell",
-      "command": "printf '%s:%s' '${input:tagVersion}' '${input:tagMessage}'"
+      "command": "bash",
+      "args": [
+        "-lc",
+        "printf '%s:%s' '${input:tagVersion}' '${input:tagMessage}'"
+      ]
     }
   ],
   "inputs": [
@@ -75,13 +79,15 @@ end
 
 local command
 package.loaded["vstask.Job"] = {
-  clean_command = function(value) return value end,
+  clean_command = function(value, _, args)
+    return value .. " " .. table.concat(args, " ")
+  end,
   start_job = function(opts) command = opts.command end,
 }
 
 local debug_config = require("config.vscode_debug")
 assert(debug_config.run_task("Create tag"), "expected task to start")
-assert(command == "printf '%s:%s' 'v2.3.4' 'Release 2.3.4'", "task inputs were not expanded: " .. tostring(command))
+assert(command == "bash -lc printf '%s:%s' 'v2.3.4' 'Release 2.3.4'", "task inputs were not expanded: " .. tostring(command))
 vim.cmd.quitall()
 LUA
 
