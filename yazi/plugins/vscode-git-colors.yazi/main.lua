@@ -373,7 +373,7 @@ local function setup(st, opts)
 		-- Patch AFTER the original style so the git foreground also wins on
 		-- the hovered row; a bg/reversed hover indicator is preserved since
 		-- these styles only set the foreground.
-		local code = self._file.is_hidden and CODES.ignored or resolve(st, self._file.url)
+		local code = self._file.cha.is_hidden and CODES.ignored or resolve(st, self._file.url)
 		local patch = code and styles[code]
 		return patch and s:patch(patch) or s
 	end

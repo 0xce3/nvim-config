@@ -29,6 +29,21 @@ NVIM_WINDOWS_DOWNLOAD_DIR="$download_test_dir/Downloads" "$repo_root/bin/nvim-do
 [[ -f "$download_test_dir/Downloads/manual (1).pdf" ]] || fail "download name conflict is resolved"
 rm -rf "$download_test_dir"
 
+open_test_dir="$(mktemp -d)"
+printf 'pdf fixture\n' > "$open_test_dir/manual.pdf"
+cat > "$open_test_dir/wslpath" <<'STUB'
+#!/usr/bin/env sh
+printf '%s\n' 'C:\Users\test\manual.pdf'
+STUB
+cat > "$open_test_dir/powershell.exe" <<'STUB'
+#!/usr/bin/env sh
+printf '%s\n' "$NVIM_OPEN_FILE" > "$NVIM_OPEN_RESULT"
+STUB
+chmod +x "$open_test_dir/wslpath" "$open_test_dir/powershell.exe"
+NVIM_OPEN_RESULT="$open_test_dir/result" PATH="$open_test_dir:/usr/bin:/bin" "$repo_root/bin/nvim-open" "$open_test_dir/manual.pdf"
+[[ "$(cat "$open_test_dir/result")" == 'C:\Users\test\manual.pdf' ]] || fail "Windows file path is passed to PowerShell"
+rm -rf "$open_test_dir"
+
 readme_install_command="$(grep -F 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"' "$repo_root/README.md" | head -n 1)"
 [[ -n "$readme_install_command" ]] || fail "README install command exists"
 bash -n -c "$readme_install_command"

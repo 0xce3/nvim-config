@@ -18,7 +18,9 @@ open_windows() {
 
   local windows_path
   windows_path="$(wslpath -w "$1")"
-  powershell.exe -NoProfile -Command 'Start-Process -LiteralPath $args[0]' "$windows_path" >/dev/null
+  NVIM_OPEN_FILE="$windows_path" \
+    WSLENV="${WSLENV:+$WSLENV:}NVIM_OPEN_FILE" \
+    powershell.exe -NoProfile -Command 'Invoke-Item -LiteralPath $env:NVIM_OPEN_FILE' >/dev/null
 }
 
 if [[ "${DEVCONTAINER:-}" != "true" ]]; then
