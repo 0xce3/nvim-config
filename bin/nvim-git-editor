@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_nvim() {
+  local candidate directory
+  IFS=: read -ra directories <<< "$PATH"
+  for directory in "${directories[@]}"; do
+    candidate="$directory/nvim"
+    if [[ -x "$candidate" && "$candidate" != "$HOME/.local/bin/nvim" && "$candidate" != "$HOME/.config/nvim/bin/nvim" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+nvim_bin="$(real_nvim)" || { printf 'nvim executable not found\n' >&2; exit 127; }
+
+if [[ -n "${NVIM:-}" ]]; then
+  "$nvim_bin" --server "$NVIM" --remote-tab-silent "$@"
+
+  files=()
+  for argument in "$@"; do
+    if [[ "$argument" != -* && "$argument" != +* ]]; then
+      files+=("$(realpath -m "$argument")")
+    fi
+  done
+
+  while :; do
+    visible=false
+    for file in "${files[@]}"; do
+      escaped="${file//\'/\'\'}"
+      if [[ "$("$nvim_bin" --server "$NVIM" --remote-expr "empty(win_findbuf(bufnr('$escaped')))" 2>/dev/null || printf 1)" == "0" ]]; then
+        visible=true
+        break
+      fi
+    done
+    [[ "$visible" == true ]] || exit 0
+    sleep 0.1
+  done
+fi
+
+exec "$nvim_bin" "$@"

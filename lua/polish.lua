@@ -88,6 +88,12 @@ vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
 vim.opt.shell = "bash"
 vim.opt.shellcmdflag = "-lc"
 
+-- Git commands started in an Nvim terminal should reuse this server. The
+-- wrapper waits only for the remotely opened tab, not for the entire editor.
+local git_editor = vim.fs.joinpath(vim.fn.stdpath("config"), "bin", "nvim-git-editor")
+vim.env.GIT_EDITOR = git_editor
+vim.env.GIT_SEQUENCE_EDITOR = git_editor
+
 -- Keep clangd diagnostics aligned with the firmware toolchain. The wrapper
 -- provides the matching container build directory when one is selected on the
 -- host; the global config removes GCC-only flags that clangd cannot parse.
