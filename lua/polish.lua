@@ -33,6 +33,10 @@ vim.api.nvim_create_autocmd("TermOpen", {
 vim.keymap.set("t", "<C-Space>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
 vim.keymap.set("t", "<C-q>", [[<C-\><C-n>]], { silent = true, desc = "Leave terminal mode" })
 
+-- Line motions on keys that are directly accessible on German layouts.
+vim.keymap.set({ "n", "x", "o" }, "ö", "^", { desc = "First non-blank character" })
+vim.keymap.set({ "n", "x", "o" }, "ä", "$", { desc = "End of line" })
+
 vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/site")
 
 -- Keep normal Vim yanks/deletes local. Use the explicit "+ register mappings
