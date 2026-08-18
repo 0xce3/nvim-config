@@ -117,8 +117,8 @@ return {
           desc = "Open lazygit float",
         },
         ["<Leader>fg"] = {
-          function() require("snacks").picker.grep() end,
-          desc = "Grep project",
+          function() require("snacks").picker.resume({ source = "grep" }) end,
+          desc = "Resume project grep",
         },
         ["<Leader>fw"] = {
           function() require("snacks").picker.grep_word() end,
