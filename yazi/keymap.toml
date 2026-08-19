@@ -13,6 +13,11 @@ on = "D"
 run = "shell --block -- nvim-download %h"
 desc = "Download file to Windows"
 
+[[mgr.prepend_keymap]]
+on = "d"
+run = "remove --permanently"
+desc = "Delete permanently without creating a workspace trash folder"
+
 [[confirm.prepend_keymap]]
 on = "<Left>"
 run = "arrow -1"
