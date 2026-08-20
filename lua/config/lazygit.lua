@@ -71,6 +71,14 @@ function M.open_window()
   })
   vim.api.nvim_buf_set_name(window.buf, "Lazygit")
   vim.bo[window.buf].filetype = "lazygit"
+  vim.keymap.set("t", "<Esc>", function()
+    if window.job then vim.api.nvim_chan_send(window.job, "\27") end
+  end, {
+    buffer = window.buf,
+    silent = true,
+    nowait = true,
+    desc = "Send Escape to LazyGit",
+  })
   vim.api.nvim_create_autocmd("BufEnter", {
     buffer = window.buf,
     callback = function() vim.schedule(resize_window) end,
