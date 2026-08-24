@@ -11,6 +11,15 @@ local function resize_window()
   if ok and pid > 0 then pcall(vim.uv.kill, pid, "sigwinch") end
 end
 
+local function send_escape()
+  if window.job then vim.api.nvim_chan_send(window.job, "\27") end
+  if vim.api.nvim_get_mode().mode ~= "t" then
+    vim.schedule(function()
+      if window.buf and window.job and vim.api.nvim_get_current_buf() == window.buf then vim.cmd("startinsert") end
+    end)
+  end
+end
+
 local function with_config(opts, args)
   if not config_file then
     config_file = vim.fn.tempname() .. ".yml"
@@ -71,9 +80,7 @@ function M.open_window()
   })
   vim.api.nvim_buf_set_name(window.buf, "Lazygit")
   vim.bo[window.buf].filetype = "lazygit"
-  vim.keymap.set("t", "<Esc>", function()
-    if window.job then vim.api.nvim_chan_send(window.job, "\27") end
-  end, {
+  vim.keymap.set({ "n", "t" }, "<Esc>", send_escape, {
     buffer = window.buf,
     silent = true,
     nowait = true,
@@ -81,8 +88,13 @@ function M.open_window()
   })
   vim.api.nvim_create_autocmd("BufEnter", {
     buffer = window.buf,
-    callback = function() vim.schedule(resize_window) end,
-    desc = "Resize the LazyGit terminal after restoring its buffer",
+    callback = function()
+      vim.schedule(function()
+        resize_window()
+        if window.job and vim.api.nvim_get_current_buf() == window.buf then vim.cmd("startinsert") end
+      end)
+    end,
+    desc = "Restore direct LazyGit terminal control",
   })
   resize_window()
   vim.cmd("startinsert")
