@@ -102,6 +102,7 @@ vim.env.GIT_SEQUENCE_EDITOR = git_editor
 -- provides the matching container build directory when one is selected on the
 -- host; the global config removes GCC-only flags that clangd cannot parse.
 pcall(function() require("config.clangd_config").ensure() end)
+require("config.skeleton").setup()
 
 vim.api.nvim_create_user_command("LspRestart", function()
   local clients = vim.lsp.get_clients({ bufnr = 0 })
