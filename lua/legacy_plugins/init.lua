@@ -1293,7 +1293,6 @@ return {
         { "<leader>o", group = "opencode" },
         { "<leader>p", group = "pull request / issues" },
         { "<leader>q", group = "session" },
-        { "<leader>r", group = "REST / HTTP" },
         { "<leader>t", group = "tasks/terminals" },
         { "<leader>w", group = "window" },
       })
@@ -1329,6 +1328,23 @@ return {
         end,
       })
 
+      -- Reap unnamed scratch (nofile/prompt) buffers that are not shown in any
+      -- window. Without this, pickers and previews leak hundreds of nofile
+      -- buffers across a long session (they were only wiped on PersistenceSavePre).
+      vim.api.nvim_create_autocmd({ "BufHidden", "WinClosed", "CursorHold" }, {
+        desc = "Reap unnamed scratch buffers",
+        callback = function()
+          for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            if not vim.api.nvim_buf_is_valid(buf) then goto continue end
+            local bt = vim.bo[buf].buftype
+            if (bt == "nofile" or bt == "prompt") and vim.fn.bufname(buf) == "" and vim.fn.bufwinid(buf) == -1 then
+              pcall(vim.api.nvim_buf_delete, buf, { force = true })
+            end
+            ::continue::
+          end
+        end,
+      })
+
       if vim.fn.argc(-1) == 0 and vim.v.this_session == "" then
         vim.schedule(function()
           if vim.v.this_session == "" then
@@ -1351,32 +1367,8 @@ return {
   },
   {
     "mistweaverco/kulala.nvim",
-    keys = {
-      {
-        "<leader>r",
-        function()
-          require("kulala").run()
-        end,
-        desc = "Run request under cursor",
-      },
-      { "<leader>rr", desc = "Run request under cursor" },
-      { "<leader>ra", desc = "Run all requests" },
-      { "<leader>rs", desc = "Open scratchpad" },
-      { "<leader>rc", desc = "Copy as cURL" },
-      {
-        "<Esc>",
-        function()
-          pcall(require("kulala.cmd.kulala_core_bridge").interrupt_active)
-          vim.cmd("nohlsearch")
-        end,
-        desc = "Cancel running request",
-        mode = "n",
-      },
-    },
-    ft = { "http", "rest" },
     opts = {
-      global_keymaps = true,
-      global_keymaps_prefix = "<leader>r",
+      global_keymaps = false,
       kulala_keymaps_prefix = "",
       treesitter = { enable = false },
     },
