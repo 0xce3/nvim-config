@@ -121,8 +121,8 @@ function M.setup()
     nargs = 1,
   })
 
-  vim.keymap.set("n", "<leader>cs", "<cmd>SkeletonSource<cr>", { desc = "Generate source skeleton" })
-  vim.keymap.set("n", "<leader>ch", "<cmd>SkeletonHeader<cr>", { desc = "Generate header skeleton" })
+  vim.keymap.set("n", "<leader>ks", "<cmd>SkeletonSource<cr>", { desc = "Generate source skeleton" })
+  vim.keymap.set("n", "<leader>kh", "<cmd>SkeletonHeader<cr>", { desc = "Generate header skeleton" })
 end
 
 return M
