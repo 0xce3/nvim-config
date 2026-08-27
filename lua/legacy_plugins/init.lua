@@ -1178,7 +1178,6 @@ return {
         local cmd = {
           "clangd",
           "--log=error",
-          "--clang-tidy",
           "--query-driver=**/arm-zephyr-eabi-gcc,**/arm-zephyr-eabi-g++",
         }
         local compile_commands_dir = require("config.clangd_build").active(vim.fn.getcwd())
@@ -1364,13 +1363,5 @@ return {
         persistence.stop()
       end, { desc = "Do not save session" })
     end,
-  },
-  {
-    "mistweaverco/kulala.nvim",
-    opts = {
-      global_keymaps = false,
-      kulala_keymaps_prefix = "",
-      treesitter = { enable = false },
-    },
   },
 }
