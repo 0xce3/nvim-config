@@ -1177,6 +1177,7 @@ return {
       local function clangd_cmd()
         local cmd = {
           "clangd",
+          "--log=error",
           "--clang-tidy",
           "--query-driver=**/arm-zephyr-eabi-gcc,**/arm-zephyr-eabi-g++",
         }

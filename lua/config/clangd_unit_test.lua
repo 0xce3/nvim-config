@@ -107,7 +107,7 @@ end
 
 function M.cmd(dispatchers, config)
   local directory = cached_compile_commands_dir(config.root_dir)
-  local cmd = { "clangd" }
+  local cmd = { "clangd", "--log=error" }
   if directory then table.insert(cmd, "--compile-commands-dir=" .. directory) end
   return vim.lsp.rpc.start(cmd, dispatchers, { cwd = config.root_dir })
 end
