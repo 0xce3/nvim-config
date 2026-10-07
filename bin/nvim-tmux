@@ -29,6 +29,24 @@ def configure_window(target):
         ("window-status-current-style", "bg=#504945,fg=#ebdbb2,bold"),
     ):
         tmux("set-window-option", "-t", target, option, value)
+    name = tmux("display-message", "-p", "-t", target, "#{window_name}").stdout.strip()
+    scrolling = name in ("bash", "tasks")
+    tmux(
+        "set-window-option",
+        "-t",
+        target,
+        "pane-scrollbars",
+        "on" if scrolling else "off",
+    )
+    if scrolling:
+        tmux("set-window-option", "-t", target, "pane-scrollbars-position", "right")
+        tmux(
+            "set-window-option",
+            "-t",
+            target,
+            "pane-scrollbars-style",
+            "bg=#3c3836,fg=#a89984,width=1,pad=0",
+        )
 
 
 def configure_keys():
@@ -38,13 +56,14 @@ def configure_keys():
         tmux("bind-key", "-n", f"C-{index}", "select-window", "-t", f":{index}")
 
     bash_window = "#{==:#{window_name},bash}"
+    scroll_window = "#{||:" + bash_window + ",#{==:#{window_name},tasks}}"
     tmux(
         "bind-key",
         "-n",
         "PPage",
         "if-shell",
         "-F",
-        bash_window,
+        scroll_window,
         "copy-mode -u",
         "send-keys PPage",
     )
@@ -56,18 +75,27 @@ def configure_keys():
         "NPage",
         "if-shell",
         "-F",
-        "#{!=:#{window_name},bash}",
+        "#{!:" + scroll_window + "}",
         "send-keys NPage",
     )
     for table in ("copy-mode", "copy-mode-vi"):
         tmux("bind-key", "-T", table, "PPage", "send-keys", "-X", "page-up")
-        bottom = "#{&&:" + bash_window + ",#{==:#{scroll_position},0}}"
+        bottom = "#{&&:" + scroll_window + ",#{==:#{scroll_position},0}}"
         tmux(
             "bind-key",
             "-T",
             table,
             "NPage",
             "send-keys -X page-down ; if-shell -F "
+            + shlex.quote(bottom)
+            + " 'copy-mode -q'",
+        )
+        tmux(
+            "bind-key",
+            "-T",
+            table,
+            "WheelDownPane",
+            "select-pane -t = ; send-keys -X -N 3 scroll-down ; if-shell -F "
             + shlex.quote(bottom)
             + " 'copy-mode -q'",
         )
@@ -171,6 +199,7 @@ def launch(target):
         if index != "1":
             tmux("move-window", "-s", f"{session}:{index}", "-t", f"{session}:1")
         tmux("set-option", "-t", session, "base-index", "1")
+        tmux("set-option", "-t", session, "history-limit", "50000")
         tmux("set-option", "-t", session, "renumber-windows", "off")
         tmux("set-option", "-t", session, "status", "on")
         tmux("set-option", "-t", session, "status-position", "top")
@@ -254,6 +283,8 @@ def launch(target):
             tmux("set-window-option", "-t", f"{session}:2", "allow-rename", "off")
         tmux("select-window", "-t", f"{session}:1")
         configure_lifecycle(session)
+    tmux("set-option", "-t", session, "mouse", "on")
+    tmux("set-option", "-t", session, "history-limit", "50000")
     for index in tmux(
         "list-windows", "-t", session, "-F", "#{window_index}"
     ).stdout.splitlines():

@@ -17,7 +17,7 @@ nvim
 
 ## Requirements
 
-**Host (WSL / Linux / macOS):** Neovim 0.11+, `git`, `curl`, `ripgrep`, `fd`,
+**Host (WSL / Linux / macOS):** Neovim 0.11+, tmux 3.6+, `git`, `curl`, `ripgrep`, `fd`,
   `python3`, `node`/`npm`, a C compiler, `make`, Docker, and a Nerd Font for
   icons. Treesitter parsers are compiled locally for the host system.
 
@@ -88,12 +88,21 @@ Windows Terminal must forward these keys as CSI-u sequences using `sendInput`:
 `\u001b[57;5u`. `Ctrl+0` retains Windows Terminal's default font-size reset.
 The bindings are consumed by tmux before reaching Neovim or Bash.
 
-In the `bash` window, PageUp enters tmux scrollback and scrolls up one page;
-PageDown scrolls down and returns to the live prompt at the bottom. Up/Down
-continue to select previous/next shell commands: from scrollback they first
-leave copy mode and then forward the arrow key to Bash. PageUp/PageDown in the
+In the `bash` and `tasks` windows, PageUp enters tmux scrollback and scrolls up
+one page; PageDown scrolls down and returns to the live prompt at the bottom.
+Up/Down in Bash continue to select previous/next shell commands: from scrollback
+they first leave copy mode and then forward the arrow key to Bash. PageUp/PageDown in the
 editor window are still forwarded to Neovim. Escape or `q` can also leave copy
 mode with the standard tmux bindings.
+
+Mouse support is enabled. The wheel scrolls tmux output, and Bash/task windows
+have a draggable scrollbar on the right. Neovim keeps its own mouse handling
+and does not receive a tmux scrollbar. New panes retain up to 50,000 lines.
+The scrollback belongs to tmux rather than Windows Terminal's outer scrollbar.
+Native pane scrollbars require tmux 3.6 or newer. Container setup installs the
+pinned, checksum-verified 3.6 release if necessary; on an older Linux host run
+`bash ~/.config/nvim/bin/install-tmux`. Existing tmux servers must be closed
+before the new binary and scrollbar settings take effect.
 
 Tmux and Python 3 must be installed in the selected runtime (the installers
 include tmux). `NVIM_NO_TMUX=1 nvim .` bypasses the automatic session. Neovim

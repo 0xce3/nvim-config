@@ -443,6 +443,9 @@ main() {
   ensure_command "$manager" unzip "" "extract Mason packages"
   ensure_command "$manager" nvim "0.12.0" "editor runtime"
   ensure_command "$manager" tmux "" "editor, shell, and task windows"
+  if [[ "$skip_packages" -eq 0 ]]; then
+    run bash "$config_dir/bin/install-tmux"
+  fi
   ensure_command "$manager" rg "" "fast text search"
   ensure_command "$manager" fd "" "fast file search"
   ensure_command "$manager" fzf "0.36.0" "interactive launchers and pickers"

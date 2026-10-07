@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Keep the running launcher independent of config syncs, pulls, and edits.
+# In particular, cleanup after the UI exits must not read a changed file.
+if [[ "${NVIM_LAUNCHER_SNAPSHOT:-}" != "$0" ]]; then
+  exec env NVIM_LAUNCHER_SNAPSHOT="$0" bash -c "$(<"$0")" "$0" "$@"
+fi
+unset NVIM_LAUNCHER_SNAPSHOT
+
 target="${1:-.}"
 
 if [[ -t 2 && "${NO_COLOR:-}" == "" ]]; then
@@ -526,6 +533,7 @@ ensure_container_tools() {
     if [ -f \"\$tag_file\" ] \
       && [ \"\$(cat \"\$tag_file\" 2>/dev/null || true)\" = $(quote "$config_hash") ] \
       && nvim --version >/dev/null 2>&1 \
+      && bash \"\$cfg/nvim/bin/install-tmux\" --check \
       && lazygit --version >/dev/null 2>&1 \
       && (command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1) \
       && chafa --version >/dev/null 2>&1 \
@@ -602,6 +610,10 @@ if [ -n "${missing:-}" ]; then
   fi
 fi
 ' || die "failed to ensure required tools in container"
+
+  [[ -n "$config_dir" ]] || die "could not determine the container configuration directory"
+  docker exec -u root "$container" bash "$config_dir/nvim/bin/install-tmux" \
+    || die "failed to install tmux with native scrollbar support"
 
   if [[ -n "$config_hash" && -n "$config_dir" ]]; then
     docker exec -u root "$container" sh -lc "
