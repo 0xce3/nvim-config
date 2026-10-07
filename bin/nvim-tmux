@@ -352,23 +352,20 @@ def bridge(args):
                         ]
                     )
                     target = f"{args.session}:3"
-                    windows = tmux(
-                        "list-windows", "-t", args.session, "-F", "#{window_index}"
-                    ).stdout.splitlines()
-                    if "3" in windows:
-                        tmux("respawn-window", "-k", "-t", target, run)
-                    else:
-                        tmux(
-                            "new-window",
-                            "-d",
-                            "-t",
-                            target,
-                            "-n",
-                            "tasks",
-                            "-c",
-                            args.workspace,
-                            run,
-                        )
+                    # respawn-window has no detached flag and can select the
+                    # target. Recreate it detached, including on later runs.
+                    tmux(
+                        "new-window",
+                        "-d",
+                        "-k",
+                        "-t",
+                        target,
+                        "-n",
+                        "tasks",
+                        "-c",
+                        args.workspace,
+                        run,
+                    )
                     tmux("rename-window", "-t", target, "tasks")
                     tmux("set-window-option", "-t", target, "automatic-rename", "off")
                     tmux("set-window-option", "-t", target, "allow-rename", "off")
