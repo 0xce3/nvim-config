@@ -193,6 +193,10 @@ local function open()
 end
 
 function M.toggle()
+  if require("config.tmux").available() then
+    require("config.tmux").select(3)
+    return
+  end
   local current = vim.api.nvim_get_current_buf()
 
   if buf_ok() and current == state.buf then
@@ -219,6 +223,43 @@ end
 
 function M.run(command, label)
   if not command or command == "" then
+    return
+  end
+
+  local tmux = require("config.tmux")
+  if tmux.available() then
+    if state.task_running then
+      vim.notify("A task is already running in tmux window 3", vim.log.levels.WARN)
+      return
+    end
+    state.task_running = true
+    state.task_status = nil
+    state.task_label = label or "Task"
+    redraw_spinner()
+    local submitted = tmux.request({ action = "task", command = command, cwd = vim.fn.getcwd() }, function(ok, stem)
+      if not ok then
+        state.task_running = false
+        state.task_status = "failed"
+        vim.cmd.redrawstatus()
+        return
+      end
+      local function poll()
+        if vim.fn.filereadable(stem .. ".result") == 1 then
+          local code = tonumber(vim.fn.readfile(stem .. ".result")[1])
+          state.task_running = false
+          state.task_status = code == 0 and "success" or "failed"
+          vim.fn.delete(stem .. ".sh")
+          vim.cmd.redrawstatus()
+        elseif state.task_running then
+          vim.defer_fn(poll, 250)
+        end
+      end
+      poll()
+    end)
+    if not submitted then
+      state.task_running = false
+      state.task_status = "failed"
+    end
     return
   end
 
@@ -369,6 +410,10 @@ function M.send(keys)
 end
 
 function M.stop_task()
+  if require("config.tmux").available() then
+    require("config.tmux").request({ action = "stop" })
+    return
+  end
   if not state.chan or not state.task_running then return end
   vim.fn.chansend(state.chan, "\003")
   state.task_running = false

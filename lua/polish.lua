@@ -92,6 +92,10 @@ vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
 vim.opt.shell = "bash"
 vim.opt.shellcmdflag = "-lc"
 
+vim.keymap.set("n", "<leader>tb", function() require("config.tmux").select(1) end, {
+  desc = "Switch to tmux bash window",
+})
+
 -- Git commands started in an Nvim terminal should reuse this server. The
 -- wrapper waits only for the remotely opened tab, not for the entire editor.
 local git_editor = vim.fs.joinpath(vim.fn.stdpath("config"), "bin", "nvim-git-editor")

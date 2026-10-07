@@ -24,7 +24,7 @@ local function module_name(path, kind, root)
   local rel = relative_path(path, root)
   local file_base = vim.fn.fnamemodify(path, ":t:r")
 
-  if kind == "header" and rel:match("include/qmx/[^/]+/[^/]+%.h$") then
+  if kind == "header" and rel:match("include/[^/]+/[^/]+/[^/]+%.h$") then
     return file_base
   end
 

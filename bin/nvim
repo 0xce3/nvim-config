@@ -104,12 +104,12 @@ choose_mode() {
       --layout=reverse \
       --border=rounded \
       --prompt='nvim mode> ' \
-      --header='↑/↓ select, Enter confirm, Esc defaults to local' \
+      --header='↑/↓ select, Enter confirm, Esc cancels' \
       --with-nth=1,2 \
       --delimiter='\t' | cut -f1 || true)"
     case "$choice" in
       remote|local) printf '%s\n' "$choice"; return 0 ;;
-      *) printf 'local\n'; return 0 ;;
+      *) return 130 ;;
     esac
   fi
 
@@ -118,15 +118,21 @@ choose_mode() {
   printf '%b' "${c_blue}?${c_reset} mode [local/remote] ${c_dim}(default: remote)${c_reset}: " >&2
 
   local answer
-  read -r answer
+  read -r answer || return 130
   case "${answer,,}" in
     ""|r|remote|2) printf 'remote\n' ;;
     l|local|1) printf 'local\n' ;;
-    *) printf 'remote\n' ;;
+    *) return 130 ;;
   esac
 }
 
 nvim_bin="$(real_nvim)" || { log "nvim wrapper: real nvim binary not found"; exit 127; }
+start_tmux=false
+if [[ -t 0 && -t 1 && -z "${NVIM_TMUX_LAUNCHED:-}" && -z "${NVIM:-}" && "${NVIM_NO_TMUX:-0}" != 1 ]]; then
+  if [[ "$#" -eq 0 || ( "$#" -eq 1 && -d "$1" ) ]]; then
+    start_tmux=true
+  fi
+fi
 update_config
 root="$(project_root || true)"
 
@@ -136,11 +142,16 @@ if [[ -n "$root" && -z "${OPENCODE_PORT:-}" ]]; then
   export OPENCODE_SERVER_URL="http://127.0.0.1:${OPENCODE_PORT}"
 fi
 
-if [[ "$#" -gt 0 && -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
-  mode="$(choose_mode)"
+if [[ ( "$#" -gt 0 || "$start_tmux" == true ) && -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
+  mode="$(choose_mode)" || exit "$?"
   if [[ "$mode" == "remote" ]]; then
     exec "$HOME/.config/nvim/bin/nvim-dev" "$target"
   fi
+fi
+
+if [[ "$start_tmux" == true ]]; then
+  export NVIM_DEV_DEFAULT=local
+  exec python3 "$HOME/.config/nvim/bin/nvim-tmux" launch "$target"
 fi
 
 if [[ "$#" -eq 0 ]]; then

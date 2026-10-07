@@ -64,6 +64,28 @@ Exact pinned versions live in `lazy-lock.json`.
 
 ## Devcontainer (Remote Workflow)
 
+Interactive `nvim` and `nvim .` starts first select the local or remote runtime,
+then use a project-specific tmux session there. The tmux window bar is at the top;
+AstroNvim's statusline stays at the bottom. Windows are `0:nvim`, `1:bash`, and
+`3:tasks` (created on the first task).
+The existing local/remote choice appears before tmux starts. In remote mode,
+tmux, its Neovim UI client, Bash, and tasks run in the selected container.
+Local mode uses host Bash and host tasks. Python environment activation follows
+the shell startup configuration and the task's existing environment setup.
+
+Use `Ctrl+b`, then `0`, `1`, or `3` to select a window. `<leader>tb` switches
+from Neovim to Bash, and `<leader>tj` / F12 selects the task window. Task results
+continue to update the AstroNvim statusline. Interactive Neovim task-buffer
+diagnostic navigation applies only to the fallback embedded terminal. Debug
+server terminals remain embedded for the existing DAP lifecycle integration.
+
+Tmux and Python 3 must be installed in the selected runtime (the installers
+include tmux). `NVIM_NO_TMUX=1 nvim .` bypasses the automatic session. Neovim
+invoked from an embedded terminal or with CLI
+options (for example `--headless` or `--server`) is not wrapped in a new session.
+The tmux session persists while other windows remain open; `Ctrl+b`, then `d`
+detaches it, and another `nvim .` in the same directory reattaches it.
+
 This config supports a devcontainer workflow through the shell launcher. Run
 `nvim .` in a project with `.devcontainer/devcontainer.json`; the wrapper asks
 whether to open local host nvim or attach to a containerized nvim server.
@@ -99,8 +121,7 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | `<leader>dr` | Open debug REPL |
 | `<Esc><Esc>` | Leave terminal mode |
 | `<C-h/j/k/l>` | Move between Neovim windows, also from terminal mode |
-| `<leader>tp/tn` | Previous/next tmux window in the task terminal |
-| `<leader>t1..t9` | Numbered tmux window in the task terminal |
+| `<leader>tb` | Switch to the external tmux Bash window |
 | `<leader>r` | Run request under cursor |
 | `<leader>rg` | Generate external `.http` workspace from OpenAPI |
 | `<leader>ro` | Open external `.http` workspace |

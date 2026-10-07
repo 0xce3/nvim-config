@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""Manage editor, Bash, and task windows in the selected runtime environment."""
+
+import argparse
+import hashlib
+import json
+import os
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def tmux(*args, check=True):
+    return subprocess.run(["tmux", *args], check=check, text=True, capture_output=True)
+
+
+def shell_command(args):
+    return shlex.join([str(arg) for arg in args])
+
+
+def configure_window(target):
+    for option, value in (
+        ("automatic-rename", "off"),
+        ("allow-rename", "off"),
+        ("window-status-format", " #I:#W "),
+        ("window-status-current-format", " #I:#W "),
+        ("window-status-current-style", "bg=#504945,fg=#ebdbb2,bold"),
+    ):
+        tmux("set-window-option", "-t", target, option, value)
+
+
+def launch(target):
+    root = Path(target).resolve()
+    session = "nvim-" + hashlib.sha256(str(root).encode()).hexdigest()[:12]
+    directory = (
+        Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        / "nvim/tmux"
+        / session
+    )
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.environ.get("NVIM_TMUX_BRIDGE_DIR"):
+        directory = Path(os.environ["NVIM_TMUX_BRIDGE_DIR"])
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    helper = Path(__file__).resolve()
+    wrapper = Path.home() / ".config/nvim/bin/nvim"
+    command = (
+        'while [ "$(tmux show-option -qv -t '
+        + shlex.quote(session)
+        + ' @nvim_ready)" != 1 ]; do sleep 0.1; done; '
+        + shell_command(
+            [
+                sys.executable,
+                helper,
+                "bridge",
+                "--session",
+                session,
+                "--directory",
+                directory,
+                "--workspace",
+                root,
+            ]
+        )
+        + " --parent $$ & exec env TERM=tmux-256color COLORTERM=truecolor "
+        + (
+            os.environ.get("NVIM_TMUX_EDITOR_COMMAND")
+            or shell_command(
+                [
+                    "env",
+                    "NVIM_TMUX_LAUNCHED=1",
+                    f"NVIM_TMUX_SESSION={session}",
+                    f"NVIM_TMUX_BRIDGE_DIR={directory}",
+                    wrapper,
+                    root,
+                ]
+            )
+        )
+    )
+    if tmux("has-session", "-t", "=" + session, check=False).returncode:
+        tmux("new-session", "-d", "-s", session, "-n", "nvim", "-c", str(root), command)
+        # Preserve truecolor when tmux becomes the terminal seen by Neovim.
+        tmux(
+            "set-option",
+            "-s",
+            "-a",
+            "terminal-overrides",
+            ",xterm:Tc,xterm-256color:Tc,tmux-256color:Tc",
+        )
+        tmux("set-option", "-g", "default-terminal", "tmux-256color")
+        tmux("set-option", "-t", session, "renumber-windows", "off")
+        # Explicit targets also work when the user's base-index is not zero.
+        index = tmux(
+            "display-message", "-p", "-t", session, "#{window_index}"
+        ).stdout.strip()
+        if index != "0":
+            tmux("move-window", "-s", f"{session}:{index}", "-t", f"{session}:0")
+        tmux("set-option", "-t", session, "base-index", "0")
+        tmux("set-option", "-t", session, "renumber-windows", "off")
+        tmux("set-option", "-t", session, "status", "on")
+        tmux("set-option", "-t", session, "status-position", "top")
+        tmux("set-option", "-t", session, "status-left", "")
+        tmux("set-option", "-t", session, "status-right", "")
+        tmux("set-option", "-t", session, "status-justify", "left")
+        tmux("set-window-option", "-t", session, "window-status-format", " #I:#W ")
+        tmux(
+            "set-window-option",
+            "-t",
+            session,
+            "window-status-current-format",
+            " #I:#W ",
+        )
+        tmux("set-option", "-t", session, "status-style", "bg=#282828,fg=#a89984")
+        tmux(
+            "set-window-option",
+            "-t",
+            session,
+            "window-status-current-style",
+            "bg=#504945,fg=#ebdbb2,bold",
+        )
+        tmux("set-window-option", "-t", f"{session}:0", "automatic-rename", "off")
+        tmux("set-window-option", "-t", f"{session}:0", "allow-rename", "off")
+        tmux(
+            "new-window",
+            "-d",
+            "-t",
+            f"{session}:1",
+            "-n",
+            "bash",
+            "-c",
+            str(root),
+            "bash -il",
+        )
+        tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
+        tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
+        tmux("select-window", "-t", f"{session}:0")
+        tmux("set-option", "-t", session, "@nvim_ready", "1")
+    else:
+        windows = tmux(
+            "list-windows", "-t", session, "-F", "#{window_index}"
+        ).stdout.splitlines()
+        if "0" not in windows:
+            tmux(
+                "new-window",
+                "-d",
+                "-t",
+                f"{session}:0",
+                "-n",
+                "nvim",
+                "-c",
+                str(root),
+                command,
+            )
+            tmux("set-window-option", "-t", f"{session}:0", "automatic-rename", "off")
+            tmux("set-window-option", "-t", f"{session}:0", "allow-rename", "off")
+        if "1" not in windows:
+            tmux(
+                "new-window",
+                "-d",
+                "-t",
+                f"{session}:1",
+                "-n",
+                "bash",
+                "-c",
+                str(root),
+                "bash -il",
+            )
+            tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
+            tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
+        tmux("select-window", "-t", f"{session}:0")
+    for index in tmux(
+        "list-windows", "-t", session, "-F", "#{window_index}"
+    ).stdout.splitlines():
+        configure_window(f"{session}:{index}")
+    if os.environ.get("TMUX"):
+        tmux("switch-client", "-t", session)
+    else:
+        os.execvp("tmux", ["tmux", "attach-session", "-t", session])
+
+
+def bridge(args):
+    directory = Path(args.directory)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+    running_result = None
+    while tmux("has-session", "-t", "=" + args.session, check=False).returncode == 0:
+        if args.parent:
+            try:
+                os.kill(args.parent, 0)
+            except ProcessLookupError:
+                return
+        (directory / "heartbeat").touch()
+        for request in sorted(directory.glob("*.request")):
+            response = request.with_suffix(".response")
+            try:
+                data = json.loads(request.read_text())
+                action = data["action"]
+                if action == "select":
+                    tmux("select-window", "-t", f"{args.session}:{int(data['window'])}")
+                elif action == "stop":
+                    tmux("send-keys", "-t", f"{args.session}:3", "C-c")
+                elif action == "task":
+                    if running_result is not None and not running_result.exists():
+                        raise ValueError("A task is already running in tmux window 3")
+                    if running_result is not None:
+                        running_result.unlink(missing_ok=True)
+                    script = request.with_suffix(".sh")
+                    result = request.with_suffix(".result")
+                    remote_script = str(script)
+                    remote_result = str(result)
+                    command = (
+                        "#!/usr/bin/env bash\n"
+                        + "trap ':' INT\n"
+                        + "bash -lc "
+                        + shlex.quote(data["command"])
+                        + "\n"
+                        + "task_exit=$?\n"
+                        + "printf '%s\\n' \"$task_exit\" > "
+                        + shlex.quote(remote_result)
+                        + "\n"
+                        + "printf '\\nTask finished (exit %s).\\n' \"$task_exit\"\n"
+                        + "exec bash -il\n"
+                    )
+                    script.write_text(command)
+                    cwd = data.get("cwd", args.workspace)
+                    run = shell_command(
+                        [
+                            "bash",
+                            "-ilc",
+                            "cd "
+                            + shlex.quote(cwd)
+                            + " && exec bash "
+                            + shlex.quote(remote_script),
+                        ]
+                    )
+                    target = f"{args.session}:3"
+                    windows = tmux(
+                        "list-windows", "-t", args.session, "-F", "#{window_index}"
+                    ).stdout.splitlines()
+                    if "3" in windows:
+                        tmux("respawn-window", "-k", "-t", target, run)
+                    else:
+                        tmux(
+                            "new-window",
+                            "-d",
+                            "-t",
+                            target,
+                            "-n",
+                            "tasks",
+                            "-c",
+                            args.workspace,
+                            run,
+                        )
+                    tmux("rename-window", "-t", target, "tasks")
+                    tmux("set-window-option", "-t", target, "automatic-rename", "off")
+                    tmux("set-window-option", "-t", target, "allow-rename", "off")
+                    configure_window(target)
+                    tmux("select-window", "-t", target)
+                    running_result = result
+                else:
+                    raise ValueError(f"Unknown action: {action}")
+                response.write_text("ok")
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                subprocess.CalledProcessError,
+            ) as error:
+                response.write_text(str(error))
+            finally:
+                request.unlink(missing_ok=True)
+        time.sleep(0.1)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="action", required=True)
+    start = subparsers.add_parser("launch")
+    start.add_argument("target")
+    serve = subparsers.add_parser("bridge")
+    serve.add_argument("--session", required=True)
+    serve.add_argument("--directory", required=True)
+    serve.add_argument("--workspace", required=True)
+    serve.add_argument("--parent", type=int)
+    args = parser.parse_args()
+    if args.action == "launch":
+        launch(args.target)
+    else:
+        bridge(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(f"nvim-tmux: {error}", file=sys.stderr)
+        sys.exit(1)
