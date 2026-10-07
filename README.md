@@ -66,25 +66,46 @@ Exact pinned versions live in `lazy-lock.json`.
 
 Interactive `nvim` and `nvim .` starts first select the local or remote runtime,
 then use a project-specific tmux session there. The tmux window bar is at the top;
-AstroNvim's statusline stays at the bottom. Windows are `0:nvim`, `1:bash`, and
+AstroNvim's statusline stays at the bottom. Windows are `1:nvim`, `2:bash`, and
 `3:tasks` (created on the first task).
 The existing local/remote choice appears before tmux starts. In remote mode,
 tmux, its Neovim UI client, Bash, and tasks run in the selected container.
 Local mode uses host Bash and host tasks. Python environment activation follows
 the shell startup configuration and the task's existing environment setup.
 
-Use `Ctrl+b`, then `0`, `1`, or `3` to select a window. `<leader>tb` switches
+Use `Ctrl+1`, `Ctrl+2`, or `Ctrl+3` to select a window. `<leader>tb` switches
 from Neovim to Bash, and `<leader>tj` / F12 selects the task window. Task results
-continue to update the AstroNvim statusline. Interactive Neovim task-buffer
-diagnostic navigation applies only to the fallback embedded terminal. Debug
+continue to update the AstroNvim statusline. Tasks start in window 3 without
+changing the active window; switch there manually when needed. Window 0 is not
+used, and windows 4 through 9 are available for additional shells or tools.
+Interactive Neovim task-buffer diagnostic navigation applies only to the
+fallback embedded terminal. Debug
 server terminals remain embedded for the existing DAP lifecycle integration.
+
+`Ctrl+1` through `Ctrl+9` select tmux windows directly, without the prefix.
+Windows Terminal must forward these keys as CSI-u sequences using `sendInput`:
+`Ctrl+1` sends `\u001b[49;5u`, and so on through `Ctrl+9`, which sends
+`\u001b[57;5u`. `Ctrl+0` retains Windows Terminal's default font-size reset.
+The bindings are consumed by tmux before reaching Neovim or Bash.
+
+In the `bash` window, PageUp enters tmux scrollback and scrolls up one page;
+PageDown scrolls down and returns to the live prompt at the bottom. Up/Down
+continue to select previous/next shell commands: from scrollback they first
+leave copy mode and then forward the arrow key to Bash. PageUp/PageDown in the
+editor window are still forwarded to Neovim. Escape or `q` can also leave copy
+mode with the standard tmux bindings.
 
 Tmux and Python 3 must be installed in the selected runtime (the installers
 include tmux). `NVIM_NO_TMUX=1 nvim .` bypasses the automatic session. Neovim
 invoked from an embedded terminal or with CLI
 options (for example `--headless` or `--server`) is not wrapped in a new session.
-The tmux session persists while other windows remain open; `Ctrl+b`, then `d`
-detaches it, and another `nvim .` in the same directory reattaches it.
+The editor owns its workspace session: closing Neovim also closes its Bash and
+task windows. Closing or detaching the last tmux client destroys the session,
+so `Ctrl+b`, then `d` exits rather than leaving a background workspace behind.
+Multiple clients may share a live session; disconnecting one does not destroy
+it while another is still attached. The remote launcher also stops its port and
+file bridges and shuts down the headless server once no UI is using it. A
+terminal disconnect uses Neovim's signal-preservation path for modified buffers.
 
 This config supports a devcontainer workflow through the shell launcher. Run
 `nvim .` in a project with `.devcontainer/devcontainer.json`; the wrapper asks

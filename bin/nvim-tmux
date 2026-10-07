@@ -31,6 +31,81 @@ def configure_window(target):
         tmux("set-window-option", "-t", target, option, value)
 
 
+def configure_keys():
+    # Windows Terminal sends Ctrl+digits as distinct CSI-u key sequences.
+    tmux("unbind-key", "-n", "C-0")
+    for index in range(1, 10):
+        tmux("bind-key", "-n", f"C-{index}", "select-window", "-t", f":{index}")
+
+    bash_window = "#{==:#{window_name},bash}"
+    tmux(
+        "bind-key",
+        "-n",
+        "PPage",
+        "if-shell",
+        "-F",
+        bash_window,
+        "copy-mode -u",
+        "send-keys PPage",
+    )
+    # At the live prompt there is no newer scrollback to show. Do not send
+    # PageDown to Readline, where it may be bound to next-history.
+    tmux(
+        "bind-key",
+        "-n",
+        "NPage",
+        "if-shell",
+        "-F",
+        "#{!=:#{window_name},bash}",
+        "send-keys NPage",
+    )
+    for table in ("copy-mode", "copy-mode-vi"):
+        tmux("bind-key", "-T", table, "PPage", "send-keys", "-X", "page-up")
+        bottom = "#{&&:" + bash_window + ",#{==:#{scroll_position},0}}"
+        tmux(
+            "bind-key",
+            "-T",
+            table,
+            "NPage",
+            "send-keys -X page-down ; if-shell -F "
+            + shlex.quote(bottom)
+            + " 'copy-mode -q'",
+        )
+        for key, motion in (("Up", "cursor-up"), ("Down", "cursor-down")):
+            tmux(
+                "bind-key",
+                "-T",
+                table,
+                key,
+                "if-shell",
+                "-F",
+                bash_window,
+                f"send-keys -X cancel ; send-keys {key}",
+                f"send-keys -X {motion}",
+            )
+
+
+def configure_lifecycle(session):
+    # The editor owns the workspace. Its exit closes Bash and task panes too.
+    tmux("set-window-option", "-t", f"{session}:1", "remain-on-exit", "on")
+    tmux(
+        "set-hook",
+        "-t",
+        session,
+        "pane-died",
+        "if-shell -F '#{==:#{window_index},1}' "
+        + shlex.quote("kill-session -t =" + session),
+    )
+    # Enable this only after attachment: creation initially happens detached.
+    tmux(
+        "set-hook",
+        "-t",
+        session,
+        "client-attached",
+        "set-option -t " + session + " destroy-unattached on",
+    )
+
+
 def launch(target):
     root = Path(target).resolve()
     session = "nvim-" + hashlib.sha256(str(root).encode()).hexdigest()[:12]
@@ -89,13 +164,13 @@ def launch(target):
         )
         tmux("set-option", "-g", "default-terminal", "tmux-256color")
         tmux("set-option", "-t", session, "renumber-windows", "off")
-        # Explicit targets also work when the user's base-index is not zero.
+        # Explicit targets also work with a different user-configured base index.
         index = tmux(
             "display-message", "-p", "-t", session, "#{window_index}"
         ).stdout.strip()
-        if index != "0":
-            tmux("move-window", "-s", f"{session}:{index}", "-t", f"{session}:0")
-        tmux("set-option", "-t", session, "base-index", "0")
+        if index != "1":
+            tmux("move-window", "-s", f"{session}:{index}", "-t", f"{session}:1")
+        tmux("set-option", "-t", session, "base-index", "1")
         tmux("set-option", "-t", session, "renumber-windows", "off")
         tmux("set-option", "-t", session, "status", "on")
         tmux("set-option", "-t", session, "status-position", "top")
@@ -118,41 +193,37 @@ def launch(target):
             "window-status-current-style",
             "bg=#504945,fg=#ebdbb2,bold",
         )
-        tmux("set-window-option", "-t", f"{session}:0", "automatic-rename", "off")
-        tmux("set-window-option", "-t", f"{session}:0", "allow-rename", "off")
+        tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
+        tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
         tmux(
             "new-window",
             "-d",
             "-t",
-            f"{session}:1",
+            f"{session}:2",
             "-n",
             "bash",
             "-c",
             str(root),
             "bash -il",
         )
-        tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
-        tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
-        tmux("select-window", "-t", f"{session}:0")
+        tmux("set-window-option", "-t", f"{session}:2", "automatic-rename", "off")
+        tmux("set-window-option", "-t", f"{session}:2", "allow-rename", "off")
+        tmux("select-window", "-t", f"{session}:1")
+        configure_lifecycle(session)
         tmux("set-option", "-t", session, "@nvim_ready", "1")
     else:
         windows = tmux(
             "list-windows", "-t", session, "-F", "#{window_index}"
         ).stdout.splitlines()
-        if "0" not in windows:
-            tmux(
-                "new-window",
-                "-d",
-                "-t",
-                f"{session}:0",
-                "-n",
-                "nvim",
-                "-c",
-                str(root),
-                command,
-            )
-            tmux("set-window-option", "-t", f"{session}:0", "automatic-rename", "off")
-            tmux("set-window-option", "-t", f"{session}:0", "allow-rename", "off")
+        if "0" in windows:
+            # Preserve a workspace created with the previous numbering scheme.
+            if "1" in windows:
+                tmux("move-window", "-s", f"{session}:1", "-t", f"{session}:2")
+            tmux("move-window", "-s", f"{session}:0", "-t", f"{session}:1")
+            windows = tmux(
+                "list-windows", "-t", session, "-F", "#{window_index}"
+            ).stdout.splitlines()
+        tmux("set-option", "-t", session, "base-index", "1")
         if "1" not in windows:
             tmux(
                 "new-window",
@@ -160,18 +231,34 @@ def launch(target):
                 "-t",
                 f"{session}:1",
                 "-n",
+                "nvim",
+                "-c",
+                str(root),
+                command,
+            )
+            tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
+            tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
+        if "2" not in windows:
+            tmux(
+                "new-window",
+                "-d",
+                "-t",
+                f"{session}:2",
+                "-n",
                 "bash",
                 "-c",
                 str(root),
                 "bash -il",
             )
-            tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
-            tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
-        tmux("select-window", "-t", f"{session}:0")
+            tmux("set-window-option", "-t", f"{session}:2", "automatic-rename", "off")
+            tmux("set-window-option", "-t", f"{session}:2", "allow-rename", "off")
+        tmux("select-window", "-t", f"{session}:1")
+        configure_lifecycle(session)
     for index in tmux(
         "list-windows", "-t", session, "-F", "#{window_index}"
     ).stdout.splitlines():
         configure_window(f"{session}:{index}")
+    configure_keys()
     if os.environ.get("TMUX"):
         tmux("switch-client", "-t", session)
     else:
@@ -255,7 +342,6 @@ def bridge(args):
                     tmux("set-window-option", "-t", target, "automatic-rename", "off")
                     tmux("set-window-option", "-t", target, "allow-rename", "off")
                     configure_window(target)
-                    tmux("select-window", "-t", target)
                     running_result = result
                 else:
                     raise ValueError(f"Unknown action: {action}")
@@ -277,6 +363,7 @@ def main():
     subparsers = parser.add_subparsers(dest="action", required=True)
     start = subparsers.add_parser("launch")
     start.add_argument("target")
+    subparsers.add_parser("configure-keys")
     serve = subparsers.add_parser("bridge")
     serve.add_argument("--session", required=True)
     serve.add_argument("--directory", required=True)
@@ -285,8 +372,10 @@ def main():
     args = parser.parse_args()
     if args.action == "launch":
         launch(args.target)
-    else:
+    elif args.action == "bridge":
         bridge(args)
+    else:
+        configure_keys()
 
 
 if __name__ == "__main__":

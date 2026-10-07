@@ -756,6 +756,37 @@ esac
 
 workspace="$(container_workspace "$container")"
 host="$(container_host "$container")"
+ui_pid=""
+download_bridge_pid=""
+port_bridge_pid=""
+server_ready=false
+
+cleanup_runtime() {
+  trap - EXIT HUP INT TERM
+  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
+    [[ -z "$child" ]] || kill "$child" 2>/dev/null || true
+  done
+  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
+    [[ -z "$child" ]] || wait "$child" 2>/dev/null || true
+  done
+  if [[ "$server_ready" == true ]]; then
+    # Stop only this endpoint, and only when no UI is still using it. TERM
+    # gives Neovim its normal signal-preservation path for modified buffers.
+    for attempt in {1..10}; do
+      users="$(timeout 1s "$nvim_bin" --server "$addr" --remote-expr 'len(nvim_list_uis())' 2>/dev/null)" || break
+      if [[ "$users" == 0 ]]; then
+        timeout 3s "$nvim_bin" --server "$addr" --remote-expr \
+          'len(nvim_list_uis()) == 0 ? luaeval("vim.uv.kill(vim.fn.getpid(), 15)") : 0' >/dev/null 2>&1 || true
+        break
+      fi
+      sleep 0.1
+    done
+  fi
+}
+trap cleanup_runtime EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 existing_port="$(running_server_port "$container")"
 port="${NVIM_DEV_PORT:-$existing_port}"
 if [[ -z "$port" ]]; then
@@ -778,6 +809,7 @@ else
   bootstrap_and_start_server "$container" "$workspace" "$port"
 fi
 wait_for_server "$addr" || die "timed out waiting for container nvim server at $addr"
+server_ready=true
 ok "attach remote UI"
 
 windows_download_dir() {
@@ -795,6 +827,7 @@ windows_download_dir() {
 }
 
 download_bridge() {
+  trap - EXIT HUP INT TERM
   local parent_pid="$1" request_dir="$root/.git/nvim-download" target_dir request processing response source_file host_file windows_path name stem ext candidate index
   target_dir="$(windows_download_dir)" || return 0
   mkdir -p "$request_dir" "$target_dir"
@@ -867,6 +900,7 @@ download_bridge() {
 }
 
 download_bridge "$$" &
+download_bridge_pid=$!
 
 container_listening_ports() {
   docker exec "$container" sh -lc 'ss -H -ltn 2>/dev/null' | while read -r _ _ _ address _; do
@@ -882,8 +916,25 @@ port_forward_bridge() {
   local parent_pid="$1" relay="$HOME/.config/nvim/bin/nvim-port-relay" relay_log_dir status_file lock_file
   local forwarded_port relay_pid
   declare -A relays=()
+  local owns_status=false
+  cleanup_relays() {
+    trap - EXIT HUP INT TERM
+    for relay_pid in "${relays[@]}"; do
+      kill "$relay_pid" 2>/dev/null || true
+    done
+    for relay_pid in "${relays[@]}"; do
+      wait "$relay_pid" 2>/dev/null || true
+    done
+    if [[ "$owns_status" == true ]]; then
+      rm -f "$status_file" "$status_file.tmp.$$"
+    fi
+  }
   relay_log_dir="${XDG_STATE_HOME:-$HOME/.local/state}/nvim/port-relays-$root_name"
   status_file="$root/.git/nvim-forwarded-ports"
+  trap cleanup_relays EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   mkdir -p "$relay_log_dir"
 
   if command -v flock >/dev/null 2>&1; then
@@ -895,6 +946,7 @@ port_forward_bridge() {
     done
   fi
 
+  owns_status=true
   while kill -0 "$parent_pid" 2>/dev/null; do
     declare -A wanted=()
     while read -r forwarded_port; do
@@ -942,12 +994,18 @@ port_forward_bridge() {
 
 info "port forwarding" "container TCP ports → Windows localhost"
 port_forward_bridge "$$" &
+port_bridge_pid=$!
 
 if [[ -t 0 && -t 1 && "${NVIM_NO_TMUX:-0}" != 1 ]]; then
+  exec 3<&0
   tmux_user="$(devcontainer_json_value remoteUser || true)"
   [[ -n "$tmux_user" ]] || tmux_user="$(docker inspect -f '{{.Config.User}}' "$container")"
   [[ -n "$tmux_user" ]] || tmux_user=root
-  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor bash -ilc \
-    "command -v tmux >/dev/null || { printf 'tmux is required in the devcontainer\\n' >&2; exit 127; }; exec env COLORTERM=truecolor NVIM_TMUX_EDITOR_COMMAND=$(quote "nvim --server 127.0.0.1:$port --remote-ui") NVIM_TMUX_BRIDGE_DIR=$(quote "$workspace/.git/nvim-tmux") python3 \"\$HOME/.config/nvim/bin/nvim-tmux\" launch $(quote "$workspace")"
+  docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor bash -ilc \
+    "command -v tmux >/dev/null || { printf 'tmux is required in the devcontainer\\n' >&2; exit 127; }; exec env COLORTERM=truecolor NVIM_TMUX_EDITOR_COMMAND=$(quote "nvim --server 127.0.0.1:$port --remote-ui") NVIM_TMUX_BRIDGE_DIR=$(quote "$workspace/.git/nvim-tmux") python3 \"\$HOME/.config/nvim/bin/nvim-tmux\" launch $(quote "$workspace")" <&3 &
+else
+  exec 3<&0
+  "$nvim_bin" --server "$addr" --remote-ui <&3 &
 fi
-exec "$nvim_bin" --server "$addr" --remote-ui
+ui_pid=$!
+wait "$ui_pid"

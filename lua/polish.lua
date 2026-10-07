@@ -92,7 +92,7 @@ vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
 vim.opt.shell = "bash"
 vim.opt.shellcmdflag = "-lc"
 
-vim.keymap.set("n", "<leader>tb", function() require("config.tmux").select(1) end, {
+vim.keymap.set("n", "<leader>tb", function() require("config.tmux").select(2) end, {
   desc = "Switch to tmux bash window",
 })
 
