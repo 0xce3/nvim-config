@@ -88,6 +88,11 @@ Windows Terminal must forward these keys as CSI-u sequences using `sendInput`:
 `\u001b[57;5u`. `Ctrl+0` retains Windows Terminal's default font-size reset.
 The bindings are consumed by tmux before reaching Neovim or Bash.
 
+`Ctrl+Left` and `Ctrl+Right` select the previous and next tmux windows, wrapping
+at the ends and skipping unused numbers. Windows Terminal forwards these using
+`sendInput` sequences `\u001b[1;5D` and `\u001b[1;5C`, replacing its pane-focus
+bindings on those keys. `Ctrl+1` through `Ctrl+9` still select windows directly.
+
 In the `bash` and `tasks` windows, PageUp enters tmux scrollback and scrolls up
 one page; PageDown scrolls down and returns to the live prompt at the bottom.
 Up/Down in Bash continue to select previous/next shell commands: from scrollback
@@ -96,7 +101,9 @@ editor window are still forwarded to Neovim. Escape or `q` can also leave copy
 mode with the standard tmux bindings.
 
 Mouse support is enabled. The wheel scrolls tmux output, and Bash/task windows
-have a draggable scrollbar on the right. Neovim keeps its own mouse handling
+have a draggable scrollbar on the right when scrollback exists. Its track uses
+the terminal's default background, and it hides when there is no scrollback.
+Neovim keeps its own mouse handling
 and does not receive a tmux scrollbar. New panes retain up to 50,000 lines.
 The scrollback belongs to tmux rather than Windows Terminal's outer scrollbar.
 Native pane scrollbars require tmux 3.6 or newer. Container setup installs the

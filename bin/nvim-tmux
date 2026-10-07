@@ -31,12 +31,13 @@ def configure_window(target):
         tmux("set-window-option", "-t", target, option, value)
     name = tmux("display-message", "-p", "-t", target, "#{window_name}").stdout.strip()
     scrolling = name in ("bash", "tasks")
+    history = int(tmux("display-message", "-p", "-t", target, "#{history_size}").stdout.strip())
     tmux(
         "set-window-option",
         "-t",
         target,
         "pane-scrollbars",
-        "on" if scrolling else "off",
+        "on" if scrolling and history > 0 else "off",
     )
     if scrolling:
         tmux("set-window-option", "-t", target, "pane-scrollbars-position", "right")
@@ -45,8 +46,30 @@ def configure_window(target):
             "-t",
             target,
             "pane-scrollbars-style",
-            "bg=#3c3836,fg=#a89984,width=1,pad=0",
+            "bg=default,fg=#665c54,width=1,pad=0",
         )
+
+
+def update_scrollbars(session, previous):
+    # pane-scrollbars is not a format option, so update it as history grows.
+    result = tmux(
+        "list-panes", "-s", "-t", session, "-F",
+        "#{window_id}\t#{window_name}\t#{history_size}",
+        check=False,
+    )
+    if result.returncode:
+        return
+    panes = result.stdout.splitlines()
+    windows = {}
+    for pane in panes:
+        window, name, history = pane.split("\t", 2)
+        if name in ("bash", "tasks"):
+            windows[window] = windows.get(window, False) or int(history) > 0
+    for window, visible in windows.items():
+        if previous.get(window) != visible:
+            tmux("set-window-option", "-t", window, "pane-scrollbars", "on" if visible else "off", check=False)
+    previous.clear()
+    previous.update(windows)
 
 
 def configure_keys():
@@ -54,6 +77,8 @@ def configure_keys():
     tmux("unbind-key", "-n", "C-0")
     for index in range(1, 10):
         tmux("bind-key", "-n", f"C-{index}", "select-window", "-t", f":{index}")
+    tmux("bind-key", "-n", "C-Left", "previous-window")
+    tmux("bind-key", "-n", "C-Right", "next-window")
 
     bash_window = "#{==:#{window_name},bash}"
     scroll_window = "#{||:" + bash_window + ",#{==:#{window_name},tasks}}"
@@ -301,6 +326,8 @@ def bridge(args):
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     running_result = None
+    scrollbar_states = {}
+    scrollbar_updated = 0
     while tmux("has-session", "-t", "=" + args.session, check=False).returncode == 0:
         if args.parent:
             try:
@@ -308,6 +335,9 @@ def bridge(args):
             except ProcessLookupError:
                 return
         (directory / "heartbeat").touch()
+        if time.monotonic() - scrollbar_updated >= 1:
+            update_scrollbars(args.session, scrollbar_states)
+            scrollbar_updated = time.monotonic()
         for request in sorted(directory.glob("*.request")):
             response = request.with_suffix(".response")
             try:
