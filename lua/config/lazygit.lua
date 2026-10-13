@@ -23,7 +23,15 @@ end
 local function with_config(opts, args)
   if not config_file then
     config_file = vim.fn.tempname() .. ".yml"
-    local ok, err = pcall(vim.fn.writefile, {}, config_file)
+    local editor = vim.fs.joinpath(vim.fn.stdpath("config"), "bin", "nvim-lazygit-editor")
+    -- Keep LazyGit in its terminal buffer and ask its editor helper to replace
+    -- that buffer, or focus an existing one, without changing tabpages.
+    local ok, err = pcall(vim.fn.writefile, {
+      "os:",
+      "  edit: bash " .. editor .. " {{filename}}",
+      "  editAtLine: bash " .. editor .. " {{filename}} {{line}}",
+      "  editInTerminal: false",
+    }, config_file)
     if not ok then
       vim.notify(err, vim.log.levels.ERROR, { title = "lazygit" })
       config_file = nil
@@ -41,6 +49,18 @@ end
 
 function M.log(opts)
   return require("snacks").lazygit.open(with_config(opts, { "log" }))
+end
+
+function M.edit(path, line)
+  path = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
+  local bufnr = vim.fn.bufnr(path)
+  local windows = bufnr > 0 and vim.fn.win_findbuf(bufnr) or {}
+  if #windows > 0 then
+    vim.api.nvim_set_current_win(windows[1])
+  else
+    vim.cmd.edit(vim.fn.fnameescape(path))
+  end
+  if line and line > 0 then vim.api.nvim_win_set_cursor(0, { line, 0 }) end
 end
 
 function M.open_window()

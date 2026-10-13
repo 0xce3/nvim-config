@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+file="${1:?missing file path}"
+line="${2:-0}"
+if [[ ! "$line" =~ ^[0-9]+$ ]]; then line=0; fi
+
+if [[ -z "${NVIM:-}" ]]; then
+  if ((line > 0)); then exec nvim "+$line" -- "$file"; fi
+  exec nvim -- "$file"
+fi
+
+# Pass the path as Base64 so filenames cannot alter the remote Lua expression.
+encoded="$(printf '%s' "$file" | base64 --wrap=0)"
+exec nvim --server "$NVIM" --remote-expr \
+  "luaeval(\"require('config.lazygit').edit(vim.base64.decode(_A[1]), _A[2])\", ['$encoded', $line])"

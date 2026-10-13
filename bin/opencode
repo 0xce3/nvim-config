@@ -4,32 +4,10 @@ set -euo pipefail
 real_opencode="${OPENCODE_REAL_BIN:-$HOME/.opencode/bin/opencode}"
 
 if [[ ! -x "$real_opencode" ]]; then
-  printf 'opencode wrapper: real opencode binary not found: %s\n' "$real_opencode" >&2
+  printf 'opencode wrapper: real OpenCode binary not found: %s\n' "$real_opencode" >&2
   exit 127
 fi
 
-root="$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)"
-if [[ -z "${OPENCODE_PORT:-}" ]]; then
-  root_hash="$(printf '%s' "$root" | cksum | awk '{print $1}')"
-  export OPENCODE_PORT=$((4100 + root_hash % 10000))
-fi
-export OPENCODE_SERVER_URL="${OPENCODE_SERVER_URL:-http://127.0.0.1:${OPENCODE_PORT}}"
-
-has_port=0
-has_hostname=0
-for arg in "$@"; do
-  case "$arg" in
-    --port|--port=*) has_port=1 ;;
-    --hostname|--hostname=*) has_hostname=1 ;;
-  esac
-done
-
-args=()
-if [[ "$has_port" -eq 0 ]]; then
-  args+=(--port "${OPENCODE_PORT:-4096}")
-fi
-if [[ "$has_hostname" -eq 0 ]]; then
-  args+=(--hostname "${OPENCODE_HOSTNAME:-0.0.0.0}")
-fi
-
-exec "$real_opencode" "${args[@]}" "$@"
+# OpenCode V2 manages its background service itself.  V1's --port and
+# --hostname flags are no longer accepted by the terminal client.
+exec "$real_opencode" "$@"
