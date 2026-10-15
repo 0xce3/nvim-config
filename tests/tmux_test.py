@@ -94,7 +94,21 @@ class TmuxTest(unittest.TestCase):
         )
         self.assertIn(
             "remote",
-            module.tmux("show-option", "-v", "-t", self.session, "status-left").stdout,
+            module.tmux(
+                "show-option", "-v", "-t", self.session, "@nvim_status_left"
+            ).stdout,
+        )
+        self.assertEqual(
+            len(
+                module.tmux(
+                    "display-message",
+                    "-p",
+                    "-t",
+                    self.session,
+                    "#{p78:@nvim_status_left}",
+                ).stdout.rstrip("\n")
+            ),
+            78,
         )
         self.assertIn(
             "○",
