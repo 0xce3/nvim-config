@@ -180,7 +180,7 @@ return {
           local neotest = require("neotest")
           neotest.run.run(vim.fn.expand("%"))
           vim.schedule(function()
-            neotest.summary.open()
+            neotest.summary.open({ enter = true })
           end)
         end,
         desc = "Run test file",
@@ -217,6 +217,7 @@ return {
           animated = true,
           enabled = true,
           follow = true,
+          open = "tabnew",
         },
       })
     end,
