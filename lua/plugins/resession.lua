@@ -2,6 +2,38 @@ return {
   {
     "stevearc/resession.nvim",
     init = function()
+      local function reload_blank_file_buffers()
+        local reloaded = {}
+        for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if not reloaded[buf] then
+              local name = vim.api.nvim_buf_get_name(buf)
+              local stat = name ~= "" and vim.uv.fs_stat(name) or nil
+              if
+                vim.bo[buf].buftype == ""
+                and not vim.bo[buf].modified
+                and stat
+                and stat.type == "file"
+                and stat.size > 0
+              then
+                vim.fn.bufload(buf)
+                local lines = vim.api.nvim_buf_get_lines(buf, 0, 1, false)
+                if #lines == 1 and lines[1] == "" then
+                  reloaded[buf] = true
+                  vim.api.nvim_win_call(win, function()
+                    -- Resession defers the final :edit until after LoadPost. Force
+                    -- a normal buffer read here; a later retry handles remote-UI
+                    -- buffer synchronization that completes on the next event loop.
+                    vim.cmd("silent! keepjumps edit!")
+                  end)
+                end
+              end
+            end
+          end
+        end
+      end
+
       vim.api.nvim_create_autocmd("VimLeavePre", {
         callback = function()
           -- Always capture the actual state immediately before :qa. Without
@@ -20,27 +52,8 @@ return {
             vim.cmd.cd(workspace)
           end
 
-          vim.schedule(function()
-            for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-              for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
-                local buf = vim.api.nvim_win_get_buf(win)
-                local name = vim.api.nvim_buf_get_name(buf)
-                local stat = name ~= "" and vim.uv.fs_stat(name) or nil
-                local lines = vim.api.nvim_buf_get_lines(buf, 0, 2, false)
-                local is_blank = #lines == 1 and lines[1] == ""
-
-                if
-                  vim.bo[buf].buftype == ""
-                  and stat
-                  and stat.type == "file"
-                  and stat.size > 0
-                  and is_blank
-                then
-                  vim.api.nvim_win_call(win, function() pcall(vim.cmd, "silent edit!") end)
-                end
-              end
-            end
-          end)
+          vim.schedule(reload_blank_file_buffers)
+          vim.defer_fn(reload_blank_file_buffers, 50)
         end,
         desc = "Finish restoring session file buffers",
       })
