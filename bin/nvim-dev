@@ -822,46 +822,47 @@ trap cleanup_runtime EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-existing_port="$(running_server_port "$container")"
-port="${NVIM_DEV_PORT:-$existing_port}"
-if [[ -z "$port" ]]; then
-  port="$((41000 + RANDOM % 10000))"
+direct_container_editor=false
+if [[ "${NVIM_DEV_REMOTE_UI:-0}" != 1 ]]; then
+  direct_container_editor=true
+  # There is no headless Nvim server in direct mode. Keep its port out of
+  # the forwarding list while forwarding every service exposed by the
+  # devcontainer.
+  port=0
+  addr=""
+else
+  existing_port="$(running_server_port "$container")"
+  port="${NVIM_DEV_PORT:-$existing_port}"
+  if [[ -z "$port" ]]; then
+    port="$((41000 + RANDOM % 10000))"
+  fi
+  addr="$host:$port"
 fi
-addr="$host:$port"
 
 sync_nvim_config_to_container "$container"
-if [[ "${NVIM_DEV_REMOTE_UI:-0}" != 1 ]]; then
+if [[ "$direct_container_editor" == true ]]; then
   check_container_editor_tools "$container"
   info "container" "$container"
   info "workspace" "$workspace"
-  ok "attach direct container editor"
-
-  tmux_user="$(devcontainer_json_value remoteUser || true)"
-  [[ -n "$tmux_user" ]] || tmux_user="$(docker inspect -f '{{.Config.User}}' "$container")"
-  [[ -n "$tmux_user" ]] || tmux_user=root
-  if [[ "${NVIM_NO_TMUX:-0}" == 1 ]]; then
-    exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" nvim .
-  fi
-  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" bash -ilc \
-    'exec python3 "$HOME/.config/nvim/bin/nvim-tmux" launch "$PWD"'
-fi
-
-ensure_container_tools "$container"
-ensure_container_git_forge "$container"
-copy_startup_log_to_container "$container"
-
-info "container" "$container"
-info "workspace" "$workspace"
-info "server" "$addr"
-if [[ -n "$existing_port" && "$existing_port" == "$port" ]]; then
-  ok "reuse server" "$addr"
+  ok "prepare direct container editor"
 else
-  step "start server" "$addr"
-  bootstrap_and_start_server "$container" "$workspace" "$port"
+  ensure_container_tools "$container"
+  ensure_container_git_forge "$container"
+  copy_startup_log_to_container "$container"
+
+  info "container" "$container"
+  info "workspace" "$workspace"
+  info "server" "$addr"
+  if [[ -n "$existing_port" && "$existing_port" == "$port" ]]; then
+    ok "reuse server" "$addr"
+  else
+    step "start server" "$addr"
+    bootstrap_and_start_server "$container" "$workspace" "$port"
+  fi
+  wait_for_server "$addr" || die "timed out waiting for container nvim server at $addr"
+  server_ready=true
+  ok "attach remote UI"
 fi
-wait_for_server "$addr" || die "timed out waiting for container nvim server at $addr"
-server_ready=true
-ok "attach remote UI"
 
 windows_download_dir() {
   if [[ -n "${NVIM_WINDOWS_DOWNLOAD_DIR:-}" ]]; then
@@ -1046,6 +1047,17 @@ port_forward_bridge() {
 info "port forwarding" "container TCP ports → Windows localhost"
 port_forward_bridge "$$" &
 port_bridge_pid=$!
+
+if [[ "$direct_container_editor" == true ]]; then
+  tmux_user="$(devcontainer_json_value remoteUser || true)"
+  [[ -n "$tmux_user" ]] || tmux_user="$(docker inspect -f '{{.Config.User}}' "$container")"
+  [[ -n "$tmux_user" ]] || tmux_user=root
+  if [[ "${NVIM_NO_TMUX:-0}" == 1 ]]; then
+    exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" nvim .
+  fi
+  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" bash -ilc \
+    'exec python3 "$HOME/.config/nvim/bin/nvim-tmux" launch "$PWD"'
+fi
 
 if [[ -t 0 && -t 1 && "${NVIM_NO_TMUX:-0}" != 1 ]]; then
   exec 3<&0
