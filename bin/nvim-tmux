@@ -186,8 +186,18 @@ def configure_status(session):
         ("status-style", "bg=#282828,fg=#a89984"),
         ("status-left-length", "40"),
         ("status-right-length", "40"),
-        ("status-left", "#[fg=#83a598,bg=#3c3836,bold] 󰉋 #S #[fg=#3c3836,bg=#282828]"),
-        ("status-right", "#[fg=#282828,bg=#83a598]#[fg=#282828,bg=#83a598,bold] #H "),
+        (
+            "status-left",
+            "#[fg=#282828,bg=#61afef]  #[fg=#fb83a7,bg=#3c3836,bold] remote "
+            "#[fg=#a89984]│ #[fg=#fb83a7]#(git -C '#{pane_current_path}' branch --show-current 2>/dev/null) "
+            "#[fg=#3c3836,bg=#282828]",
+        ),
+        (
+            "status-right",
+            "#[fg=#282828,bg=#fabd2f]#[fg=#282828,bg=#fabd2f,bold] "
+            "󰆍 #{pane_current_command} #[fg=#fabd2f,bg=#282828] "
+            "#[fg=#83a598,bold] %H:%M ",
+        ),
     )
     for option, value in settings:
         tmux("set-option", "-t", session, option, value)
@@ -196,14 +206,14 @@ def configure_status(session):
         "-t",
         session,
         "window-status-format",
-        "#[fg=#928374,bg=#282828] #I:#W ",
+        "#[fg=#928374,bg=#282828] ○ #I:#W ",
     )
     tmux(
         "set-window-option",
         "-t",
         session,
         "window-status-current-format",
-        "#[fg=#282828,bg=#fabd2f,bold] #I:#W #[fg=#fabd2f,bg=#282828]",
+        "#[fg=#83a598,bg=#282828,bold] ● #I:#W ",
     )
     tmux(
         "set-hook",

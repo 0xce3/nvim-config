@@ -92,6 +92,10 @@ class TmuxTest(unittest.TestCase):
             ).stdout.strip(),
             "bottom",
         )
+        self.assertIn(
+            "remote",
+            module.tmux("show-option", "-v", "-t", self.session, "status-left").stdout,
+        )
         self.assertEqual(
             module.tmux(
                 "show-option", "-v", "-t", self.session, "status"
