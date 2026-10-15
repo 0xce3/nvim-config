@@ -92,6 +92,26 @@ class TmuxTest(unittest.TestCase):
             ).stdout.strip(),
             "bottom",
         )
+        self.assertEqual(
+            module.tmux(
+                "show-option", "-v", "-t", self.session, "status"
+            ).stdout.strip(),
+            "off",
+        )
+        module.tmux("select-window", "-t", f"{self.session}:2")
+        self.assertEqual(
+            module.tmux(
+                "show-option", "-v", "-t", self.session, "status"
+            ).stdout.strip(),
+            "on",
+        )
+        module.tmux("select-window", "-t", f"{self.session}:1")
+        self.assertEqual(
+            module.tmux(
+                "show-option", "-v", "-t", self.session, "status"
+            ).stdout.strip(),
+            "off",
+        )
         with (
             patch.object(module.os, "execvp", side_effect=Attached),
             self.assertRaises(Attached),

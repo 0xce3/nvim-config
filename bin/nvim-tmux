@@ -205,6 +205,18 @@ def configure_status(session):
         "window-status-current-format",
         "#[fg=#282828,bg=#fabd2f,bold] #I:#W #[fg=#fabd2f,bg=#282828]",
     )
+    tmux(
+        "set-hook",
+        "-t",
+        session,
+        "after-select-window",
+        "if-shell -F '#{==:#{window_name},nvim}' "
+        + shlex.quote("set-option -t " + session + " status off")
+        + " "
+        + shlex.quote("set-option -t " + session + " status on"),
+    )
+    # The launcher always selects the editor window before attaching.
+    tmux("set-option", "-t", session, "status", "off")
 
 
 def launch(target):
