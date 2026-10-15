@@ -646,8 +646,6 @@ return {
       map("n", "<leader>ts", function()
         require("vstask").command()
       end, { desc = "Run shell task" })
-      map("n", "<leader>tj", term.toggle, { desc = "Toggle task terminal" })
-        map("n", "<leader>tq", term.close, { desc = "Leave task terminal" })
     end,
   },
 

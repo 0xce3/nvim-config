@@ -85,14 +85,6 @@ return {
       -- first key is the mode
       n = {
         ["<S-w>"] = { "<C-w>w", desc = "Switch window" },
-        ["<F12>"] = {
-          function() require("config.terminal").toggle() end,
-          desc = "Toggle task terminal",
-        },
-        ["<leader>td"] = {
-          function() require("config.terminal").toggle_debug() end,
-          desc = "Toggle debug terminal",
-        },
         ["<leader>c"] = {
           function() close_buffer(0, false) end,
           desc = "Close buffer",
@@ -167,12 +159,7 @@ return {
         -- setting a mapping to false will disable it
         -- ["<C-S>"] = false,
       },
-      t = {
-        ["<F12>"] = {
-          function() require("config.terminal").toggle() end,
-          desc = "Toggle task terminal",
-        },
-      },
+      t = {},
     },
   },
 }
