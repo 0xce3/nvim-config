@@ -775,15 +775,10 @@ server_ready=false
 
 cleanup_runtime() {
   trap - EXIT HUP INT TERM
-  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
-    [[ -z "$child" ]] || kill "$child" 2>/dev/null || true
-  done
-  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
-    [[ -z "$child" ]] || wait "$child" 2>/dev/null || true
-  done
+  # Stop the headless server before waiting for the tmux/docker UI process.
+  # The tmux pane owns the server process; waiting for it first can deadlock
+  # when :qa has already closed the remote UI but the pane is still attached.
   if [[ "$server_ready" == true ]]; then
-    # Stop only this endpoint, and only when no UI is still using it. TERM
-    # gives Neovim its normal signal-preservation path for modified buffers.
     for attempt in {1..10}; do
       users="$(timeout 1s "$nvim_bin" --server "$addr" --remote-expr 'len(nvim_list_uis())' 2>/dev/null)" || break
       if [[ "$users" == 0 ]]; then
@@ -794,6 +789,22 @@ cleanup_runtime() {
       sleep 0.1
     done
   fi
+  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
+    [[ -z "$child" ]] || kill "$child" 2>/dev/null || true
+  done
+  # Do not let a child holding a Docker/port-forwarding pipe delay exit.
+  for _ in {1..20}; do
+    local running=false
+    for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
+      if [[ -n "$child" ]] && kill -0 "$child" 2>/dev/null; then running=true; fi
+    done
+    [[ "$running" == false ]] && break
+    sleep 0.1
+  done
+  for child in "$ui_pid" "$download_bridge_pid" "$port_bridge_pid"; do
+    [[ -z "$child" ]] || kill -9 "$child" 2>/dev/null || true
+    [[ -z "$child" ]] || wait "$child" 2>/dev/null || true
+  done
 }
 trap cleanup_runtime EXIT
 trap 'exit 129' HUP
