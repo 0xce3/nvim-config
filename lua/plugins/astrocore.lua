@@ -120,18 +120,19 @@ return {
           function() require("snacks").picker.grep_word() end,
           desc = "Grep word under cursor",
         },
-        -- second key is the lefthand side of the map
-        ["<C-p>"] = {
+        ["<Leader>p"] = {
           function() require("snacks").picker.files() end,
           desc = "Find files",
         },
-        ["<C-P>"] = {
+        ["<Leader>P"] = {
           function()
             local root = vim.fs.root(0, { ".git" }) or vim.uv.cwd()
             require("snacks").picker.files({ cwd = root, hidden = true, ignored = true })
           end,
           desc = "Find all project files",
         },
+        ["<C-p>"] = false,
+        ["<C-P>"] = false,
         ["<Tab>"] = {
           function() require("astrocore.buffer").nav(vim.v.count1) end,
           desc = "Next buffer",
