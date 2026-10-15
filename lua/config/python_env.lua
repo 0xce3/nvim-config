@@ -19,8 +19,12 @@ function M.root(path)
   }) or vim.fn.getcwd()
 end
 
+function M.project_root(path)
+  return vim.fs.root(path or 0, { ".git" }) or M.root(path)
+end
+
 function M.python(path)
-  local root = M.root(path)
+  local root = M.project_root(path)
   local active = vim.env.VIRTUAL_ENV
   if active then
     local candidate = vim.fs.joinpath(active, "bin", "python")
@@ -30,6 +34,9 @@ function M.python(path)
   end
 
   local project = python_in(root)
+  if project then return project end
+  local test_root = vim.fs.joinpath(root, "tests", "system")
+  project = python_in(test_root)
   if project then return project end
 
   -- pyenv's shim resolves the project-local .python-version automatically.

@@ -45,10 +45,18 @@ return {
       pyright = {
         root_dir = function(bufnr, on_dir)
           local python_env = require("config.python_env")
-          on_dir(python_env.root(vim.api.nvim_buf_get_name(bufnr)))
+          on_dir(python_env.project_root(vim.api.nvim_buf_get_name(bufnr)))
         end,
         settings = {
-          python = { pythonPath = require("config.python_env").python() },
+          python = {
+            pythonPath = require("config.python_env").python(),
+            analysis = {
+              extraPaths = {
+                require("config.python_env").project_root(),
+                vim.fs.joinpath(require("config.python_env").project_root(), "tests", "system"),
+              },
+            },
+          },
         },
       },
     },
