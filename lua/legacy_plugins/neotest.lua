@@ -177,7 +177,11 @@ return {
         "<leader>tf",
         function()
           refresh_state()
-          require("neotest").run.run(vim.fn.expand("%"))
+          local neotest = require("neotest")
+          neotest.run.run(vim.fn.expand("%"))
+          vim.schedule(function()
+            neotest.summary.open()
+          end)
         end,
         desc = "Run test file",
       },
