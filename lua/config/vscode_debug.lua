@@ -522,6 +522,7 @@ function M.pick_task()
       finder = make_finder(),
       sorter = conf.generic_sorter({}),
       attach_mappings = function(prompt_bufnr, map)
+        map("n", "q", function() actions.close(prompt_bufnr) end)
         actions.select_default:replace(function()
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
