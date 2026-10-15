@@ -154,6 +154,14 @@ local function python_adapter()
   return adapter
 end
 
+local function open_test_workspace(neotest)
+  neotest.summary.close()
+  neotest.output_panel.close()
+  neotest.summary.open()
+  neotest.output_panel.open()
+  neotest.output_panel.clear()
+end
+
 return {
   {
     "nvim-neotest/neotest",
@@ -180,7 +188,7 @@ return {
           local neotest = require("neotest")
           neotest.run.run(vim.fn.expand("%"))
           vim.schedule(function()
-            neotest.summary.open({ enter = true })
+            open_test_workspace(neotest)
           end)
         end,
         desc = "Run test file",
@@ -217,7 +225,14 @@ return {
           animated = true,
           enabled = true,
           follow = true,
-          open = "tabnew",
+          open = "topleft vsplit | vertical resize 45",
+        },
+        output_panel = {
+          -- The summary opens a left split first. Reuse the remaining editor
+          -- window for the output buffer so the workspace stays two-pane.
+          open = function()
+            return vim.api.nvim_get_current_win()
+          end,
         },
       })
     end,
