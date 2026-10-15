@@ -5,7 +5,9 @@ return {
       opts.picker = opts.picker or {}
       opts.picker.sources = opts.picker.sources or {}
       opts.picker.sources.files = opts.picker.sources.files or {}
-      opts.picker.sources.files.hidden = true
+      -- Keep the frequent file picker fast. Hidden/generated trees such as
+      -- .west_workspace and build caches are available through <C-P>.
+      opts.picker.sources.files.hidden = false
       opts.picker.sources.grep = opts.picker.sources.grep or {}
       opts.picker.sources.grep.hidden = true
       opts.picker.win = opts.picker.win or {}
