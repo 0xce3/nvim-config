@@ -94,7 +94,7 @@ return {
         tabline_file_info = {
           file_icon = {
             hl = function(self)
-              local attributes = require("astroui.status.hl").file_icon("tabline")(self)
+              local attributes = require("astroui.status.hl").file_icon("tabline")(self) or {}
               if self.tab_type == "buffer_active" then
                 attributes.bg = "#3c3836"
                 attributes.underline = true
