@@ -96,6 +96,26 @@ class TmuxTest(unittest.TestCase):
             "remote",
             module.tmux("show-option", "-v", "-t", self.session, "status-left").stdout,
         )
+        self.assertIn(
+            "○",
+            module.tmux(
+                "show-window-options",
+                "-v",
+                "-t",
+                f"{self.session}:2",
+                "window-status-format",
+            ).stdout,
+        )
+        self.assertIn(
+            "●",
+            module.tmux(
+                "show-window-options",
+                "-v",
+                "-t",
+                f"{self.session}:2",
+                "window-status-current-format",
+            ).stdout,
+        )
         self.assertEqual(
             module.tmux(
                 "show-option", "-v", "-t", self.session, "status"

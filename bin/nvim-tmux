@@ -11,6 +11,9 @@ import sys
 import time
 from pathlib import Path
 
+WINDOW_STATUS_FORMAT = "#[fg=#928374,bg=#282828] ○ #I:#W "
+WINDOW_STATUS_CURRENT_FORMAT = "#[fg=#83a598,bg=#282828,bold] ● #I:#W "
+
 
 def tmux(*args, check=True):
     return subprocess.run(["tmux", *args], check=check, text=True, capture_output=True)
@@ -24,16 +27,10 @@ def configure_window(target):
     for option, value in (
         ("automatic-rename", "off"),
         ("allow-rename", "off"),
+        ("window-status-format", WINDOW_STATUS_FORMAT),
+        ("window-status-current-format", WINDOW_STATUS_CURRENT_FORMAT),
     ):
         tmux("set-window-option", "-t", target, option, value)
-    # Remove settings left by an older launcher version so the session-wide
-    # Astro-inspired window style consistently applies to every tmux window.
-    for option in (
-        "window-status-format",
-        "window-status-current-format",
-        "window-status-current-style",
-    ):
-        tmux("set-window-option", "-t", target, "-u", option, check=False)
     name = tmux("display-message", "-p", "-t", target, "#{window_name}").stdout.strip()
     scrolling = name in ("bash", "tasks")
     history = int(
@@ -201,20 +198,6 @@ def configure_status(session):
     )
     for option, value in settings:
         tmux("set-option", "-t", session, option, value)
-    tmux(
-        "set-window-option",
-        "-t",
-        session,
-        "window-status-format",
-        "#[fg=#928374,bg=#282828] ○ #I:#W ",
-    )
-    tmux(
-        "set-window-option",
-        "-t",
-        session,
-        "window-status-current-format",
-        "#[fg=#83a598,bg=#282828,bold] ● #I:#W ",
-    )
     tmux(
         "set-hook",
         "-t",
