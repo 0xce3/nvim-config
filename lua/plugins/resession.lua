@@ -2,6 +2,16 @@ return {
   {
     "stevearc/resession.nvim",
     init = function()
+      vim.api.nvim_create_autocmd("VimLeavePre", {
+        callback = function()
+          -- Always capture the actual state immediately before :qa. Without
+          -- this, <leader>s kept loading an older Last Session indefinitely.
+          pcall(function()
+            require("resession").save("Last Session", { notify = false })
+          end)
+        end,
+        desc = "Save last session before exit",
+      })
       vim.api.nvim_create_autocmd("User", {
         pattern = "ResessionLoadPost",
         callback = function()
@@ -36,6 +46,11 @@ return {
       })
     end,
     opts = function(_, opts)
+      opts.autosave = {
+        enabled = true,
+        interval = 60,
+        notify = false,
+      }
       opts.extensions = opts.extensions or {}
       opts.extensions.task_terminal = { enable_in_tab = true }
     end,
