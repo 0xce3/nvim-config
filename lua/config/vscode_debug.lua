@@ -385,7 +385,7 @@ function M.run_task(label, supplied_inputs, debug_terminal)
     if tmux.available() then
       -- Keep task output out of Neovim's buffer layout, including compound
       -- VS Code tasks with dependencies.
-      require("config.terminal").run(cmd, expanded_task.label, true)
+      require("config.terminal").run(cmd, expanded_task.label)
     elseif debug_terminal then
       require("config.terminal").run_debug(cmd)
     elseif expanded_task.dependsOn ~= nil then
