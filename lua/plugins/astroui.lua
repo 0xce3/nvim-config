@@ -58,20 +58,11 @@ local function project_header()
   }, "\n")
 end
 
-local function tabline_buffer_color(self)
-  local error_count = #vim.diagnostic.get(self.bufnr, {
-    severity = vim.diagnostic.severity.ERROR,
-  })
-  if error_count > 0 then return "#fb4934", true end
-  if vim.bo[self.bufnr].modified then return "#fe8019", false end
-  return require("astroui.status.hl").filetype_color(self).fg, false
-end
-
 return {
   {
   "AstroNvim/astroui",
   init = function()
-    vim.api.nvim_create_autocmd({ "BufModifiedSet", "DiagnosticChanged" }, {
+    vim.api.nvim_create_autocmd("BufModifiedSet", {
       callback = function() vim.schedule(function() vim.cmd.redrawtabline() end) end,
       desc = "Refresh tabline buffer state",
     })
@@ -84,7 +75,7 @@ return {
       init = {
         StatusLine = { bg = "#282828", fg = "#ebdbb2" },
         StatusLineNC = { bg = "#282828", fg = "#a89984" },
-        TabLine = { bg = "#32302f", fg = "#a89984" },
+        TabLine = { bg = "#32302f", fg = "#ebdbb2" },
         TabLineFill = { bg = "#32302f", fg = "#a89984" },
         TabLineSel = { bg = "#3c3836", fg = "#ebdbb2", bold = true },
         FoldColumn = { bg = "NONE" },
@@ -107,8 +98,9 @@ return {
               if self.tab_type == "buffer_active" then
                 attributes.bg = "#3c3836"
                 attributes.underline = true
-                attributes.sp = "#fabd2f"
+                attributes.sp = "#ebdbb2"
               end
+              attributes.fg = "#ebdbb2"
               return attributes
             end,
           },
@@ -118,15 +110,16 @@ return {
             if active then
               attributes.bg = "#3c3836"
               attributes.underline = true
-              attributes.sp = "#fabd2f"
+              attributes.sp = "#ebdbb2"
             end
-            attributes.fg, attributes.bold = tabline_buffer_color(self)
+            attributes.fg = "#ebdbb2"
+            attributes.bold = false
             return attributes
           end,
           close_button = {
             hl = function(self)
               local attributes = require("astroui.status.hl").get_attributes(self.tab_type .. "_close")
-              attributes.fg = tabline_buffer_color(self)
+              attributes.fg = "#ebdbb2"
               return attributes
             end,
           },
