@@ -48,6 +48,10 @@ return {
     treesitter = {
       auto_install = false,
       ensure_installed = {},
+      -- The bundled textobject mappings currently pass the legacy `buf`
+      -- keymap option on session/FileType restore. Keep core Tree-sitter
+      -- features enabled while avoiding that restore-time incompatibility.
+      textobjects = false,
     },
     -- vim options can be configured here
     options = {
