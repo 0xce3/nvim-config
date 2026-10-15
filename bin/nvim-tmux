@@ -174,15 +174,8 @@ def configure_lifecycle(session):
     )
 
 
-def configure_status(session, root):
+def configure_status(session):
     """Render a Gruvbox/AstroNvim-inspired statusline at tmux's bottom edge."""
-    branch = subprocess.run(
-        ["git", "-C", str(root), "branch", "--show-current"],
-        check=False,
-        text=True,
-        capture_output=True,
-    ).stdout.strip()
-    tmux("set-option", "-t", session, "@nvim_status_left", "remote │ " + branch)
     settings = (
         ("status", "on"),
         ("status-position", "bottom"),
@@ -192,12 +185,12 @@ def configure_status(session, root):
         ("status-right-length", "72"),
         (
             "status-left",
-            "#[fg=#282828,bg=#61afef] ◆ #[fg=#fb83a7,bg=#282828,bold]#{p78:@nvim_status_left}",
+            "#[fg=#282828,bg=#fabd2f,bold] 󰆍 #{p12:window_name}"
+            "#[fg=#fabd2f,bg=#282828]#{p64:}",
         ),
         (
             "status-right",
-            "#[fg=#83a598,bg=#282828]#{p-62:pane_current_command} "
-            "#[fg=#fabd2f,bold]󰆍  #[fg=#83a598,bold]%H:%M ",
+            "#[fg=#83a598,bg=#282828]#{p-66:}#[fg=#83a598,bold]%H:%M ",
         ),
     )
     for option, value in settings:
@@ -347,7 +340,7 @@ def launch(target):
         configure_lifecycle(session)
     tmux("set-option", "-t", session, "mouse", "on")
     tmux("set-option", "-t", session, "history-limit", "50000")
-    configure_status(session, root)
+    configure_status(session)
     for index in tmux(
         "list-windows", "-t", session, "-F", "#{window_index}"
     ).stdout.splitlines():

@@ -221,7 +221,7 @@ function M.restore()
   vim.cmd("stopinsert")
 end
 
-function M.run(command, label)
+function M.run(command, label, focus_tmux)
   if not command or command == "" then
     return
   end
@@ -243,6 +243,7 @@ function M.run(command, label)
         vim.cmd.redrawstatus()
         return
       end
+      if focus_tmux then tmux.select(3) end
       local function poll()
         if vim.fn.filereadable(stem .. ".result") == 1 then
           local code = tonumber(vim.fn.readfile(stem .. ".result")[1])

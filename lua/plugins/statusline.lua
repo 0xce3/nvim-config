@@ -21,7 +21,9 @@ local function tmux_windows()
   for _, line in ipairs(lines) do
     local index, name, active = line:match("^(%d+)\t([^\t]+)\t([01])$")
     if index and name and active then
-      table.insert(windows, (active == "1" and "● " or "○ ") .. index .. ":" .. name)
+      local group = active == "1" and "TmuxWindowActive" or "TmuxWindowInactive"
+      local marker = active == "1" and "●" or "○"
+      table.insert(windows, "%#" .. group .. "#" .. marker .. " " .. index .. ":" .. name .. "%*")
     end
   end
   tmux_windows_cache.value = table.concat(windows, "  ")
@@ -63,6 +65,8 @@ return {
     "rebelot/heirline.nvim",
     opts = function(_, opts)
       local status = require("astroui.status")
+      vim.api.nvim_set_hl(0, "TmuxWindowActive", { fg = "#83a598", bold = true })
+      vim.api.nvim_set_hl(0, "TmuxWindowInactive", { fg = "#928374" })
 
       vim.api.nvim_create_user_command("ForwardedPorts", show_forwarded_ports, {
         desc = "Show forwarded devcontainer ports",
@@ -104,7 +108,6 @@ return {
       opts.statusline[7] = status.component.builder {
         condition = function() return tmux_windows() ~= "" end,
         { provider = function() return " " .. tmux_windows() .. " " end },
-        hl = { fg = "#83a598", bold = true },
         surround = { separator = "both", color = "bg" },
       }
       table.insert(opts.statusline, 9, status.component.builder {

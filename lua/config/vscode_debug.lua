@@ -380,9 +380,13 @@ function M.run_task(label, supplied_inputs, debug_terminal)
       return
     end
 
-    -- Run every VS Code task through the reusable in-Nvim terminal buffer.
     notify("Task started: " .. expanded_task.label, vim.log.levels.INFO)
-    if debug_terminal then
+    local tmux = require("config.tmux")
+    if tmux.available() then
+      -- Keep task output out of Neovim's buffer layout, including compound
+      -- VS Code tasks with dependencies.
+      require("config.terminal").run(cmd, expanded_task.label, true)
+    elseif debug_terminal then
       require("config.terminal").run_debug(cmd)
     elseif expanded_task.dependsOn ~= nil then
       job.run_dependent_tasks(expanded_task, expanded_tasks)
