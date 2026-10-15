@@ -101,6 +101,17 @@ return {
         },
         components = {
         tabline_file_info = {
+          file_icon = {
+            hl = function(self)
+              local attributes = require("astroui.status.hl").file_icon("tabline")(self)
+              if self.tab_type == "buffer_active" then
+                attributes.bg = "#3c3836"
+                attributes.underline = true
+                attributes.sp = "#fabd2f"
+              end
+              return attributes
+            end,
+          },
           hl = function(self)
             local active = self.tab_type == "buffer_active"
             local attributes = require("astroui.status.hl").get_attributes(self.tab_type)
