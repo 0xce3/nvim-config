@@ -196,6 +196,7 @@ def launch(target):
             or shell_command(
                 [
                     "env",
+                    "NVIM_WRAPPER_BYPASS=1",
                     "NVIM_TMUX_LAUNCHED=1",
                     f"NVIM_TMUX_SESSION={session}",
                     f"NVIM_TMUX_BRIDGE_DIR={directory}",

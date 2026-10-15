@@ -624,6 +624,18 @@ fi
   ok "tools ready" "$((SECONDS - start))s"
 }
 
+check_container_editor_tools() {
+  local container="$1" remote_user required="nvim"
+  if [[ "${NVIM_NO_TMUX:-0}" != 1 ]]; then required="$required tmux"; fi
+  remote_user="$(devcontainer_json_value remoteUser || true)"
+  [[ -n "$remote_user" ]] || remote_user="$(docker inspect -f '{{.Config.User}}' "$container")"
+  [[ -n "$remote_user" ]] || remote_user=root
+
+  docker exec -u "$remote_user" "$container" sh -lc "
+    for command in $required; do command -v \"\$command\" >/dev/null || exit 127; done
+  " || die "the existing devcontainer must provide $required"
+}
+
 ensure_container_git_forge() {
   local container="$1" remote_user remote_home answer remote_url remote_host cli forge
   remote_user="$(devcontainer_json_value remoteUser || true)"
@@ -818,6 +830,22 @@ fi
 addr="$host:$port"
 
 sync_nvim_config_to_container "$container"
+if [[ "${NVIM_DEV_REMOTE_UI:-0}" != 1 ]]; then
+  check_container_editor_tools "$container"
+  info "container" "$container"
+  info "workspace" "$workspace"
+  ok "attach direct container editor"
+
+  tmux_user="$(devcontainer_json_value remoteUser || true)"
+  [[ -n "$tmux_user" ]] || tmux_user="$(docker inspect -f '{{.Config.User}}' "$container")"
+  [[ -n "$tmux_user" ]] || tmux_user=root
+  if [[ "${NVIM_NO_TMUX:-0}" == 1 ]]; then
+    exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" nvim .
+  fi
+  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" bash -ilc \
+    'exec python3 "$HOME/.config/nvim/bin/nvim-tmux" launch "$PWD"'
+fi
+
 ensure_container_tools "$container"
 ensure_container_git_forge "$container"
 copy_startup_log_to_container "$container"
