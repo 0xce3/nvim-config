@@ -1,4 +1,4 @@
-local function task_root()
+local function find_task_root()
   return require("config.vscode_debug").find_task_root()
 end
 
@@ -23,8 +23,7 @@ local function expand_vars(value, root)
   return require("config.vscode_debug").expand_vscode_vars(value, root)
 end
 
-local function pytest_args()
-  local root = task_root()
+local function pytest_args(root)
   local settings = read_vscode_settings(root)
   local args = settings["python.testing.pytestArgs"] or { "tests/system" }
   local test_root = vim.fs.joinpath(root, "tests", "system")
@@ -60,15 +59,33 @@ local function pytest_args()
   return result
 end
 
-local function python_path()
+local function python_path(root)
   local python_env = require("config.python_env")
-  local root = task_root()
   local settings = read_vscode_settings(root)
   local configured = expand_vars(settings["python.defaultInterpreterPath"], root)
   if configured and vim.fn.executable(configured) == 1 then
     return configured
   end
   return python_env.python(root)
+end
+
+local state = {}
+
+-- Neotest evaluates adapter callbacks from libuv fast events. Cache all values
+-- that require Vim API calls before starting a test, so those callbacks remain
+-- safe in that context.
+local function refresh_state()
+  local root = find_task_root()
+  state.root = root
+  state.python = python_path(root)
+  state.pytest_args = pytest_args(root)
+  state.test_root = vim.fs.joinpath(root, "tests", "system")
+  state.has_test_root = vim.fn.isdirectory(state.test_root) == 1
+  return state
+end
+
+local function task_root()
+  return state.root or refresh_state().root
 end
 
 local function is_under(path, root)
@@ -116,19 +133,23 @@ local function run_current_unit_test()
 end
 
 local function python_adapter()
+  refresh_state()
   local adapter = require("neotest-python")({
-    python = python_path,
+    python = function()
+      return state.python
+    end,
     pytest_discover_instances = true,
-    args = pytest_args,
+    args = function()
+      return state.pytest_args
+    end,
   })
-  local fallback_root = adapter.root
   adapter.root = function(path)
-    local root = task_root()
-    local test_root = root and vim.fs.joinpath(root, "tests", "system") or nil
-    if type(path) == "string" and root and test_root and vim.fn.isdirectory(test_root) == 1 and is_under(path, root) then
+    local root = state.root
+    local test_root = state.test_root
+    if type(path) == "string" and root and state.has_test_root and test_root and is_under(path, root) then
       return test_root
     end
-    return fallback_root(path)
+    return nil
   end
   return adapter
 end
@@ -144,9 +165,30 @@ return {
       "nvim-neotest/neotest-python",
     },
     keys = {
-      { "<leader>tn", function() require("neotest").run.run() end, desc = "Run nearest test" },
-      { "<leader>tf", function() require("neotest").run.run(vim.fn.expand("%")) end, desc = "Run test file" },
-      { "<leader>ta", function() require("neotest").run.run(task_root() .. "/tests/system") end, desc = "Run system tests" },
+      {
+        "<leader>tn",
+        function()
+          refresh_state()
+          require("neotest").run.run()
+        end,
+        desc = "Run nearest test",
+      },
+      {
+        "<leader>tf",
+        function()
+          refresh_state()
+          require("neotest").run.run(vim.fn.expand("%"))
+        end,
+        desc = "Run test file",
+      },
+      {
+        "<leader>ta",
+        function()
+          local root = refresh_state().root
+          require("neotest").run.run(root .. "/tests/system")
+        end,
+        desc = "Run system tests",
+      },
       { "<leader>to", function() require("neotest").output.open({ enter = true, auto_close = true }) end, desc = "Test output" },
       { "<leader>tp", function() require("neotest").summary.toggle() end, desc = "Test panel" },
       { "<leader>tx", function() require("neotest").run.stop() end, desc = "Stop test" },
