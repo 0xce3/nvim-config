@@ -42,6 +42,15 @@ return {
     -- customize language server configuration passed to `vim.lsp.config`
     -- client specific configuration can also go in `lsp/` in your configuration root (see `:h lsp-config`)
     config = {
+      pyright = {
+        root_dir = function(bufnr, on_dir)
+          local python_env = require("config.python_env")
+          on_dir(python_env.root(vim.api.nvim_buf_get_name(bufnr)))
+        end,
+        settings = {
+          python = { pythonPath = require("config.python_env").python() },
+        },
+      },
     },
     -- customize how language servers are attached
     handlers = {

@@ -36,6 +36,11 @@ local function pytest_args()
     elseif type(arg) == "string" and arg:sub(1, 1) ~= "-" and (arg == "tests/system" or arg == test_root) then
       -- Neotest appends the selected file/test itself. Keeping VS Code's
       -- positional test target here makes pytest receive duplicate targets.
+    elseif type(arg) == "string" and arg:match("^%-%-[^=]+-path=") then
+      -- Ignore stale absolute paths from a different host/container. The
+      -- project task or environment can still provide a valid path explicitly.
+      local value = arg:match("^[^=]+=([^=]+)$")
+      if value and vim.fn.filereadable(value) == 1 then table.insert(result, arg) end
     else
       table.insert(result, arg)
     end
@@ -56,13 +61,14 @@ local function pytest_args()
 end
 
 local function python_path()
+  local python_env = require("config.python_env")
   local root = task_root()
   local settings = read_vscode_settings(root)
   local configured = expand_vars(settings["python.defaultInterpreterPath"], root)
   if configured and vim.fn.executable(configured) == 1 then
     return configured
   end
-  return vim.fn.exepath("python3") ~= "" and vim.fn.exepath("python3") or "python3"
+  return python_env.python(root)
 end
 
 local function is_under(path, root)
