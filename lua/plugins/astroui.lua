@@ -58,6 +58,15 @@ local function project_header()
   }, "\n")
 end
 
+local function tabline_buffer_color(self)
+  local error_count = #vim.diagnostic.get(self.bufnr, {
+    severity = vim.diagnostic.severity.ERROR,
+  })
+  if error_count > 0 then return "#fb4934", true end
+  if vim.bo[self.bufnr].modified then return "#fe8019", false end
+  return require("astroui.status.hl").filetype_color(self).fg, false
+end
+
 return {
   {
   "AstroNvim/astroui",
@@ -95,26 +104,19 @@ return {
           hl = function(self)
             local active = self.tab_type == "buffer_active"
             local attributes = require("astroui.status.hl").get_attributes(self.tab_type)
-            local filetype_color = require("astroui.status.hl").filetype_color(self).fg
             if active then
               attributes.bg = "#3c3836"
               attributes.underline = true
               attributes.sp = "#fabd2f"
             end
-            if filetype_color then attributes.fg = filetype_color end
-            local error_count = #vim.diagnostic.get(self.bufnr, {
-              severity = vim.diagnostic.severity.ERROR,
-            })
-            if error_count > 0 then attributes.fg = "#fb4934"; attributes.bold = true end
-            if vim.bo[self.bufnr].modified then attributes.fg = "#fe8019"; attributes.bold = true end
+            attributes.fg, attributes.bold = tabline_buffer_color(self)
             return attributes
           end,
           close_button = {
             hl = function(self)
-              if self.tab_type == "buffer_active" then
-                return require("astroui.status.hl").filetype_color(self)
-              end
-              return require("astroui.status.hl").get_attributes(self.tab_type .. "_close")
+              local attributes = require("astroui.status.hl").get_attributes(self.tab_type .. "_close")
+              attributes.fg = tabline_buffer_color(self)
+              return attributes
             end,
           },
         },
