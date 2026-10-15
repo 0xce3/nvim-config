@@ -516,6 +516,9 @@ function M.pick_task()
   pickers
     .new({}, {
       prompt_title = "VS Code task",
+      -- Task selection is primarily keyboard navigation. Start in normal mode
+      -- so <Esc> closes the picker and `i` explicitly enables searching.
+      initial_mode = "normal",
       finder = make_finder(),
       sorter = conf.generic_sorter({}),
       attach_mappings = function(prompt_bufnr, map)
