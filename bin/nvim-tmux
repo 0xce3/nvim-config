@@ -24,14 +24,21 @@ def configure_window(target):
     for option, value in (
         ("automatic-rename", "off"),
         ("allow-rename", "off"),
-        ("window-status-format", " #I:#W "),
-        ("window-status-current-format", " #I:#W "),
-        ("window-status-current-style", "bg=#504945,fg=#ebdbb2,bold"),
     ):
         tmux("set-window-option", "-t", target, option, value)
+    # Remove settings left by an older launcher version so the session-wide
+    # Astro-inspired window style consistently applies to every tmux window.
+    for option in (
+        "window-status-format",
+        "window-status-current-format",
+        "window-status-current-style",
+    ):
+        tmux("set-window-option", "-t", target, "-u", option, check=False)
     name = tmux("display-message", "-p", "-t", target, "#{window_name}").stdout.strip()
     scrolling = name in ("bash", "tasks")
-    history = int(tmux("display-message", "-p", "-t", target, "#{history_size}").stdout.strip())
+    history = int(
+        tmux("display-message", "-p", "-t", target, "#{history_size}").stdout.strip()
+    )
     tmux(
         "set-window-option",
         "-t",
@@ -53,7 +60,11 @@ def configure_window(target):
 def update_scrollbars(session, previous):
     # pane-scrollbars is not a format option, so update it as history grows.
     result = tmux(
-        "list-panes", "-s", "-t", session, "-F",
+        "list-panes",
+        "-s",
+        "-t",
+        session,
+        "-F",
         "#{window_id}\t#{window_name}\t#{history_size}",
         check=False,
     )
@@ -67,7 +78,14 @@ def update_scrollbars(session, previous):
             windows[window] = windows.get(window, False) or int(history) > 0
     for window, visible in windows.items():
         if previous.get(window) != visible:
-            tmux("set-window-option", "-t", window, "pane-scrollbars", "on" if visible else "off", check=False)
+            tmux(
+                "set-window-option",
+                "-t",
+                window,
+                "pane-scrollbars",
+                "on" if visible else "off",
+                check=False,
+            )
     previous.clear()
     previous.update(windows)
 
@@ -159,6 +177,36 @@ def configure_lifecycle(session):
     )
 
 
+def configure_status(session):
+    """Render a Gruvbox/AstroNvim-inspired statusline at tmux's bottom edge."""
+    settings = (
+        ("status", "on"),
+        ("status-position", "bottom"),
+        ("status-justify", "centre"),
+        ("status-style", "bg=#282828,fg=#a89984"),
+        ("status-left-length", "40"),
+        ("status-right-length", "40"),
+        ("status-left", "#[fg=#83a598,bg=#3c3836,bold] 󰉋 #S #[fg=#3c3836,bg=#282828]"),
+        ("status-right", "#[fg=#282828,bg=#83a598]#[fg=#282828,bg=#83a598,bold] #H "),
+    )
+    for option, value in settings:
+        tmux("set-option", "-t", session, option, value)
+    tmux(
+        "set-window-option",
+        "-t",
+        session,
+        "window-status-format",
+        "#[fg=#928374,bg=#282828] #I:#W ",
+    )
+    tmux(
+        "set-window-option",
+        "-t",
+        session,
+        "window-status-current-format",
+        "#[fg=#282828,bg=#fabd2f,bold] #I:#W #[fg=#fabd2f,bg=#282828]",
+    )
+
+
 def launch(target):
     root = Path(target).resolve()
     session = "nvim-" + hashlib.sha256(str(root).encode()).hexdigest()[:12]
@@ -227,27 +275,6 @@ def launch(target):
         tmux("set-option", "-t", session, "base-index", "1")
         tmux("set-option", "-t", session, "history-limit", "50000")
         tmux("set-option", "-t", session, "renumber-windows", "off")
-        tmux("set-option", "-t", session, "status", "on")
-        tmux("set-option", "-t", session, "status-position", "top")
-        tmux("set-option", "-t", session, "status-left", "")
-        tmux("set-option", "-t", session, "status-right", "")
-        tmux("set-option", "-t", session, "status-justify", "left")
-        tmux("set-window-option", "-t", session, "window-status-format", " #I:#W ")
-        tmux(
-            "set-window-option",
-            "-t",
-            session,
-            "window-status-current-format",
-            " #I:#W ",
-        )
-        tmux("set-option", "-t", session, "status-style", "bg=#282828,fg=#a89984")
-        tmux(
-            "set-window-option",
-            "-t",
-            session,
-            "window-status-current-style",
-            "bg=#504945,fg=#ebdbb2,bold",
-        )
         tmux("set-window-option", "-t", f"{session}:1", "automatic-rename", "off")
         tmux("set-window-option", "-t", f"{session}:1", "allow-rename", "off")
         tmux(
@@ -311,6 +338,7 @@ def launch(target):
         configure_lifecycle(session)
     tmux("set-option", "-t", session, "mouse", "on")
     tmux("set-option", "-t", session, "history-limit", "50000")
+    configure_status(session)
     for index in tmux(
         "list-windows", "-t", session, "-F", "#{window_index}"
     ).stdout.splitlines():

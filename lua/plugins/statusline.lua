@@ -1,6 +1,32 @@
 -- Customize only the statusline tree. Do not modify AstroUI's shared status
 -- component defaults because the buffer tabline derives icons from them.
 local ports_cache = { updated = 0, values = {} }
+local tmux_windows_cache = { updated = 0, value = "" }
+
+local function tmux_windows()
+  local session = vim.env.NVIM_TMUX_SESSION
+  if not session or session == "" then return "" end
+
+  local now = vim.uv.now()
+  if now - tmux_windows_cache.updated < 1000 then return tmux_windows_cache.value end
+  tmux_windows_cache.updated = now
+
+  local lines = vim.fn.systemlist({ "tmux", "list-windows", "-t", session, "-F", "#{window_index}\t#{window_name}\t#{window_active}" })
+  if vim.v.shell_error ~= 0 then
+    tmux_windows_cache.value = ""
+    return ""
+  end
+
+  local windows = {}
+  for _, line in ipairs(lines) do
+    local index, name, active = line:match("^(%d+)\t([^\t]+)\t([01])$")
+    if index and name and active then
+      table.insert(windows, (active == "1" and "● " or "○ ") .. index .. ":" .. name)
+    end
+  end
+  tmux_windows_cache.value = table.concat(windows, "  ")
+  return tmux_windows_cache.value
+end
 
 local function forwarded_ports()
   local now = vim.uv.now()
@@ -74,6 +100,12 @@ return {
             end,
           },
         },
+      }
+      opts.statusline[7] = status.component.builder {
+        condition = function() return tmux_windows() ~= "" end,
+        { provider = function() return " " .. tmux_windows() .. " " end },
+        hl = { fg = "#83a598", bold = true },
+        surround = { separator = "both", color = "bg" },
       }
       table.insert(opts.statusline, 9, status.component.builder {
         condition = function()

@@ -90,7 +90,7 @@ class TmuxTest(unittest.TestCase):
             module.tmux(
                 "show-option", "-v", "-t", self.session, "status-position"
             ).stdout.strip(),
-            "top",
+            "bottom",
         )
         with (
             patch.object(module.os, "execvp", side_effect=Attached),
