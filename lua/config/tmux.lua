@@ -2,11 +2,14 @@
 local M = {}
 
 local function directory()
+  local bridge = vim.env.NVIM_TMUX_BRIDGE_DIR
+  if bridge and bridge ~= "" then return bridge end
+
   if vim.env.NVIM_DEV_REMOTE == "1" then
     local workspace = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
     return workspace and vim.fs.joinpath(workspace, ".git", "nvim-tmux")
   end
-  return vim.env.NVIM_TMUX_BRIDGE_DIR
+  return nil
 end
 
 function M.available()
