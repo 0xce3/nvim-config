@@ -2,6 +2,8 @@ return {
   {
     "stevearc/resession.nvim",
     init = function()
+      local cwd_before_session_load
+
       local function reload_blank_file_buffers()
         local reloaded = {}
         for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
@@ -45,11 +47,24 @@ return {
         desc = "Save last session before exit",
       })
       vim.api.nvim_create_autocmd("User", {
+        pattern = "ResessionLoadPre",
+        callback = function()
+          cwd_before_session_load = vim.fn.getcwd()
+        end,
+        desc = "Preserve the launch directory while loading a session",
+      })
+      vim.api.nvim_create_autocmd("User", {
         pattern = "ResessionLoadPost",
         callback = function()
-          local workspace = vim.env.NVIM_DEV_WORKSPACE
-          if vim.env.NVIM_DEV_REMOTE == "1" and workspace and vim.fn.isdirectory(workspace) == 1 then
-            vim.cmd.cd(workspace)
+          local workspace = cwd_before_session_load
+          cwd_before_session_load = nil
+          local remote_workspace = vim.env.NVIM_DEV_WORKSPACE
+          if vim.env.NVIM_DEV_REMOTE == "1" and remote_workspace and vim.fn.isdirectory(remote_workspace) == 1 then
+            workspace = remote_workspace
+          end
+          if workspace and vim.fn.isdirectory(workspace) == 1 then
+            vim.api.nvim_set_current_dir(workspace)
+            vim.cmd.tcd({ args = { workspace } })
           end
 
           vim.schedule(reload_blank_file_buffers)
