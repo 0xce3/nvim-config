@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import pty
+import shlex
 import signal
 import subprocess
 import sys
@@ -295,6 +296,29 @@ class TmuxTest(unittest.TestCase):
         finally:
             os.close(master)
             os.close(slave)
+
+    def test_directory_argument_preserves_requested_working_directory(self):
+        project = self.root / "project"
+        nested = project / "nested"
+        nested.mkdir(parents=True)
+        (project / ".git").mkdir()
+        output = self.root / "cwd"
+        executable = self.root / "nvim"
+        executable.write_text(f"#!/bin/sh\npwd > {shlex.quote(str(output))}\n")
+        executable.chmod(0o700)
+
+        subprocess.run(
+            ["bash", str(HELPER.parent / "nvim"), str(nested)],
+            check=True,
+            env=dict(
+                os.environ,
+                NVIM_NO_TMUX="1",
+                NVIM_REAL_BIN=str(executable),
+            ),
+            timeout=10,
+        )
+
+        self.assertEqual(output.read_text().strip(), str(nested))
 
     def test_ctrl_digit_sequences_select_windows_without_prefix(self):
         for index in range(3, 10):

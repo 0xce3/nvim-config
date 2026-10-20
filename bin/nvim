@@ -166,7 +166,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 if [[ "$#" -eq 1 && -d "$target" ]]; then
-  cd "${root:-$target}"
+  cd "$target"
   exec "$nvim_bin"
 fi
 
