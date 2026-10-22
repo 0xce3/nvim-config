@@ -857,6 +857,27 @@ if [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$container")" == host 
 fi
 if [[ "$direct_container_editor" == true ]]; then
   check_container_editor_tools "$container"
+  # Direct mode skips bootstrap_and_start_server(), which normally syncs lazy.nvim.
+  # The lockfile can be updated while the container still has the V1 plugin.
+  remote_user="$(devcontainer_json_value remoteUser || true)"
+  [[ -n "$remote_user" ]] || remote_user="$(docker inspect -f '{{.Config.User}}' "$container")"
+  [[ -n "$remote_user" ]] || remote_user=root
+  opencode_revision="$(python3 - "$HOME/.config/nvim/lazy-lock.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as lockfile:
+    print(json.load(lockfile)["opencode.nvim"]["commit"])
+PY
+)"
+  installed_revision="$(docker exec -u "$remote_user" "$container" sh -lc '
+    data="${XDG_DATA_HOME:-$HOME/.local/share}"
+    git -C "$data/nvim/lazy/opencode.nvim" rev-parse HEAD 2>/dev/null
+  ' || true)"
+  if [[ "$installed_revision" != "$opencode_revision" ]]; then
+    step "sync OpenCode plugin" "$opencode_revision"
+    docker exec -u "$remote_user" -w "$workspace" "$container" sh -lc \
+      "nvim --headless '+Lazy! sync' '+qa'" \
+      || die "failed to sync Neovim plugins in the devcontainer"
+  fi
   info "container" "$container"
   info "workspace" "$workspace"
   ok "prepare direct container editor"
