@@ -62,6 +62,14 @@ For local testing:
 
 Exact pinned versions live in `lazy-lock.json`.
 
+OpenCode V2: `<leader>oa` opens an ask for the current buffer (or visual
+selection) and sends it to the most recently updated session in the current
+project. The plugin discovers the local service through OpenCode's private
+`service.json`; it does not use the old fixed `OPENCODE_PORT`. For a
+host-networked devcontainer, `nvim-dev` copies this registration securely into
+the container and translates workspace paths to host paths. Restart Neovim
+after upgrading this configuration or restarting the OpenCode service.
+
 ## Devcontainer (Remote Workflow)
 
 Interactive `nvim` and `nvim .` starts first select the local or remote runtime,

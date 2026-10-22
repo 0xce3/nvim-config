@@ -411,7 +411,6 @@ export DEVCONTAINER=true
 export NVIM_DEV_HOST_ROOT=$(quote "$root")
 export NVIM_DEV_CONTAINER_WORKSPACE=$(quote "$workspace")
 export NVIM_TMUX_BRIDGE_DIR=$(quote "$workspace/.git/nvim-tmux")
-export OPENCODE_SERVER_URL=$(quote "${OPENCODE_SERVER_URL:-http://127.0.0.1:4096}")
 if [ -n $(quote "$remote_build_dir") ] && [ -f $(quote "$remote_build_dir/compile_commands.json") ]; then
   export NVIM_CLANGD_COMPILE_COMMANDS_DIR=$(quote "$remote_build_dir")
 fi
@@ -840,6 +839,22 @@ else
 fi
 
 sync_nvim_config_to_container "$container"
+if [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$container")" == host ]]; then
+  # OpenCode V2 registers its changing URL and password in this private file.
+  # Host-networked editors can use the same service if they have the registration.
+  opencode service status >/dev/null 2>&1 || true
+  registration="${XDG_STATE_HOME:-$HOME/.local/state}/opencode/service.json"
+  if [[ -f "$registration" ]]; then
+    remote_user="$(devcontainer_json_value remoteUser || true)"
+    [[ -n "$remote_user" ]] || remote_user="$(docker inspect -f '{{.Config.User}}' "$container")"
+    [[ -n "$remote_user" ]] || remote_user=root
+    remote_state="$(docker exec -u "$remote_user" "$container" sh -lc 'printf %s "${XDG_STATE_HOME:-$HOME/.local/state}"')"
+    docker exec -u "$remote_user" "$container" mkdir -p "$remote_state/opencode"
+    docker cp "$registration" "$container:$remote_state/opencode/service.json"
+    docker exec -u root "$container" chown "$(docker exec -u "$remote_user" "$container" id -u):$(docker exec -u "$remote_user" "$container" id -g)" "$remote_state/opencode/service.json"
+    docker exec -u "$remote_user" "$container" chmod 600 "$remote_state/opencode/service.json"
+  fi
+fi
 if [[ "$direct_container_editor" == true ]]; then
   check_container_editor_tools "$container"
   info "container" "$container"
@@ -1053,9 +1068,9 @@ if [[ "$direct_container_editor" == true ]]; then
   [[ -n "$tmux_user" ]] || tmux_user="$(docker inspect -f '{{.Config.User}}' "$container")"
   [[ -n "$tmux_user" ]] || tmux_user=root
   if [[ "${NVIM_NO_TMUX:-0}" == 1 ]]; then
-    exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" nvim .
+    exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" NVIM_DEV_HOST_ROOT="$root" nvim .
   fi
-  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" bash -ilc \
+  exec docker exec -it -u "$tmux_user" -w "$workspace" "$container" env TERM="${TERM:-xterm-256color}" COLORTERM=truecolor NVIM_DEV_REMOTE=1 NVIM_DEV_WORKSPACE="$workspace" NVIM_DEV_CONTAINER_WORKSPACE="$workspace" NVIM_DEV_HOST_ROOT="$root" bash -ilc \
     'exec python3 "$HOME/.config/nvim/bin/nvim-tmux" launch "$PWD"'
 fi
 

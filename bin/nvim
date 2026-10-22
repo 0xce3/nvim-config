@@ -143,12 +143,6 @@ fi
 update_config
 root="$(project_root || true)"
 
-if [[ -n "$root" && -z "${OPENCODE_PORT:-}" ]]; then
-  root_hash="$(printf '%s' "$root" | cksum | awk '{print $1}')"
-  export OPENCODE_PORT=$((4100 + root_hash % 10000))
-  export OPENCODE_SERVER_URL="http://127.0.0.1:${OPENCODE_PORT}"
-fi
-
 if [[ ( "$#" -gt 0 || "$start_tmux" == true ) && -n "$root" && -z "${NVIM_WRAPPER_BYPASS:-}" ]] && has_devcontainer "$root"; then
   mode="$(choose_mode)" || exit "$?"
   if [[ "$mode" == "remote" ]]; then

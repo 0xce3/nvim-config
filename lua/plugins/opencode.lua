@@ -1,21 +1,11 @@
 return {
   {
     "nickjvandyke/opencode.nvim",
-    version = "*",
     dependencies = { "folke/snacks.nvim" },
     keys = {
       { "<leader>oa", function() require("opencode").ask("@buffer: ") end, mode = "n", desc = "Ask opencode about buffer" },
       { "<leader>oa", function() require("opencode").ask("@this: ") end, mode = "x", desc = "Ask opencode about selection" },
       { "<leader>oo", function() require("opencode").select() end, mode = { "n", "x" }, desc = "Select opencode action" },
-      { "<leader>on", function() require("opencode").command("session.new") end, desc = "New opencode session" },
-      { "<leader>os", function() require("opencode").command("session.select") end, desc = "Select opencode session" },
-      { "<leader>ou", function() require("opencode").command("session.undo") end, desc = "Undo opencode change" },
-      { "<leader>or", function() require("opencode").command("session.redo") end, desc = "Redo opencode change" },
-      { "<leader>oi", function() require("opencode").command("session.interrupt") end, desc = "Interrupt opencode" },
-      { "<leader>op", function() require("opencode").command("prompt.submit") end, desc = "Submit opencode prompt" },
-      { "<leader>oc", function() require("opencode").command("prompt.clear") end, desc = "Clear opencode prompt" },
-      { "<leader>oU", function() require("opencode").command("session.half.page.up") end, desc = "Scroll opencode up" },
-      { "<leader>oD", function() require("opencode").command("session.half.page.down") end, desc = "Scroll opencode down" },
       { "go", function() return require("opencode").operator("@this ") end, mode = { "n", "x" }, expr = true, desc = "Add range to opencode" },
       { "goo", function() return require("opencode").operator("@this ") .. "_" end, mode = { "n", "x" }, expr = true, desc = "Add line to opencode" },
     },
@@ -34,12 +24,40 @@ return {
       local function format_mapped(context, opts)
         local path = mapped_path(opts.buf or context.buf)
         if path == "" then return nil end
-        return require("opencode").format({ path = path, from = opts.from, to = opts.to, rel = context.server.cwd })
+        local cwd = vim.fn.getcwd()
+        local container_root = vim.env.NVIM_DEV_CONTAINER_WORKSPACE
+        local host_root = vim.env.NVIM_DEV_HOST_ROOT
+        if container_root and host_root then
+          container_root = container_root:gsub("/$", "")
+          if cwd == container_root or cwd:sub(1, #container_root + 1) == container_root .. "/" then
+            cwd = host_root:gsub("/$", "") .. cwd:sub(#container_root + 1)
+          end
+        end
+        return require("opencode").format({ path = path, from = opts.from, to = opts.to, rel = cwd })
+      end
+
+      -- The V2 service stores sessions under the host project directory, not
+      -- the devcontainer mount path. Keep session lookup aligned with @buffer.
+      if vim.env.NVIM_DEV_CONTAINER_WORKSPACE and vim.env.NVIM_DEV_HOST_ROOT then
+        local server = require("opencode.server")
+        server.get_sessions = function(self)
+          local cwd = vim.fn.getcwd()
+          local container_root = vim.env.NVIM_DEV_CONTAINER_WORKSPACE:gsub("/$", "")
+          local host_root = vim.env.NVIM_DEV_HOST_ROOT:gsub("/$", "")
+          if cwd ~= container_root and cwd:sub(1, #container_root + 1) ~= container_root .. "/" then
+            return require("opencode.promise").reject("OpenCode: directory is outside the devcontainer workspace")
+          end
+          local directory = host_root .. cwd:sub(#container_root + 1)
+          local path = "/api/session?directory=" .. vim.uri_encode(directory) .. "&order=desc&parentID=null"
+          return self:request(path, "GET"):next(function(response)
+            return require("opencode.promise").resolve(response and response.data or {})
+          end)
+        end
       end
 
       vim.g.opencode_opts = {
         server = {
-          url = vim.env.OPENCODE_SERVER_URL or (vim.env.DEVCONTAINER and "http://127.0.0.1:4096" or nil),
+          url = vim.env.OPENCODE_SERVER_URL,
           start = false,
         },
         contexts = {
