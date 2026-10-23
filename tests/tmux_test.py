@@ -85,7 +85,7 @@ class TmuxTest(unittest.TestCase):
                 "-F",
                 "#{window_index}:#{window_name}",
             ).stdout.splitlines(),
-            ["1:nvim", "2:bash"],
+            ["1:nvim", "2:tasks", "3:bash"],
         )
         self.assertEqual(
             module.tmux(
@@ -150,6 +150,24 @@ class TmuxTest(unittest.TestCase):
             self.assertRaises(Attached),
         ):
             module.launch(str(self.root))
+        module.tmux(
+            "swap-window", "-d", "-s", f"{self.session}:2", "-t", f"{self.session}:3"
+        )
+        with (
+            patch.object(module.os, "execvp", side_effect=Attached),
+            self.assertRaises(Attached),
+        ):
+            module.launch(str(self.root))
+        self.assertEqual(
+            module.tmux(
+                "list-windows",
+                "-t",
+                self.session,
+                "-F",
+                "#{window_index}:#{window_name}",
+            ).stdout.splitlines(),
+            ["1:nvim", "2:tasks", "3:bash"],
+        )
         self.assertEqual(
             len(
                 module.tmux(
@@ -321,7 +339,7 @@ class TmuxTest(unittest.TestCase):
         self.assertEqual(output.read_text().strip(), str(nested))
 
     def test_ctrl_digit_sequences_select_windows_without_prefix(self):
-        for index in range(3, 10):
+        for index in range(4, 10):
             module.tmux("new-window", "-d", "-t", f"{self.session}:{index}", "sleep 60")
         master, slave = pty.openpty()
         process = subprocess.Popen(
@@ -357,17 +375,17 @@ class TmuxTest(unittest.TestCase):
             "respawn-window",
             "-k",
             "-t",
-            f"{self.session}:2",
+            f"{self.session}:3",
             "bash --noprofile --norc -i",
         )
-        module.tmux("select-window", "-t", f"{self.session}:2")
+        module.tmux("select-window", "-t", f"{self.session}:3")
         marker = self.root / "arrow-history"
         command = (
             "HISTFILE=/dev/null; "
             "for n in {1..300}; do printf 'scroll line %s\\n' \"$n\"; done; "
             f"history -s \"printf arrow-up > '{marker}'\""
         )
-        module.tmux("send-keys", "-t", f"{self.session}:2", command, "Enter")
+        module.tmux("send-keys", "-t", f"{self.session}:3", command, "Enter")
         master, slave = pty.openpty()
         process = subprocess.Popen(
             ["tmux", "attach-session", "-t", self.session],
@@ -379,7 +397,7 @@ class TmuxTest(unittest.TestCase):
 
         def pane_value(field):
             return module.tmux(
-                "display-message", "-p", "-t", f"{self.session}:2", "#{" + field + "}"
+                "display-message", "-p", "-t", f"{self.session}:3", "#{" + field + "}"
             ).stdout.strip()
 
         def wait_until(predicate):

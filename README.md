@@ -74,8 +74,8 @@ after upgrading this configuration or restarting the OpenCode service.
 
 Interactive `nvim` and `nvim .` starts first select the local or remote runtime,
 then use a project-specific tmux session there. The tmux window bar is at the top;
-AstroNvim's statusline stays at the bottom. Windows are `1:nvim`, `2:bash`, and
-`3:tasks` (created on the first task).
+AstroNvim's statusline stays at the bottom. Windows are `1:nvim`, `2:tasks`, and
+`3:bash`.
 The existing local/remote choice appears before tmux starts. In remote mode,
 tmux, its Neovim UI client, Bash, and tasks run in the selected container.
 Local mode uses host Bash and host tasks. Python environment activation follows
@@ -83,7 +83,7 @@ the shell startup configuration and the task's existing environment setup.
 
 Use `Ctrl+1`, `Ctrl+2`, or `Ctrl+3` to select a window. `<leader>tb` switches
 from Neovim to Bash, and `<leader>tj` / F12 selects the task window. Task results
-continue to update the AstroNvim statusline. Tasks start in window 3 without
+continue to update the AstroNvim statusline. Tasks start in window 2 without
 changing the active window; switch there manually when needed. Window 0 is not
 used, and windows 4 through 9 are available for additional shells or tools.
 Interactive Neovim task-buffer diagnostic navigation applies only to the

@@ -194,7 +194,7 @@ end
 
 function M.toggle()
   if require("config.tmux").available() then
-    require("config.tmux").select(3)
+    require("config.tmux").select(2)
     return
   end
   local current = vim.api.nvim_get_current_buf()
@@ -229,7 +229,7 @@ function M.run(command, label)
   local tmux = require("config.tmux")
   if tmux.available() then
     if state.task_running then
-      vim.notify("A task is already running in tmux window 3", vim.log.levels.WARN)
+      vim.notify("A task is already running in tmux window 2", vim.log.levels.WARN)
       return
     end
     state.task_running = true
