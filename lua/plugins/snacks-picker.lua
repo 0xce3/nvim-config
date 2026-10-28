@@ -9,6 +9,12 @@ return {
       opts.explorer.trash = true
       opts.picker = opts.picker or {}
       opts.picker.sources = opts.picker.sources or {}
+      opts.picker.sources.explorer = opts.picker.sources.explorer or {}
+      -- Close the sidebar as soon as focus moves to another window.
+      opts.picker.sources.explorer.auto_close = true
+      -- Browsing should show everything: dotfiles and gitignored trees too.
+      opts.picker.sources.explorer.hidden = true
+      opts.picker.sources.explorer.ignored = true
       opts.picker.sources.files = opts.picker.sources.files or {}
       -- Keep the frequent file picker fast. Hidden/generated trees such as
       -- .west_workspace and build caches are available through <C-P>.
