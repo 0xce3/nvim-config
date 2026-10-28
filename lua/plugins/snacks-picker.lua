@@ -6,7 +6,9 @@ return {
       opts.explorer = opts.explorer or {}
       opts.explorer.enabled = true
       opts.explorer.replace_netrw = true
-      opts.explorer.trash = true
+      -- `gio trash` fails on container/overlay mounts ("system internal mounts"),
+      -- and snacks treats that as a hard error instead of falling back to delete.
+      opts.explorer.trash = false
       opts.picker = opts.picker or {}
       opts.picker.sources = opts.picker.sources or {}
       opts.picker.sources.explorer = opts.picker.sources.explorer or {}
