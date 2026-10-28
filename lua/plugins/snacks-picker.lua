@@ -2,6 +2,11 @@ return {
   {
     "folke/snacks.nvim",
     opts = function(_, opts)
+      -- Tree-style browsing of the cwd. The files picker stays fuzzy/recursive.
+      opts.explorer = opts.explorer or {}
+      opts.explorer.enabled = true
+      opts.explorer.replace_netrw = true
+      opts.explorer.trash = true
       opts.picker = opts.picker or {}
       opts.picker.sources = opts.picker.sources or {}
       opts.picker.sources.files = opts.picker.sources.files or {}

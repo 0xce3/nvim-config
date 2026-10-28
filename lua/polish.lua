@@ -57,8 +57,10 @@ vim.keymap.set("n", "<leader>gL", function()
   require("config.lazygit").open()
 end, { desc = "Open lazygit float" })
 
-vim.keymap.set("n", "<leader>e", "<Cmd>Yazi cwd<CR>", { desc = "Open yazi" })
-pcall(vim.keymap.del, "n", "<leader>E")
+vim.keymap.set("n", "<leader>e", function()
+  require("snacks").explorer()
+end, { desc = "Open explorer" })
+vim.keymap.set("n", "<leader>E", "<Cmd>Yazi cwd<CR>", { desc = "Open yazi" })
 
 vim.keymap.set("n", "<leader>gg", function()
   require("gitgraph").draw({}, { all = true, max_count = 5000 })
