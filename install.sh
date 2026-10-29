@@ -555,26 +555,66 @@ nvim_binary() {
   printf '%s\n' "$nvim_bin"
 }
 
+# Headless Neovim must never be able to stall the installer forever.
+nvim_headless() {
+  local limit="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    run timeout "$limit" "$(nvim_binary)" --headless "$@"
+  else
+    run "$(nvim_binary)" --headless "$@"
+  fi
+}
+
 sync_plugins() {
   step "Lazy sync" "install/update plugins"
-  run "$(nvim_binary)" --headless '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
+  nvim_headless 30m '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
 }
 
 install_mason_packages() {
   step "Mason packages" "language servers, formatters, linters"
-  # Lazy sync starts the Mason installs asynchronously and headless Neovim
-  # exits before they finish. The Sync command blocks until they are done.
-  run "$(nvim_binary)" --headless '+MasonToolsInstallSync' '+qa' \
+  # mason-tool-installer already installs on VimEnter. MasonToolsInstallSync
+  # would race with that run and wait for a callback that never arrives, so
+  # wait for the completion event instead. The autocommand is registered with
+  # --cmd, before the configuration loads, so the event cannot be missed.
+  nvim_headless 40m \
+    --cmd "lua vim.g.nvim_config_mason_done = false; vim.api.nvim_create_autocmd('User', { pattern = 'MasonToolsUpdateCompleted', callback = function() vim.g.nvim_config_mason_done = true end })" \
+    -c "lua vim.wait(2100000, function() return vim.g.nvim_config_mason_done end, 500)" \
+    -c 'qa!' \
     || warn "Mason package install failed" "run :MasonToolsInstall manually"
 }
 
 build_treesitter_parsers() {
   step "Treesitter parsers" "build locally for this system"
   # TSInstall returns before the parsers are compiled, so wait on the handle.
-  run "$(nvim_binary)" --headless -c \
-    "lua require('nvim-treesitter').install({'bash','c','http','lua','luap','markdown','markdown_inline','python','query','vim','vimdoc','yaml'}, { force = true }):wait(900000)" \
+  nvim_headless 30m -c \
+    "lua require('nvim-treesitter').install({'bash','c','http','lua','luap','markdown','markdown_inline','python','query','vim','vimdoc','yaml'}, { force = true }):wait(1500000)" \
     -c 'qa' \
     || warn "Treesitter parser build failed" "run :TSInstall <language> after fixing the compiler"
+}
+
+verify_editor_tools() {
+  step "verify editor tools" "Mason binaries and Treesitter parsers"
+  [[ "$dry_run" -eq 1 ]] && return 0
+
+  local mason_bin="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/mason/bin"
+  local parser_dir="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/parser"
+  local tool missing=()
+
+  for tool in clangd lua-language-server stylua; do
+    [[ -e "$mason_bin/$tool" ]] || missing+=("Mason tool $tool")
+  done
+  for tool in lua vim vimdoc c python; do
+    [[ -e "$parser_dir/$tool.so" ]] || missing+=("Treesitter parser $tool")
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    ok "editor tools verified" "Mason and Treesitter are complete"
+    return 0
+  fi
+  for tool in "${missing[@]}"; do
+    warn "missing" "$tool"
+    unmet_requirements+=("$tool was not installed")
+  done
 }
 
 script_dir() {
@@ -676,6 +716,7 @@ main() {
   sync_plugins
   install_mason_packages
   build_treesitter_parsers
+  verify_editor_tools
 
   if [[ "${#unmet_requirements[@]}" -gt 0 ]]; then
     local requirement
