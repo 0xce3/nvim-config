@@ -26,11 +26,33 @@ opencode auth login
 
 The installer is idempotent, so running it again updates an existing machine.
 
+### Behind a TLS-inspecting proxy
+
+Corporate networks often terminate TLS with their own root certificate. Without
+it in the system trust store the Neovim PPA and several downloads fail, which
+previously left the machine with an older Neovim and no Bun. The installer now
+checks the trust store up front and can import the certificates for you:
+
+```sh
+NVIM_EXTRA_CA_DIR=/path/to/certificates ./install.sh
+```
+
+The directory has to contain the root and intermediate certificates as `.crt`
+files. They are machine-specific and are deliberately not part of this
+repository. Copy them from a working machine:
+
+```sh
+cp /usr/local/share/ca-certificates/*.crt /path/to/certificates/
+```
+
+If the trust check fails the installer says so, keeps going, and exits with a
+summary of everything that stayed unmet instead of reporting success.
+
 ### What the installer sets up
 
 | Area | Contents |
 |------|----------|
-| Editor | Neovim 0.12+, this configuration, Lazy plugin sync, local Treesitter parsers |
+| Editor | Neovim 0.12+, this configuration, Lazy plugin sync, Mason language servers and formatters, locally built Treesitter parsers |
 | OpenCode | `opencode` binary, [agent crew configuration](https://github.com/0xce3/opencode-agent-crew) in `~/.config/opencode`, plugin runtime, gitleaks pre-commit hook |
 | Terminal | tmux 3.6 (built from source for native pane scrollbars), fzf, ripgrep, fd, bat, yazi, chafa |
 | Containers | Docker, `docker` group membership, devcontainer CLI, rootless Podman for agent container profiles |
