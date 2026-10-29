@@ -6,11 +6,49 @@ LSP (`clangd`, `pyright`, `ruff`), and a Gruvbox Soft Dark theme.
 
 The leader key is Space.
 
-## Restore
+## Restore on a fresh WSL
+
+One command restores the whole host workflow — Neovim, the OpenCode agent
+configuration, tmux, the container tooling, and the shell environment:
+
+```sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"
+```
+
+Then restart the shell and sign in to the services:
+
+```sh
+exec bash
+gh auth login
+glab auth login            # only for GitLab remotes
+opencode auth login
+```
+
+The installer is idempotent, so running it again updates an existing machine.
+
+### What the installer sets up
+
+| Area | Contents |
+|------|----------|
+| Editor | Neovim 0.12+, this configuration, Lazy plugin sync, local Treesitter parsers |
+| OpenCode | `opencode` binary, [agent crew configuration](https://github.com/0xce3/opencode-agent-crew) in `~/.config/opencode`, plugin runtime, gitleaks pre-commit hook |
+| Terminal | tmux 3.6 (built from source for native pane scrollbars), fzf, ripgrep, fd, bat, yazi, chafa |
+| Containers | Docker, `docker` group membership, devcontainer CLI, rootless Podman for agent container profiles |
+| Language tools | pyright, ruff, clang-format, a C compiler, Node, Python |
+| Git | git, lazygit, GitHub CLI, GitLab CLI, gitleaks, jq |
+| Shell | `~/.local/bin`, `~/.opencode/bin`, and `~/.bun/bin` on `PATH` via a managed block in `~/.bashrc` |
+| Wrappers | `nvim`, `nvim-dev`, and `opencode` in `~/.local/bin` |
+
+Existing configurations are never overwritten in place: `~/.config/nvim` and
+`~/.config/opencode` are moved to a timestamped backup before a fresh clone.
+Your OpenCode session credentials (`service.json`) and the local repair ticket
+database survive that backup.
+
+### Manual restore
 
 ```sh
 git clone https://github.com/0xce3/nvim-config.git ~/.config/nvim
-nvim
+~/.config/nvim/install.sh
 ```
 
 `lazy.nvim` bootstraps itself on first start and installs the configured plugins.
@@ -21,27 +59,27 @@ nvim
   `python3`, `node`/`npm`, a C compiler, `make`, Docker, and a Nerd Font for
   icons. Treesitter parsers are compiled locally for the host system.
 
+  The installer provides all of these. Only the Nerd Font has to be installed
+  in your Windows terminal.
+
 **Devcontainer:** Toolchain (clangd, cmake, gcc, ninja, …) – defined in your
   project's `.devcontainer/devcontainer.json` / Dockerfile.
 
   nvim on the host connects remotely to the devcontainer for LSP, builds,
   and debugging. The host itself does not need the toolchain.
 
-## One-command install
+## Installer options
 
 ```sh
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/0xce3/nvim-config/main/install.sh)"
+./install.sh --dry-run        # print every planned action, change nothing
+./install.sh --yes            # accept all install prompts
+./install.sh --skip-packages  # configuration only, no package installs
 ```
 
-The installer detects the package manager, installs host packages (nvim, git,
-ripgrep, fd, node, python, gh, lazygit), backs up an existing `~/.config/nvim`
-when needed, clones this repo, and runs Lazy plugin sync.
-
-For local testing:
+Verify the installer and helper scripts:
 
 ```sh
-./install.sh --dry-run
-./install.sh --skip-packages
+bash tests/install_test.sh
 ```
 
 ## Core Plugins

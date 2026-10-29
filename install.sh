@@ -25,8 +25,9 @@ usage() {
   cat <<'USAGE'
 Usage: ./install.sh [--dry-run] [--yes] [--skip-packages]
 
-Installs the host-side Neovim workflow: packages, wrappers, language tools,
-and plugins. Dev toolchains stay in each project's devcontainer.
+Installs the host-side Neovim and OpenCode workflow: packages, wrappers,
+language tools, plugins, the OpenCode agent configuration, and the shell
+environment. Dev toolchains stay in each project's devcontainer.
 
 Options:
   --dry-run        Print planned actions without changing the system.
@@ -146,12 +147,16 @@ pkg_name() {
     apt:gcc|apt:make) printf 'build-essential' ;;
     apt:convert) printf 'imagemagick' ;;
     apt:gs) printf 'ghostscript' ;;
+    apt:glab) printf 'glab' ;;
+    apt:jq) printf 'jq' ;;
+    apt:podman) printf 'podman' ;;
     dnf:rg) printf 'ripgrep' ;;
     dnf:fd) printf 'fd-find' ;;
     dnf:node) printf 'nodejs' ;;
     dnf:pip3) printf 'python3-pip' ;;
     dnf:convert) printf 'ImageMagick' ;;
     dnf:gs) printf 'ghostscript' ;;
+    dnf:glab) printf 'glab' ;;
     dnf:gcc) printf 'gcc' ;;
     dnf:make) printf 'make' ;;
     pacman:python3) printf 'python' ;;
@@ -313,6 +318,94 @@ install_opencode() {
   fi
 }
 
+install_opencode_config() {
+  step "OpenCode configuration" "agents, commands, plugins, theme"
+  run bash "$config_dir/bin/install-opencode-config"
+}
+
+install_bun() {
+  step "install Bun" "OpenCode plugin runtime"
+  if command -v bun >/dev/null 2>&1 || [[ -x "$HOME/.bun/bin/bun" ]]; then
+    ok "bun" "installed"
+    return 0
+  fi
+  if [[ "$skip_packages" -eq 1 ]]; then
+    warn "bun missing" "skipped"
+    return 0
+  fi
+  [[ "$(prompt_action "Install Bun from the official installer?")" == install ]] || {
+    warn "skipped" "bun"
+    return 0
+  }
+  if [[ "$dry_run" -eq 1 ]]; then
+    run curl -fsSL https://bun.sh/install
+    return 0
+  fi
+  curl -fsSL https://bun.sh/install | bash || warn "bun install failed" "run curl -fsSL https://bun.sh/install | bash manually"
+  export BUN_INSTALL="$HOME/.bun"
+  export PATH="$BUN_INSTALL/bin:$PATH"
+  command -v bun >/dev/null 2>&1 && ok "bun" "$(bun --version)"
+}
+
+install_gitleaks_github() {
+  command -v gitleaks >/dev/null 2>&1 && { ok "gitleaks" "installed"; return 0; }
+  [[ -x "$HOME/.local/bin/gitleaks" ]] && { ok "gitleaks" "installed"; return 0; }
+  [[ "$skip_packages" -eq 1 ]] && { warn "gitleaks missing" "skipped"; return 0; }
+  [[ "$(prompt_action "Install gitleaks from GitHub release?")" == install ]] || { warn "skipped" "gitleaks"; return 0; }
+  [[ "$dry_run" -eq 1 ]] && { run curl -fsSL https://github.com/gitleaks/gitleaks/releases/latest; return 0; }
+
+  local tmp arch version
+  tmp="$(mktemp -d)"
+  case "$(uname -m)" in
+    x86_64|amd64) arch=x64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) fail "unsupported architecture" "$(uname -m)"; rm -rf "$tmp"; return 1 ;;
+  esac
+  version="$(python3 -c 'import json, urllib.request; print(json.load(urllib.request.urlopen("https://api.github.com/repos/gitleaks/gitleaks/releases/latest", timeout=20))["tag_name"].lstrip("v"))')" || {
+    warn "gitleaks lookup failed" "install it manually"; rm -rf "$tmp"; return 0
+  }
+  if curl -fsSL -o "$tmp/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_${arch}.tar.gz"; then
+    tar -C "$tmp" -xf "$tmp/gitleaks.tar.gz" gitleaks
+    mkdir -p "$HOME/.local/bin"
+    install -m 0755 "$tmp/gitleaks" "$HOME/.local/bin/gitleaks"
+    ok "gitleaks installed" "$version"
+  else
+    warn "gitleaks download failed" "install it manually"
+  fi
+  rm -rf "$tmp"
+}
+
+install_devcontainer_cli() {
+  step "devcontainer CLI" "nvim-dev container workflow"
+  if command -v devcontainer >/dev/null 2>&1; then
+    ok "devcontainer" "installed"
+    return 0
+  fi
+  if [[ "$skip_packages" -eq 1 ]]; then
+    warn "devcontainer CLI missing" "skipped"
+    return 0
+  fi
+  if command -v npm >/dev/null 2>&1; then
+    as_root npm install -g @devcontainers/cli \
+      || warn "devcontainer CLI install failed" "nvim-dev falls back to npx -y @devcontainers/cli"
+  else
+    warn "npm missing" "devcontainer CLI skipped"
+  fi
+}
+
+install_rootless_podman() {
+  step "rootless Podman" "OpenCode agent container profiles"
+  if [[ "$skip_packages" -eq 1 ]]; then
+    warn "podman setup skipped" "--skip-packages"
+    return 0
+  fi
+  ensure_command "$manager" podman "" "sandboxed agent containers"
+  if [[ "$manager" == apt ]]; then
+    install_system_packages apt slirp4netns fuse-overlayfs uidmap \
+      || warn "rootless Podman dependencies failed" "install slirp4netns fuse-overlayfs uidmap manually"
+  fi
+}
+
 configure_docker_access() {
   command -v docker >/dev/null 2>&1 || return 0
   getent group docker >/dev/null 2>&1 || return 0
@@ -360,6 +453,11 @@ install_media_tools() {
   else
     ok "mmdc" "installed"
   fi
+}
+
+install_shell_env() {
+  step "shell environment" "PATH for wrappers, OpenCode, Bun"
+  run bash "$config_dir/bin/install-shell-env"
 }
 
 sync_plugins() {
@@ -458,17 +556,26 @@ main() {
   ensure_command "$manager" docker "" "devcontainer workflow"
   configure_docker_access
   ensure_command "$manager" gh "" "GitHub integration"
+  ensure_command "$manager" glab "" "GitLab integration"
+  ensure_command "$manager" jq "" "JSON processing in scripts and hooks"
 
   install_lazygit_github
   install_yazi_github
+  install_gitleaks_github
+  install_bun
   install_opencode
+  install_opencode_config
+  install_devcontainer_cli
+  install_rootless_podman
   install_wrappers
+  install_shell_env
   install_language_tools
   install_media_tools
   sync_plugins
   build_treesitter_parsers
 
-  ok "setup complete" "open a project and run: nvim ."
+  ok "setup complete" "restart the shell, then run: nvim ."
+  info "authenticate" "gh auth login · glab auth login · opencode auth login"
 }
 
 main "$@"

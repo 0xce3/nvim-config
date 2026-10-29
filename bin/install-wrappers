@@ -22,9 +22,23 @@ SH
 chmod +x "$user_bin/nvim" "$user_bin/nvim-dev" "$user_bin/opencode"
 
 opencode_config="$HOME/.config/opencode"
-mkdir -p "$opencode_config/themes"
-install -m 0644 "$HOME/.config/nvim/opencode/tui.json" "$opencode_config/tui.json"
-install -m 0644 "$HOME/.config/nvim/opencode/themes/gruvbox-soft-dark.json" "$opencode_config/themes/gruvbox-soft-dark.json"
+
+# The OpenCode agent crew repository tracks the theme itself. Only seed the
+# files when the configuration is not managed by that repository, otherwise
+# the install would fight the checkout.
+opencode_tracks() {
+  [[ -d "$opencode_config/.git" ]] || return 1
+  git -C "$opencode_config" ls-files --error-unmatch "$1" >/dev/null 2>&1
+}
+
+if opencode_tracks tui.json && opencode_tracks themes/gruvbox-soft-dark.json; then
+  printf 'opencode theme is managed by %s\n' "$opencode_config"
+else
+  mkdir -p "$opencode_config/themes"
+  opencode_tracks tui.json || install -m 0644 "$HOME/.config/nvim/opencode/tui.json" "$opencode_config/tui.json"
+  opencode_tracks themes/gruvbox-soft-dark.json \
+    || install -m 0644 "$HOME/.config/nvim/opencode/themes/gruvbox-soft-dark.json" "$opencode_config/themes/gruvbox-soft-dark.json"
+  printf 'installed opencode theme to %s\n' "$opencode_config"
+fi
 
 printf 'installed nvim wrappers to %s\n' "$user_bin"
-printf 'installed opencode theme to %s\n' "$opencode_config"

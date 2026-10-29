@@ -19,7 +19,25 @@ assert_contains() {
 
 bash -n "$install_script"
 bash -n "$repo_root/bin/nvim-download" "$repo_root/bin/nvim-open" "$repo_root/bin/nvim-git-editor" "$repo_root/bin/nvim-dev"
+bash -n "$repo_root/bin/install-wrappers" "$repo_root/bin/install-shell-env" "$repo_root/bin/install-opencode-config"
 python3 -c 'compile(open(__import__("sys").argv[1], encoding="utf-8").read(), __import__("sys").argv[1], "exec")' "$repo_root/bin/nvim-port-relay"
+
+for required_script in bin/install-shell-env bin/install-opencode-config bin/install-wrappers; do
+  [[ -x "$repo_root/$required_script" ]] || fail "$required_script is executable"
+done
+
+shell_env_dir="$(mktemp -d)"
+printf 'export EXISTING=1\n' > "$shell_env_dir/.bashrc"
+NVIM_SHELL_PROFILE="$shell_env_dir/.bashrc" "$repo_root/bin/install-shell-env" >/dev/null
+NVIM_SHELL_PROFILE="$shell_env_dir/.bashrc" "$repo_root/bin/install-shell-env" >/dev/null
+[[ "$(grep -c '>>> nvim-config managed block >>>' "$shell_env_dir/.bashrc")" -eq 1 ]] \
+  || fail "shell env block is written exactly once"
+grep -q 'export EXISTING=1' "$shell_env_dir/.bashrc" || fail "shell env keeps existing profile content"
+shell_env_path="$(env -i HOME="$shell_env_dir" PATH=/usr/bin:/bin bash -ic 'printf %s "$PATH"' 2>/dev/null)"
+[[ "$shell_env_path" == "$shell_env_dir/.local/bin:"* ]] || fail "user bin directory takes PATH precedence"
+[[ "$shell_env_path" == *"$shell_env_dir/.opencode/bin"* ]] || fail "OpenCode bin directory is on PATH"
+[[ "$shell_env_path" == *"$shell_env_dir/.bun/bin"* ]] || fail "Bun bin directory is on PATH"
+rm -rf "$shell_env_dir"
 
 download_test_dir="$(mktemp -d)"
 printf 'pdf fixture\n' > "$download_test_dir/manual.pdf"
@@ -57,6 +75,13 @@ assert_contains "$dry_run_output" "pyright"
 assert_contains "$dry_run_output" "ruff"
 assert_contains "$dry_run_output" "host dependencies"
 assert_contains "$dry_run_output" "install wrappers"
+assert_contains "$dry_run_output" "OpenCode configuration"
+assert_contains "$dry_run_output" "install-opencode-config"
+assert_contains "$dry_run_output" "shell environment"
+assert_contains "$dry_run_output" "install-shell-env"
+assert_contains "$dry_run_output" "devcontainer CLI"
+assert_contains "$dry_run_output" "rootless Podman"
+assert_contains "$dry_run_output" "Bun"
 
 apt_path="$(mktemp -d)"
 trap 'rm -rf "$apt_path"' EXIT
@@ -119,5 +144,14 @@ blocked_pattern="$(IFS='|'; printf '%s' "${blocked_terms[*]}")"
 if grep -RniE "$blocked_pattern" "$repo_root/install.sh" "$repo_root/README.md" "$repo_root/bin"; then
   fail "non-neutral terms found"
 fi
+
+# A fresh system must be able to restore the OpenCode configuration.
+opencode_config_script="$repo_root/bin/install-opencode-config"
+grep -q 'opencode-agent-crew' "$opencode_config_script" || fail "OpenCode config repository is referenced"
+grep -q 'core.hooksPath' "$opencode_config_script" || fail "OpenCode git hooks are enabled"
+grep -q '@opencode-ai/plugin' "$opencode_config_script" || fail "OpenCode plugin runtime is installed"
+for preserved in service.json ensemble.db; do
+  grep -q "$preserved" "$opencode_config_script" || fail "$preserved is preserved across re-clone"
+done
 
 printf 'install_test.sh: ok\n'

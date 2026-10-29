@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Restores ~/.config/opencode from the agent crew repository and installs the
+# plugin runtime dependencies that the repository intentionally does not track.
+
+repo_url="${OPENCODE_CONFIG_REPO:-https://github.com/0xce3/opencode-agent-crew.git}"
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+plugin_package="${OPENCODE_PLUGIN_PACKAGE:-@opencode-ai/plugin}"
+
+if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
+  c_reset=$'\033[0m' c_dim=$'\033[2m' c_green=$'\033[32m'
+  c_yellow=$'\033[33m' c_blue=$'\033[34m' c_red=$'\033[31m' c_bold=$'\033[1m'
+else
+  c_reset= c_dim= c_green= c_yellow= c_blue= c_red= c_bold=
+fi
+
+log() { printf '%b\n' "$*"; }
+step() { log "${c_blue}▸${c_reset} ${c_bold}$1${c_reset}${2:+ ${c_dim}$2${c_reset}}"; }
+ok() { log "${c_green}✓${c_reset} $1${2:+ ${c_dim}$2${c_reset}}"; }
+warn() { log "${c_yellow}!${c_reset} $1${2:+ ${c_dim}$2${c_reset}}"; }
+die() { log "${c_red}✗${c_reset} ${c_bold}install-opencode-config:${c_reset} $*"; exit 1; }
+
+command -v git >/dev/null 2>&1 || die "git is required"
+
+# Session credentials and the local repair ticket database are machine state.
+# They must survive a re-clone of the configuration.
+local_state=(service.json ensemble.db ensemble.db-shm ensemble.db-wal)
+
+preserve_local_state() {
+  local source_dir="$1" name
+  preserved_dir=""
+  for name in "${local_state[@]}"; do
+    if [[ -e "$source_dir/$name" ]]; then
+      [[ -n "$preserved_dir" ]] || preserved_dir="$(mktemp -d)"
+      cp -a "$source_dir/$name" "$preserved_dir/$name"
+    fi
+  done
+}
+
+restore_local_state() {
+  local name
+  [[ -n "${preserved_dir:-}" ]] || return 0
+  for name in "${local_state[@]}"; do
+    [[ -e "$preserved_dir/$name" ]] || continue
+    cp -a "$preserved_dir/$name" "$config_dir/$name"
+  done
+  rm -rf "$preserved_dir"
+  preserved_dir=""
+  ok "restored local state" "service.json, repair ticket database"
+}
+
+clone_fresh() {
+  if [[ -e "$config_dir" ]]; then
+    local backup_dir="${config_dir}.backup.$(date +%Y%m%d%H%M%S)"
+    warn "existing OpenCode config found" "moving to $backup_dir"
+    preserve_local_state "$config_dir"
+    mv "$config_dir" "$backup_dir"
+  fi
+  mkdir -p "$(dirname "$config_dir")"
+  git clone "$repo_url" "$config_dir"
+  restore_local_state
+}
+
+step "OpenCode config" "$config_dir"
+if [[ -d "$config_dir/.git" ]]; then
+  current_url="$(git -C "$config_dir" remote get-url origin 2>/dev/null || true)"
+  if [[ "$current_url" != "$repo_url" ]]; then
+    warn "different remote" "${current_url:-none} != $repo_url"
+    clone_fresh
+  elif [[ -n "$(git -C "$config_dir" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+    warn "local changes present" "skipping pull, keeping your working tree"
+  elif git -C "$config_dir" pull --ff-only --quiet; then
+    ok "updated" "$(git -C "$config_dir" rev-parse --short HEAD)"
+  else
+    warn "could not fast-forward" "resolve $config_dir manually"
+  fi
+else
+  clone_fresh
+  ok "cloned" "$(git -C "$config_dir" rev-parse --short HEAD)"
+fi
+
+# The pre-commit hook runs gitleaks against staged changes.
+step "git hooks" "gitleaks pre-commit"
+git -C "$config_dir" config core.hooksPath .githooks
+if [[ -d "$config_dir/.githooks" ]]; then
+  chmod +x "$config_dir"/.githooks/* 2>/dev/null || true
+fi
+[[ -d "$config_dir/scripts" ]] && { chmod +x "$config_dir"/scripts/* 2>/dev/null || true; }
+ok "hooks enabled" "core.hooksPath=.githooks"
+
+# package.json is deliberately untracked so the repository carries no lockfile
+# for a machine-local runtime. Recreate it, then resolve the current plugin SDK.
+step "plugin runtime" "$plugin_package"
+if [[ ! -f "$config_dir/package.json" ]]; then
+  cat > "$config_dir/package.json" <<'JSON'
+{
+  "dependencies": {}
+}
+JSON
+fi
+
+installed_plugin_version() {
+  [[ -f "$config_dir/node_modules/$plugin_package/package.json" ]] || return 1
+  python3 - "$config_dir/node_modules/$plugin_package/package.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle).get("version", ""))
+PY
+}
+
+install_dependencies() {
+  if command -v bun >/dev/null 2>&1; then
+    (cd "$config_dir" && bun add "$plugin_package@latest")
+  elif [[ -x "$HOME/.bun/bin/bun" ]]; then
+    (cd "$config_dir" && "$HOME/.bun/bin/bun" add "$plugin_package@latest")
+  elif command -v npm >/dev/null 2>&1; then
+    (cd "$config_dir" && npm install --no-fund --no-audit "$plugin_package@latest")
+  else
+    return 1
+  fi
+}
+
+if install_dependencies; then
+  ok "plugin runtime ready" "$plugin_package $(installed_plugin_version || printf 'installed')"
+else
+  warn "no bun or npm found" "run: cd $config_dir && npm install $plugin_package"
+fi
+
+if [[ -f "$config_dir/service.json" ]]; then
+  chmod 600 "$config_dir/service.json"
+fi
+
+ok "OpenCode config installed" "$config_dir"

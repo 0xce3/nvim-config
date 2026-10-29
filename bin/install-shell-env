@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keeps the interactive shell able to find the wrappers, OpenCode, and Bun.
+# The block is rewritten in place on every run, so repeated installs never
+# duplicate entries and never touch the rest of the file.
+
+begin_marker='# >>> nvim-config managed block >>>'
+end_marker='# <<< nvim-config managed block <<<'
+
+profile="${NVIM_SHELL_PROFILE:-$HOME/.bashrc}"
+
+block="$(cat <<'BLOCK'
+# >>> nvim-config managed block >>>
+# Managed by ~/.config/nvim/bin/install-shell-env. Manual edits are replaced.
+nvim_config_prepend_path() {
+  case ":${PATH}:" in
+    *":$1:"*) ;;
+    *) PATH="$1${PATH:+:$PATH}" ;;
+  esac
+}
+
+export BUN_INSTALL="$HOME/.bun"
+nvim_config_prepend_path "$HOME/.bun/bin"
+nvim_config_prepend_path "$HOME/.opencode/bin"
+nvim_config_prepend_path "$HOME/.local/bin"
+export PATH
+
+unset -f nvim_config_prepend_path
+# <<< nvim-config managed block <<<
+BLOCK
+)"
+
+if [[ ! -e "$profile" ]]; then
+  mkdir -p "$(dirname "$profile")"
+  : > "$profile"
+fi
+
+if grep -qxF "$begin_marker" "$profile"; then
+  NVIM_SHELL_BLOCK="$block" python3 - "$profile" "$begin_marker" "$end_marker" <<'PY'
+import os
+import sys
+
+profile, begin, end = sys.argv[1], sys.argv[2], sys.argv[3]
+block = os.environ["NVIM_SHELL_BLOCK"].rstrip("\n")
+
+with open(profile, encoding="utf-8") as handle:
+    lines = handle.read().split("\n")
+
+out, skipping, replaced = [], False, False
+for line in lines:
+    if not skipping and line == begin:
+        skipping = True
+        out.extend(block.split("\n"))
+        replaced = True
+        continue
+    if skipping:
+        if line == end:
+            skipping = False
+        continue
+    out.append(line)
+
+if skipping:
+    raise SystemExit(f"{profile}: managed block is missing its end marker")
+if not replaced:
+    raise SystemExit(f"{profile}: managed block start marker vanished")
+
+with open(profile, "w", encoding="utf-8") as handle:
+    handle.write("\n".join(out))
+PY
+  printf 'updated managed shell block in %s\n' "$profile"
+else
+  printf '\n%s\n' "$block" >> "$profile"
+  printf 'added managed shell block to %s\n' "$profile"
+fi
