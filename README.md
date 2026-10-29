@@ -54,7 +54,7 @@ summary of everything that stayed unmet instead of reporting success.
 |------|----------|
 | Editor | Neovim 0.12+, this configuration, Lazy plugin sync, Mason language servers and formatters, locally built Treesitter parsers |
 | OpenCode | `opencode` binary, [agent crew configuration](https://github.com/0xce3/opencode-agent-crew) in `~/.config/opencode`, plugin runtime, gitleaks pre-commit hook |
-| Terminal | tmux 3.6 (built from source for native pane scrollbars), fzf, ripgrep, fd, bat, yazi, chafa |
+| Terminal | tmux 3.6 (built from source for native pane scrollbars), fzf, ripgrep, fd, bat, chafa |
 | Containers | Docker, `docker` group membership, devcontainer CLI, rootless Podman for agent container profiles |
 | Language tools | pyright, ruff, clang-format, a C compiler, Node, Python |
 | Git | git, lazygit, GitHub CLI, GitLab CLI, gitleaks, jq |
@@ -205,7 +205,7 @@ Container lifecycle and attach logic lives in `bin/nvim` and `bin/nvim-dev`.
 | Key | Action |
 |-----|--------|
 | `<leader>w` | Save file |
-| `<leader>e` | Yazi in a floating window |
+| `<leader>e` | Snacks explorer |
 | `<leader>x` / `<leader>X` | Close buffer / force close buffer; also closes terminal buffers |
 | `<Tab>` / `<S-Tab>` | Open buffer picker / previous listed buffer |
 | `<leader>gg` | Fugitive Git status |
