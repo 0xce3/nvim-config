@@ -6,6 +6,7 @@ config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
 dry_run=0
 yes=0
 skip_packages=0
+unmet_requirements=()
 
 if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
   c_reset=$'\033[0m'
@@ -228,10 +229,84 @@ ensure_command() {
     install)
       package="$(pkg_name "$manager" "$cmd")"
       install_system_packages "$manager" "$package" || true
+      [[ "$dry_run" -eq 1 ]] && return 0
+
+      # A package manager can report success and still deliver an older
+      # build, for example when a third-party repository is unreachable.
+      if ! command_available "$cmd"; then
+        warn "$cmd still missing" "$reason"
+        unmet_requirements+=("$cmd is not installed ($reason)")
+        return 0
+      fi
+      current="$(command_version "$cmd" || true)"
+      if [[ -n "$min_version" && -n "$current" ]] && ! version_ge "$current" "$min_version"; then
+        warn "$cmd still too old" "$current < $min_version"
+        unmet_requirements+=("$cmd $current is older than $min_version ($reason)")
+      else
+        ok "$cmd" "${current:-installed}"
+      fi
       ;;
     skip) warn "skipped" "$cmd" ;;
     *) fail "aborted" "$cmd required for $reason"; exit 1 ;;
   esac
+}
+
+# The installer downloads from several HTTPS origins. A TLS-inspecting proxy
+# without its root certificate in the system trust store makes those downloads
+# fail in ways that look like unrelated errors, so check the trust store first.
+check_tls_trust() {
+  step "TLS trust" "verifying HTTPS downloads work"
+  if [[ "$dry_run" -eq 1 ]]; then
+    info "skipped in dry run" "TLS probe"
+    return 0
+  fi
+
+  local endpoint status untrusted=()
+  for endpoint in https://github.com https://ppa.launchpadcontent.net https://bun.sh; do
+    status=0
+    curl -sS --max-time 20 -o /dev/null "$endpoint" 2>/dev/null || status=$?
+    # 35 SSL connect error, 60 certificate not verified, 77 CA store unreadable.
+    case "$status" in
+      35|60|77) untrusted+=("$endpoint") ;;
+    esac
+  done
+
+  if [[ "${#untrusted[@]}" -eq 0 ]]; then
+    ok "TLS trust" "all download origins verified"
+    return 0
+  fi
+
+  fail "TLS certificate verification failed" "${untrusted[*]}"
+  warn "a TLS-inspecting proxy is in the way" "its root certificate is not trusted here"
+  info "install the certificates, then re-run" "NVIM_EXTRA_CA_DIR=/path/to/certs ./install.sh"
+  unmet_requirements+=("TLS trust is incomplete for: ${untrusted[*]}")
+}
+
+# Corporate root certificates cannot live in a public repository. Point
+# NVIM_EXTRA_CA_DIR at a local directory holding the .crt files instead.
+install_extra_ca_certificates() {
+  local source_dir="${NVIM_EXTRA_CA_DIR:-}"
+  [[ -n "$source_dir" ]] || return 0
+
+  step "extra CA certificates" "$source_dir"
+  if [[ ! -d "$source_dir" ]]; then
+    warn "certificate directory not found" "$source_dir"
+    return 0
+  fi
+
+  local certificate found=0
+  for certificate in "$source_dir"/*.crt; do
+    [[ -f "$certificate" ]] || continue
+    as_root install -m 0644 "$certificate" "/usr/local/share/ca-certificates/$(basename "$certificate")"
+    found=$((found + 1))
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    warn "no .crt files found" "$source_dir"
+    return 0
+  fi
+  as_root update-ca-certificates
+  ok "installed CA certificates" "$found file(s)"
 }
 
 install_lazygit_github() {
@@ -539,6 +614,9 @@ main() {
   manager="$(detect_package_manager)"
   info "Package manager" "$manager"
 
+  install_extra_ca_certificates
+  check_tls_trust
+
   step "host dependencies" "checking commands and versions"
   ensure_command "$manager" git "" "clone and update plugins"
   ensure_command "$manager" curl "" "download installers and releases"
@@ -578,6 +656,16 @@ main() {
   install_media_tools
   sync_plugins
   build_treesitter_parsers
+
+  if [[ "${#unmet_requirements[@]}" -gt 0 ]]; then
+    local requirement
+    fail "setup incomplete" "${#unmet_requirements[@]} requirement(s) not satisfied"
+    for requirement in "${unmet_requirements[@]}"; do
+      warn "unmet" "$requirement"
+    done
+    info "fix the above, then re-run" "./install.sh"
+    return 1
+  fi
 
   ok "setup complete" "restart the shell, then run: nvim ."
   info "authenticate" "gh auth login · glab auth login · opencode auth login"
