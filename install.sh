@@ -548,22 +548,33 @@ install_shell_env() {
   run bash "$config_dir/bin/install-shell-env"
 }
 
-sync_plugins() {
-  step "Lazy sync" "install/update plugins"
+nvim_binary() {
   local nvim_bin
   nvim_bin="$(command -v nvim 2>/dev/null || true)"
   [[ -n "$nvim_bin" ]] || nvim_bin="/usr/local/bin/nvim"
-  run "$nvim_bin" --headless '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
+  printf '%s\n' "$nvim_bin"
+}
+
+sync_plugins() {
+  step "Lazy sync" "install/update plugins"
+  run "$(nvim_binary)" --headless '+Lazy! sync' '+qa' || warn "Lazy sync failed" "run :Lazy sync manually"
+}
+
+install_mason_packages() {
+  step "Mason packages" "language servers, formatters, linters"
+  # Lazy sync starts the Mason installs asynchronously and headless Neovim
+  # exits before they finish. The Sync command blocks until they are done.
+  run "$(nvim_binary)" --headless '+MasonToolsInstallSync' '+qa' \
+    || warn "Mason package install failed" "run :MasonToolsInstall manually"
 }
 
 build_treesitter_parsers() {
   step "Treesitter parsers" "build locally for this system"
-  local nvim_bin
-  nvim_bin="$(command -v nvim 2>/dev/null || true)"
-  [[ -n "$nvim_bin" ]] || nvim_bin="/usr/local/bin/nvim"
-  run "$nvim_bin" --headless \
-    '+TSInstall! lua' '+TSInstall! yaml' '+TSInstall! vim' '+TSInstall! http' '+qa' \
-    || warn "Treesitter parser build failed" "run :TSInstallSync! <language> after fixing the compiler"
+  # TSInstall returns before the parsers are compiled, so wait on the handle.
+  run "$(nvim_binary)" --headless -c \
+    "lua require('nvim-treesitter').install({'bash','c','http','lua','luap','markdown','markdown_inline','python','query','vim','vimdoc','yaml'}, { force = true }):wait(900000)" \
+    -c 'qa' \
+    || warn "Treesitter parser build failed" "run :TSInstall <language> after fixing the compiler"
 }
 
 script_dir() {
@@ -663,6 +674,7 @@ main() {
   install_language_tools
   install_media_tools
   sync_plugins
+  install_mason_packages
   build_treesitter_parsers
 
   if [[ "${#unmet_requirements[@]}" -gt 0 ]]; then
