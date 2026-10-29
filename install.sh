@@ -196,10 +196,18 @@ command_version() {
 command_available() {
   local cmd="$1"
   local resolved
-  if [[ "$cmd" == "fd" ]]; then
-    command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1
-    return $?
-  fi
+  # Debian and Ubuntu ship these under a different binary name. The installer
+  # links the expected name into ~/.local/bin later on.
+  case "$cmd" in
+    fd)
+      command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1
+      return $?
+      ;;
+    bat)
+      command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1
+      return $?
+      ;;
+  esac
   resolved="$(command -v "$cmd" 2>/dev/null || true)"
   [[ -n "$resolved" && "$resolved" != /mnt/c/* ]]
 }

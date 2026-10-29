@@ -394,6 +394,9 @@ def launch(target):
     ).stdout.splitlines():
         configure_window(f"{session}:{index}")
     configure_keys()
+    # A session interrupted before this flag was set keeps its editor pane
+    # blocked in the readiness loop, so every later attach shows a blank pane.
+    tmux("set-option", "-t", session, "@nvim_ready", "1")
     if os.environ.get("TMUX"):
         tmux("switch-client", "-t", session)
     else:
