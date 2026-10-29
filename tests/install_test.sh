@@ -145,6 +145,10 @@ if grep -RniE "$blocked_pattern" "$repo_root/install.sh" "$repo_root/README.md" 
   fail "non-neutral terms found"
 fi
 
+# The OpenCode configuration targets OpenCode 2, not the 1.x installer.
+grep -q 'opencode.ai/v2/install' "$install_script" || fail "OpenCode 2 installer endpoint is used"
+grep -q 'opencode_major_version' "$install_script" || fail "the installed OpenCode major version is verified"
+
 # A fresh system must be able to restore the OpenCode configuration.
 opencode_config_script="$repo_root/bin/install-opencode-config"
 grep -q 'opencode-agent-crew' "$opencode_config_script" || fail "OpenCode config repository is referenced"

@@ -374,30 +374,56 @@ install_wrappers() {
   fi
 }
 
+opencode_version() {
+  local binary="$1" raw
+  raw="$("$binary" --version 2>/dev/null | head -n 1)" || return 1
+  raw="${raw##* }"
+  printf '%s' "${raw#v}"
+}
+
+opencode_major_version() {
+  local version
+  version="$(opencode_version "$1")" || return 1
+  printf '%s' "${version%%.*}"
+}
+
 install_opencode() {
   step "install OpenCode" "AI coding assistant"
+  # The configuration in ~/.config/opencode targets OpenCode 2: the v2 CLI
+  # schema, the background service, and the plugin API. The installer at
+  # opencode.ai/install still serves the 1.x line, so use the v2 endpoint.
+  local installer="${OPENCODE_INSTALLER:-https://opencode.ai/v2/install}"
   local binary="$HOME/.opencode/bin/opencode"
-  if [[ -x "$binary" ]]; then
-    ok "opencode" "installed"
+  local major=""
+
+  [[ -x "$binary" ]] && major="$(opencode_major_version "$binary" || true)"
+  if [[ "$major" == 2 ]]; then
+    ok "opencode" "v$(opencode_version "$binary")"
     return 0
   fi
+  [[ -n "$major" ]] && warn "opencode v$(opencode_version "$binary") is too old" "the configuration requires OpenCode 2"
+
   if [[ "$skip_packages" -eq 1 ]]; then
     warn "opencode missing" "skipped"
     return 0
   fi
-  [[ "$(prompt_action "Install OpenCode from the official installer?")" == install ]] || {
+  [[ "$(prompt_action "Install OpenCode 2 from the official installer?")" == install ]] || {
     warn "skipped" "opencode"
     return 0
   }
   if [[ "$dry_run" -eq 1 ]]; then
-    run curl -fsSL https://opencode.ai/install
-  else
-    curl -fsSL https://opencode.ai/install | bash
+    run curl -fsSL "$installer"
+    return 0
   fi
-  if [[ -x "$binary" ]]; then
-    ok "opencode" "installed"
+
+  curl -fsSL "$installer" | bash || true
+  major=""
+  [[ -x "$binary" ]] && major="$(opencode_major_version "$binary" || true)"
+  if [[ "$major" == 2 ]]; then
+    ok "opencode" "v$(opencode_version "$binary")"
   else
-    warn "opencode install failed" "run curl -fsSL https://opencode.ai/install | bash manually"
+    warn "opencode 2 install failed" "run curl -fsSL $installer | bash manually"
+    unmet_requirements+=("OpenCode 2 is not installed (the configuration requires it)")
   fi
 }
 
