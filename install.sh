@@ -409,17 +409,22 @@ install_rootless_podman() {
 configure_docker_access() {
   command -v docker >/dev/null 2>&1 || return 0
   getent group docker >/dev/null 2>&1 || return 0
-  id -nG "$USER" | tr ' ' '\n' | grep -qx docker && return 0
+
+  # USER is not exported by every shell that can run this installer.
+  local account
+  account="${USER:-$(id -un)}"
+
+  id -nG "$account" | tr ' ' '\n' | grep -qx docker && return 0
 
   if [[ "$skip_packages" -eq 1 ]]; then
-    warn "docker group membership skipped" "run: sudo usermod -aG docker $USER"
+    warn "docker group membership skipped" "run: sudo usermod -aG docker $account"
     return 0
   fi
-  [[ "$(prompt_action "Add $USER to the docker group for rootless Docker access?")" == install ]] || {
-    warn "docker group membership skipped" "run: sudo usermod -aG docker $USER"
+  [[ "$(prompt_action "Add $account to the docker group for rootless Docker access?")" == install ]] || {
+    warn "docker group membership skipped" "run: sudo usermod -aG docker $account"
     return 0
   }
-  as_root usermod -aG docker "$USER"
+  as_root usermod -aG docker "$account"
   ok "docker group membership added" "restart WSL before using docker without sudo"
 }
 
