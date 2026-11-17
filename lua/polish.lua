@@ -43,6 +43,13 @@ vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/site")
 -- below for the system clipboard so OSC52 cannot shadow the unnamed register.
 vim.opt.clipboard = ""
 vim.keymap.set("n", "q", "<Nop>", { desc = "Disable macro recording" })
+-- Also reject recording started by another mapping or :normal! so completion
+-- cannot stay disabled behind the unmapped stop key.
+vim.api.nvim_create_autocmd("RecordingEnter", {
+  group = vim.api.nvim_create_augroup("DisableMacroRecording", { clear = true }),
+  callback = function() vim.cmd.normal({ args = { "q" }, bang = true }) end,
+  desc = "Immediately stop macro recording",
+})
 
 vim.keymap.set("v", "<C-c>", '"+y', { desc = "Copy selection to system clipboard" })
 vim.keymap.set("n", "<C-v>", '"+p', { desc = "Paste from system clipboard" })
