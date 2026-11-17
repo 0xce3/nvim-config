@@ -36,6 +36,7 @@ vim.keymap.set("t", "<C-q>", [[<C-\><C-n>]], { silent = true, desc = "Leave term
 -- Line motions on keys that are directly accessible on German layouts.
 vim.keymap.set({ "n", "x", "o" }, "ö", "^", { desc = "First non-blank character" })
 vim.keymap.set({ "n", "x", "o" }, "ä", "$", { desc = "End of line" })
+vim.keymap.set("n", "4", "$", { desc = "End of line" })
 
 vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/site")
 
@@ -115,16 +116,6 @@ vim.env.GIT_SEQUENCE_EDITOR = git_editor
 -- host; the global config removes GCC-only flags that clangd cannot parse.
 pcall(function() require("config.clangd_config").ensure() end)
 require("config.skeleton").setup()
-
-vim.api.nvim_create_user_command("LspRestart", function()
-  local clients = vim.lsp.get_clients({ bufnr = 0 })
-  for _, client in ipairs(clients) do
-    client:stop(true)
-  end
-  vim.defer_fn(function()
-    if vim.api.nvim_buf_is_valid(0) then vim.cmd("edit") end
-  end, 100)
-end, { desc = "Restart LSP clients for the current buffer" })
 
 vim.api.nvim_create_user_command("LspInfo", function()
   local lines = {}
