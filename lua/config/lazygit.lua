@@ -31,6 +31,10 @@ local function with_config(opts, args)
       "  edit: bash " .. editor .. " {{filename}}",
       "  editAtLine: bash " .. editor .. " {{filename}} {{line}}",
       "  editInTerminal: false",
+      "keybinding:",
+      "  commits:",
+      "    moveUpCommit: [<ctrl+k>, <ctrl+up>]",
+      "    moveDownCommit: [<ctrl+j>, <ctrl+down>]",
     }, config_file)
     if not ok then
       vim.notify(err, vim.log.levels.ERROR, { title = "lazygit" })
